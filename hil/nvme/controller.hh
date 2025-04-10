@@ -23,6 +23,7 @@
 #define __HIL_NVME_CONTROLLER__
 
 #include <list>
+#include <limits>
 #include <unordered_map>
 
 #include "hil/nvme/abstract_subsystem.hh"
