@@ -138,7 +138,7 @@ void CPU::Core::addStat(InstStat &inst) {
 CPU::CPU(ConfigReader &c) : conf(c), lastResetStat(0) {
   clockSpeed = conf.readUint(CONFIG_CPU, CPU_CLOCK);
   clockPeriod = 1000000000000. / clockSpeed;  // in pico-seconds
-
+  
   hilCore.resize(conf.readUint(CONFIG_CPU, CPU_CORE_HIL));
   iclCore.resize(conf.readUint(CONFIG_CPU, CPU_CORE_ICL));
   ftlCore.resize(conf.readUint(CONFIG_CPU, CPU_CORE_FTL));

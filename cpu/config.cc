@@ -30,12 +30,14 @@ const char NAME_CLOCK[] = "ClockSpeed";
 const char NAME_CORE_HIL[] = "HILCoreCount";
 const char NAME_CORE_ICL[] = "ICLCoreCount";
 const char NAME_CORE_FTL[] = "FTLCoreCount";
+const char NAME_BINARY_PATH[] = "BinaryPath";
 
 Config::Config() {
   clock = 400000000;
   hilCore = 1;
   iclCore = 1;
   ftlCore = 1;
+  binary_path = "";
 }
 
 bool Config::setConfig(const char *name, const char *value) {
@@ -52,6 +54,9 @@ bool Config::setConfig(const char *name, const char *value) {
   }
   else if (MATCH_NAME(NAME_CORE_FTL)) {
     ftlCore = (uint32_t)strtoul(value, nullptr, 10);
+  }
+  else if (MATCH_NAME(NAME_BINARY_PATH)) {
+    binary_path = value;
   }
   else {
     ret = false;
@@ -85,6 +90,16 @@ uint64_t Config::readUint(uint32_t idx) {
   }
 
   return ret;
+}
+
+std::string Config::readString(uint32_t idx) {
+    std::string ret;
+    if (idx == CPU_BINARY_PATH) {
+      ret = binary_path;
+    } else {
+      ret = "";
+    }
+    return ret;
 }
 
 }  // namespace CPU

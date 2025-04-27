@@ -23,6 +23,7 @@
 #define __CPU_CONFIG__
 
 #include "sim/base_config.hh"
+#include <string>
 
 namespace SimpleSSD {
 
@@ -33,6 +34,7 @@ typedef enum {
   CPU_CORE_HIL,
   CPU_CORE_ICL,
   CPU_CORE_FTL,
+  CPU_BINARY_PATH,
 } CPU_CONFIG;
 
 class Config : public BaseConfig {
@@ -40,7 +42,8 @@ class Config : public BaseConfig {
   uint64_t clock;    //!< Default: 400MHz
   uint32_t hilCore;  //!< Default: 1
   uint32_t iclCore;  //!< Default: 1
-  uint32_t ftlCore;  //!< Default: 1
+  uint32_t ftlCore;  //!< Default: 1=
+  std::string binary_path; //!< Default: ""
 
  public:
   Config();
@@ -49,6 +52,7 @@ class Config : public BaseConfig {
   void update() override;
 
   uint64_t readUint(uint32_t) override;
+  std::string readString(uint32_t) override;
 };
 
 }  // namespace CPU
