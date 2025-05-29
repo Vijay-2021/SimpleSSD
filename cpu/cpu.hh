@@ -144,6 +144,8 @@ class CPU : public StatObject {
   void getStatValues(std::vector<double> &) override;
   void resetStatValues() override;
   void startCSD();
+  void stopCSD();
+  void initCSD();
   void intCSDFS();
   void printLastStat();
 };

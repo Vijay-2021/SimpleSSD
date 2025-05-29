@@ -45,7 +45,7 @@ const uint32_t lbaSize[nLBAFormat] = {
     4096,  // 4KB
 };
 
-Subsystem::Subsystem(Controller *ctrl, CPU *cpu, ConfigData &cfg)
+Subsystem::Subsystem(Controller *ctrl, CPU::CPU *cpu, ConfigData &cfg)
     : AbstractSubsystem(ctrl, cfg),
       pHIL(nullptr),
       pCPU(cpu),

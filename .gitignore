@@ -11,6 +11,11 @@ Release/
 x64/
 .vscode/
 
+#riscv_emulator 
+*.o
+cpu/riscv_em/build/
+cpu/riscv_em/riscv_em
+
 # CMake Specific
 CMakeCache.txt
 CMakeFiles

@@ -139,7 +139,7 @@ class OpenChannelSSD12 : public Subsystem {
   void physicalPageRead(SQEntryWrapper &, RequestFunction &);
 
  public:
-  OpenChannelSSD12(Controller *, CPU::CPU cpu, ConfigData &);
+  OpenChannelSSD12(Controller *, CPU::CPU *cpu, ConfigData &);
   ~OpenChannelSSD12();
 
   void init() override;
