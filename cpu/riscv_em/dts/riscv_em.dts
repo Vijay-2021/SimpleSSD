@@ -1,0 +1,90 @@
+/dts-v1/;
+/ {
+    #address-cells = <2>;
+    #size-cells = <2>;
+    compatible = "riscv-virtio";
+    model = "riscv-virtio,qemu";
+
+    chosen {
+        bootargs = "root=/dev/vda ro console=ttySU0";
+        stdout-path = "/uart@3000000";
+    };
+
+    cpus {
+        #address-cells = <1>;
+        #size-cells = <0>;
+        timebase-frequency = <10000000>;
+
+        cpu0: cpu@0 {
+            device_type = "cpu";
+            reg = <0>;
+            compatible = "riscv";
+            riscv,isa = "rv64ima";
+            mmu-type = "none";
+            clock-frequency = <10000000>;
+            cpu0_intc: interrupt-controller {
+                #address-cells = <1>;
+                #interrupt-cells = <1>;
+                compatible = "riscv,cpu-intc";
+                interrupt-controller;
+            };
+        };
+    };
+
+    /* Make sure these adresses and sizes match the actual
+    configuration in src/core/riscv_config.h */
+    sram: memory@80000000 {
+        device_type = "memory";
+        reg = <0x0 0x80000000 0x0  0x8000000>;
+        /* Example alternative configuration with much more RAM
+        reg = <0x0 0x80000000 0x0 0x40000000>;
+        */
+    };
+   
+    rom: memory@c0000000 {
+        compatible = "pmem-region";
+        reg = <0x0 0xc0000000 0x0 0xc800000>;
+    };
+     
+    soc {
+        #address-cells = <2>;
+        #size-cells = <2>;
+        compatible = "simple-bus";
+        ranges;
+
+        clint0: clint@2000000 {
+            #interrupt-cells = <1>;
+            compatible = "riscv,clint0";
+            reg = <0x0 0x2000000 0x0 0xC000>;
+            interrupts-extended =  <&cpu0_intc 3 &cpu0_intc 7>;
+        };
+
+        plic0: interrupt-controller@c000000 {
+            #address-cells = <2>;
+            #interrupt-cells = <1>;
+            interrupt-controller;
+            compatible = "riscv,plic0";
+            reg = <0x0 0xC000000 0x0 0x4000000>;
+            interrupts-extended = <&cpu0_intc 11>, <&cpu0_intc 0xffffffff>;
+            riscv,ndev = <1>;
+            riscv,max-priority = <7>;
+        };
+
+        // uart0: serial@10000000 {
+        //     interrupts = <0xa>;
+        //     interrupt-parent = <&plic0>;
+        //     clock-frequency = <0x384000>;
+        //     reg = <0x0 0x10000000 0x0 0x100>;
+        //     compatible = "ns16550a";
+        // };
+
+        uart0: serial@3000000 {
+            interrupts = <0xa>;
+            interrupt-parent = <&plic0>;
+            clock-frequency = <0x384000>;
+            reg = <0x0 0x3000000 0x0 0x1>;
+            compatible = "simple-uart";
+        };
+    };
+    
+};
