@@ -22,7 +22,7 @@
 
 #include "hil/hil.hh"
 #include "hil/nvme/abstract_subsystem.hh"
-
+#include "cpu/cpu.hh"
 namespace SimpleSSD {
 
 namespace HIL {
@@ -32,7 +32,7 @@ namespace NVMe {
 class Subsystem : public AbstractSubsystem {
  protected:
   HIL *pHIL;
-
+  CPU::CPU *pCPU;
   std::list<Namespace *> lNamespaces;
   uint32_t queueAllocated;
 
@@ -64,8 +64,12 @@ class Subsystem : public AbstractSubsystem {
   bool namespaceAttachment(SQEntryWrapper &, RequestFunction &);
   bool formatNVM(SQEntryWrapper &, RequestFunction &);
 
+  bool csdSOCInit(SQEntryWrapper &, RequestFunction &);
+  bool csdSOCStop(SQEntryWrapper &, RequestFunction &);
+  bool csdAddTask(SQEntryWrapper &, RequestFunction &);
+  bool csdPoll(SQEntryWrapper &, RequestFunction &);
  public:
-  Subsystem(Controller *, ConfigData &);
+  Subsystem(Controller *, CPU::CPU *, ConfigData &);
   ~Subsystem();
 
   void init() override;

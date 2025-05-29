@@ -30,14 +30,16 @@ const char NAME_CLOCK[] = "ClockSpeed";
 const char NAME_CORE_HIL[] = "HILCoreCount";
 const char NAME_CORE_ICL[] = "ICLCoreCount";
 const char NAME_CORE_FTL[] = "FTLCoreCount";
-const char NAME_BINARY_PATH[] = "BinaryPath";
+const char NAME_FW_PATH[] = "FirmwarePath";
+const char NAME_CORE_CSD[] = "CSDCoreCount";
 
 Config::Config() {
   clock = 400000000;
   hilCore = 1;
   iclCore = 1;
   ftlCore = 1;
-  binary_path = "";
+  csdCore = 1;
+  fw_path = "";
 }
 
 bool Config::setConfig(const char *name, const char *value) {
@@ -54,9 +56,11 @@ bool Config::setConfig(const char *name, const char *value) {
   }
   else if (MATCH_NAME(NAME_CORE_FTL)) {
     ftlCore = (uint32_t)strtoul(value, nullptr, 10);
+  } else if (MATCH_NAME(NAME_CORE_CSD)) {
+    csdCore = (uint32_t)strtoul(value, nullptr, 10);
   }
-  else if (MATCH_NAME(NAME_BINARY_PATH)) {
-    binary_path = value;
+  else if (MATCH_NAME(NAME_FW_PATH)) {
+    fw_path = value;
   }
   else {
     ret = false;
@@ -87,6 +91,9 @@ uint64_t Config::readUint(uint32_t idx) {
     case CPU_CORE_FTL:
       ret = ftlCore;
       break;
+    case CPU_CORE_CSD:
+      ret = csdCore;
+      break;
   }
 
   return ret;
@@ -94,8 +101,8 @@ uint64_t Config::readUint(uint32_t idx) {
 
 std::string Config::readString(uint32_t idx) {
     std::string ret;
-    if (idx == CPU_BINARY_PATH) {
-      ret = binary_path;
+    if (idx == CPU_FW_PATH) {
+      ret = fw_path;
     } else {
       ret = "";
     }

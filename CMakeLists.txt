@@ -44,6 +44,7 @@ endif ()
 
 # Add subproject
 add_subdirectory(${PROJECT_SOURCE_DIR}/lib/mcpat)
+add_subdirectory(${PROJECT_SOURCE_DIR}/cpu/riscv_em)
 
 # Set include directories
 include_directories(
@@ -52,6 +53,7 @@ include_directories(
   ${PROJECT_SOURCE_DIR}/lib/mcpat/cacti
   ${PROJECT_SOURCE_DIR}/lib/inih
   ${DRAMPOWER_SOURCE_DIR}
+  ${PROJECT_SOURCE_DIR}/cpu/riscv_em
 )
 
 # Platform specific settings
@@ -195,4 +197,4 @@ add_library(simplessd STATIC
   ${SRC_SIM}
   ${SRC_UTIL}
 )
-target_link_libraries(simplessd mcpat)
+target_link_libraries(simplessd mcpat riscv_em_lib)

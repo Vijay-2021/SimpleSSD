@@ -26,6 +26,13 @@
 #include <queue>
 #include <unordered_map>
 #include <vector>
+#include <termios.h>
+#include <pthread.h>
+#include <stdio.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 
 #include "cpu/def.hh"
 #include "lib/mcpat/mcpat.h"
@@ -33,6 +40,10 @@
 #include "sim/dma_interface.hh"
 #include "sim/simulator.hh"
 #include "sim/statistics.hh"
+
+#include "cpu/riscv_em/src/soc/riscv_example_soc.h"
+#include "cpu/riscv_em/src/core/riscv_helper.h"
+#include "cpu/riscv_em/src/peripherals/uart/simple_uart.h"
 
 namespace SimpleSSD {
 
@@ -75,6 +86,7 @@ class CPU : public StatObject {
 
     CoreStat();
   };
+  Event csdCycleEvent; // cycle for computational storage device
 
   class Core {
    private:
@@ -111,14 +123,16 @@ class CPU : public StatObject {
   std::vector<Core> hilCore;
   std::vector<Core> iclCore;
   std::vector<Core> ftlCore;
-
+  rv_soc_td csd;
   // CPIs
   std::unordered_map<uint16_t, std::unordered_map<uint16_t, InstStat>> cpi;
 
   uint32_t leastBusyCPU(std::vector<Core> &);
   void calculatePower(Power &);
+  void csdCycle();
+  bool csd_in_progress;
 
- public:
+  public:
   CPU(ConfigReader &);
   ~CPU();
 
@@ -129,12 +143,17 @@ class CPU : public StatObject {
   void getStatList(std::vector<Stats> &, std::string) override;
   void getStatValues(std::vector<double> &) override;
   void resetStatValues() override;
-
+  void startCSD();
+  void intCSDFS();
   void printLastStat();
 };
 
 }  // namespace CPU
 
 }  // namespace SimpleSSD
+
+uint8_t* read_flash(uint8_t* buffer, uint32_t offset , uint32_t len); // for the flash functions
+
+uint8_t* write_flash(uint8_t* buffer, uint32_t offset , uint32_t len);
 
 #endif

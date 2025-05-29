@@ -41,8 +41,9 @@ RegisterTable::_RegisterTable() {
   memset(data, 0, 64);
 }
 
-Controller::Controller(Interface *intrface, ConfigReader &c)
-    : pParent(intrface),
+Controller::Controller(Interface *interface, CPU::CPU *cpu, ConfigReader &c)
+    : pParent(interface),
+      pCPU(cpu),
       adminQueueInited(false),
       interruptMask(0),
       shutdownReserved(false),
@@ -1746,7 +1747,7 @@ void Controller::completion() {
   };
 
   DMAContext *submitContext = new DMAContext(doSubmit);
-  CompletionContext *pData = new CompletionContext();
+  CompletionContext *pData =  new CompletionContext();
 
   submitContext->context = pData;
 

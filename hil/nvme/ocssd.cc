@@ -41,8 +41,8 @@ BlockData::_BlockData(uint32_t i, uint8_t v) : index(i), value(v) {}
 ChunkUpdateEntry::_ChunkUpdateEntry(ChunkDescriptor *p, uint32_t i)
     : pDesc(p), pageIdx(i) {}
 
-OpenChannelSSD12::OpenChannelSSD12(Controller *c, ConfigData &cfg)
-    : Subsystem(c, cfg),
+OpenChannelSSD12::OpenChannelSSD12(Controller *c, CPU::CPU cpu, ConfigData &cfg)
+    : Subsystem(c, cpu, cfg),
       lastScheduled(0),
       eraseCount(0),
       readCount(0),

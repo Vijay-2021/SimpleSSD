@@ -18,7 +18,7 @@
  */
 
 #include "hil/nvme/subsystem.hh"
-
+#include <iostream>
 #include <algorithm>
 #include <cmath>
 
@@ -45,9 +45,10 @@ const uint32_t lbaSize[nLBAFormat] = {
     4096,  // 4KB
 };
 
-Subsystem::Subsystem(Controller *ctrl, ConfigData &cfg)
+Subsystem::Subsystem(Controller *ctrl, CPU *cpu, ConfigData &cfg)
     : AbstractSubsystem(ctrl, cfg),
       pHIL(nullptr),
+      pCPU(cpu),
       allocatedLogicalPages(0),
       commandCount(0) {}
 
@@ -314,6 +315,8 @@ void Subsystem::fillIdentifyNamespace(uint8_t *buffer,
   }
 }
 
+
+
 void Subsystem::submitCommand(SQEntryWrapper &req, RequestFunction func) {
   struct CommandContext {
     SQEntryWrapper req;
@@ -367,6 +370,18 @@ void Subsystem::submitCommand(SQEntryWrapper &req, RequestFunction func) {
         break;
       case OPCODE_FORMAT_NVM:
         processed = formatNVM(req, func);
+        break;
+      case OPCODE_CSD_SOC_INIT:
+        processed = csdSOCInit(req, func);
+        break;
+      case OPCODE_CSD_SOC_STOP:
+        processed = csdSOCStop(req, func);
+        break;
+      case OPCODE_CSD_SOC_ADD_TASK:
+        processed = csdAddTask(req, func);
+        break;
+      case OPCODE_CSD_SOC_POLL:
+        processed = csdPoll(req, func);
         break;
       default:
         resp.makeStatus(true, false, TYPE_GENERIC_COMMAND_STATUS,
@@ -1291,13 +1306,49 @@ bool Subsystem::formatNVM(SQEntryWrapper &req, RequestFunction &func) {
   return true;
 }
 
+bool Subsystem::csdSOCInit(SQEntryWrapper &req, RequestFunction &func) {
+  CQEntryWrapper resp(req); // create the completion queue response
+  debugprint(LOG_HIL_NVME, "ADMIN   | CSD SOC Init | NSID %d",
+             req.entry.namespaceID);
+  // start soc
+  pCPU->startCSD();
+  pCPU->initCSDFS(); // initialize file system
+  // init file system
+  func(resp);
+  return true; // Not implemented yet
+}
+
+bool Subsystem::csdSOCStop(SQEntryWrapper &req, RequestFunction &func) {
+  CQEntryWrapper resp(req); // create the completion queue response
+  debugprint(LOG_HIL_NVME, "ADMIN   | CSD SOC Stop | NSID %d",
+             req.entry.namespaceID);
+  func(resp);
+  return true; // Not implemented yet
+}
+
+bool Subsystem::csdAddTask(SQEntryWrapper &req, RequestFunction &func) {
+  CQEntryWrapper resp(req); // create the completion queue response
+  debugprint(LOG_HIL_NVME, "ADMIN   | CSD Add Task | NSID %d",
+             req.entry.namespaceID);
+  func(resp);
+  return true; // Not implemented yet
+}
+
+bool Subsystem::csdPoll(SQEntryWrapper &req, RequestFunction &func) {
+  CQEntryWrapper resp(req); // create the completion queue response
+  debugprint(LOG_HIL_NVME, "ADMIN   | CSD Poll | NSID %d",
+             req.entry.namespaceID);
+  func(resp);
+  return true; // Not implemented yet
+}
+
 void Subsystem::getStatList(std::vector<Stats> &list, std::string prefix) {
   Stats temp;
 
   temp.name = prefix + "command_count";
   temp.desc = "Total number of NVMe command handled";
   list.push_back(temp);
-
+   
   pHIL->getStatList(list, prefix);
 }
 

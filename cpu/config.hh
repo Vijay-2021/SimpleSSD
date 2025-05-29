@@ -34,7 +34,8 @@ typedef enum {
   CPU_CORE_HIL,
   CPU_CORE_ICL,
   CPU_CORE_FTL,
-  CPU_BINARY_PATH,
+  CPU_FW_PATH,
+  CPU_CORE_CSD,
 } CPU_CONFIG;
 
 class Config : public BaseConfig {
@@ -42,8 +43,9 @@ class Config : public BaseConfig {
   uint64_t clock;    //!< Default: 400MHz
   uint32_t hilCore;  //!< Default: 1
   uint32_t iclCore;  //!< Default: 1
-  uint32_t ftlCore;  //!< Default: 1=
-  std::string binary_path; //!< Default: ""
+  uint32_t ftlCore;  //!< Default: 1
+  uint32_t csdCore; //!< Default: 1
+  std::string  fw_path; //!< Default: ""
 
  public:
   Config();
@@ -53,6 +55,9 @@ class Config : public BaseConfig {
 
   uint64_t readUint(uint32_t) override;
   std::string readString(uint32_t) override;
+  char getch();
+  void *uart_rx_thread(void* p);
+  void start_uart_rx_thread(void *p);
 };
 
 }  // namespace CPU

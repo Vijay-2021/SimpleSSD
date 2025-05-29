@@ -22,7 +22,7 @@
 #include <limits>
 
 #include "sim/trace.hh"
-
+#include <stdlib.h>
 namespace SimpleSSD {
 
 namespace CPU {
@@ -135,14 +135,26 @@ void CPU::Core::addStat(InstStat &inst) {
   stat.instStat += inst;
 }
 
+void CPU::csdCycle() {
+  if (csd_in_progress) {
+    rv_soc_tick(&csd, 0, 1);
+    schedule(csdCycleEvent, getTick() + clockPeriod);
+  }
+}
+
 CPU::CPU(ConfigReader &c) : conf(c), lastResetStat(0) {
   clockSpeed = conf.readUint(CONFIG_CPU, CPU_CLOCK);
   clockPeriod = 1000000000000. / clockSpeed;  // in pico-seconds
-  
+  csd.num_cores = conf.readUint(CONFIG_CPU, CPU_CORE_CSD);
+  csd.rv_cores = (rv_core_td*) malloc(csd.num_cores * sizeof(rv_core_td));
   hilCore.resize(conf.readUint(CONFIG_CPU, CPU_CORE_HIL));
   iclCore.resize(conf.readUint(CONFIG_CPU, CPU_CORE_ICL));
   ftlCore.resize(conf.readUint(CONFIG_CPU, CPU_CORE_FTL));
-
+  rv_soc_init(&csd, const_cast<char*>(conf.readString(CONFIG_CPU, CPU_FW_PATH).c_str()), nullptr, nullptr); // TO-DO: make this less hacky
+  csdCycleEvent = allocate([this](uint64_t) {
+    csdCycle();
+  });
+  // schedule(csdCycleEvent, getTick()); // start the csd core(s) as soon as possible
   // Initialize CPU table
   cpi.insert({FTL, std::unordered_map<uint16_t, InstStat>()});
   cpi.insert({FTL__PAGE_MAPPING, std::unordered_map<uint16_t, InstStat>()});
@@ -298,7 +310,25 @@ CPU::CPU(ConfigReader &c) : conf(c), lastResetStat(0) {
       {40, InstStat(33, 100, 17, 61, 0, 3, clockPeriod)});
 }
 
-CPU::~CPU() {}
+CPU::~CPU() {
+  free(csd.rv_cores);
+}
+
+void CPU::startCSD() {
+  bool csd_in_progress = true;
+  csd.read = read_flash;
+  csd.write = write_flash;
+  schedule(csdCycleEvent, getTick());
+}
+
+void CPU::stopCSD() {
+  uint64_t csdCycleTick = 0;
+  isScheduled(csdCycleEvent, csdCycleTick)
+  if (csdCycleTick >= getTick()) {
+    deschedule(csdCycleEvent);
+  }
+  csd_in_progress = false;
+}
 
 void CPU::calculatePower(Power &power) {
   // Print stats before die
@@ -728,6 +758,7 @@ void CPU::execute(NAMESPACE ns, FUNCTION fct, DMAFunction &func, void *context,
   else {
     func(getTick(), context);
   }
+  
 }
 
 uint64_t CPU::applyLatency(NAMESPACE ns, FUNCTION fct) {
@@ -998,6 +1029,16 @@ void CPU::printLastStat() {
     debugprint(LOG_CPU, "  Runtime Dynamic: %lf W",
                power.level3.runtimeDynamic);
   }
+}
+
+uint8_t* read_flash(uint8_t* buffer, uint32_t offset , uint32_t len) {
+  int temp = buffer + offset + len;
+  return temp;
+}
+
+uint8_t* write_flash(uint8_t* buffer, uint32_t offset , uint32_t len) {
+  int temp = buffer + offset + len;
+  return temp;
 }
 
 }  // namespace CPU
