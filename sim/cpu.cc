@@ -19,6 +19,8 @@
 
 #include "sim/cpu.hh"
 
+#include "sim/simulator.hh"
+
 namespace SimpleSSD {
 
 // Defined in sim/cpu.hh
@@ -41,6 +43,7 @@ void initCPU(ConfigReader &conf) {
   }
 
   cpu = new CPU::CPU(conf);
+  Simulator::simCPU = cpu;
 }
 
 void deInitCPU() {

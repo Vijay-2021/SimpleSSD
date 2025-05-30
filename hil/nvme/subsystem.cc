@@ -24,6 +24,7 @@
 
 #include "hil/nvme/controller.hh"
 #include "util/algorithm.hh"
+#include "sim/simulator.hh"
 
 namespace SimpleSSD {
 
@@ -61,7 +62,7 @@ Subsystem::~Subsystem() {
 }
 
 void Subsystem::init() {
-  pHIL = new HIL(conf);
+  pHIL = Simulator::simHIL;
   uint16_t nNamespaces =
       (uint16_t)conf.readUint(CONFIG_NVME, NVME_ENABLE_DEFAULT_NAMESPACE);
 
@@ -1312,7 +1313,7 @@ bool Subsystem::csdSOCInit(SQEntryWrapper &req, RequestFunction &func) {
              req.entry.namespaceID);
   // start soc
   pCPU->startCSD();
-  pCPU->initCSDFS(); // initialize file system
+  pCPU->initFS(); // initialize file system
   // init file system
   func(resp);
   return true; // Not implemented yet

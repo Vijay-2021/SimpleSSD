@@ -129,11 +129,11 @@ Controller::Controller(Interface *interface, CPU::CPU *cpu, ConfigReader &c)
 
     switch (ssvid) {
       case OCSSD_SSVID_1_2:
-        pSubsystem = new OpenChannelSSD12(this, cfgdata);
+        pSubsystem = new OpenChannelSSD12(this, cpu, cfgdata);
 
         break;
       case OCSSD_SSVID_2_0:
-        pSubsystem = new OpenChannelSSD20(this, cfgdata);
+        pSubsystem = new OpenChannelSSD20(this, cpu, cfgdata);
 
         break;
       default:
@@ -143,7 +143,7 @@ Controller::Controller(Interface *interface, CPU::CPU *cpu, ConfigReader &c)
     }
   }
   else {
-    pSubsystem = new Subsystem(this, cfgdata);
+    pSubsystem = new Subsystem(this, cpu, cfgdata);
   }
 
   // Initialize Subsystem

@@ -1169,8 +1169,8 @@ void OpenChannelSSD12::resetStatValues() {
   pPALOLD->resetStatValues();
 }
 
-OpenChannelSSD20::OpenChannelSSD20(Controller *c, ConfigData &cfg)
-    : OpenChannelSSD12(c, cfg),
+OpenChannelSSD20::OpenChannelSSD20(Controller *c, CPU::CPU *cpu, ConfigData &cfg)
+    : OpenChannelSSD12(c, cpu, cfg),
       pDescriptor(nullptr),
       vectorEraseCount(0),
       vectorReadCount(0),

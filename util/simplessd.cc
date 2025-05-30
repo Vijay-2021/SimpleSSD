@@ -18,8 +18,12 @@
  */
 
 #include "util/simplessd.hh"
-
+#include "hil/hil.hh"
+#include "icl/icl.hh"
+#include "ftl/ftl.hh"
+#include "pal/pal.hh"
 #include "sim/log.hh"
+#include "cpu/cpu.hh"
 
 using namespace SimpleSSD;
 
@@ -33,8 +37,18 @@ ConfigReader initSimpleSSDEngine(Simulator *sim, std::ostream *info,
   if (!conf.init(config)) {
     panic("Failed to open configuration file %s", config.c_str());
   }
+  Simulator::simHIL = new SimpleSSD::HIL::HIL(conf);
+  Simulator::simICL = Simulator::simHIL->getICL();
+  Simulator::simFTL = Simulator::simICL->getFTL();
+  Simulator::simPAL = Simulator::simFTL->getPAL();
+  if (!Simulator::simHIL || !Simulator::simICL || !Simulator::simFTL || !Simulator::simPAL) {
+    panic("Failed to initialize SimpleSSD HIL, ICL, FTL, or PAL");
+  }
 
   initCPU(conf);
+  if (!Simulator::simCPU) {
+    panic("Failed to initialize SimpleSSD CPU");
+  }
 
   return conf;
 }

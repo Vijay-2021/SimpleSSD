@@ -27,23 +27,46 @@
 
 #include "sim/config_reader.hh"
 
+
 namespace SimpleSSD {
+
+namespace HIL {
+    class HIL;
+}
+namespace ICL {
+    class ICL;
+}
+namespace FTL {
+    class FTL;
+}
+namespace PAL {
+    class PAL;
+}
+namespace CPU {
+    class CPU;
+}
 
 typedef uint64_t Event;
 typedef std::function<void(uint64_t)> EventFunction;
 
 class Simulator {
- public:
-  Simulator() {}
-  virtual ~Simulator() {}
+  public:
+    Simulator() {}
+    virtual ~Simulator() {}
 
-  virtual uint64_t getCurrentTick() = 0;
+    virtual uint64_t getCurrentTick() = 0;
 
-  virtual Event allocateEvent(EventFunction) = 0;
-  virtual void scheduleEvent(Event, uint64_t) = 0;
-  virtual void descheduleEvent(Event) = 0;
-  virtual bool isScheduled(Event, uint64_t * = nullptr) = 0;
-  virtual void deallocateEvent(Event) = 0;
+    virtual Event allocateEvent(EventFunction) = 0;
+    virtual void scheduleEvent(Event, uint64_t) = 0;
+    virtual void descheduleEvent(Event) = 0;
+    virtual bool isScheduled(Event, uint64_t * = nullptr) = 0;
+    virtual void deallocateEvent(Event) = 0;
+    static HIL::HIL *simHIL;
+    static ICL::ICL *simICL;
+    static FTL::FTL *simFTL;
+    static PAL::PAL *simPAL;
+    static CPU::CPU *simCPU;
+ 
 };
 
 void setSimulator(Simulator *p);

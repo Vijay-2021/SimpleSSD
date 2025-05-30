@@ -23,6 +23,8 @@
 #include "hil/hil.hh"
 #include "hil/nvme/abstract_subsystem.hh"
 #include "cpu/cpu.hh"
+#include "util/simplessd.hh"
+
 namespace SimpleSSD {
 
 namespace HIL {

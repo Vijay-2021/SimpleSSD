@@ -23,6 +23,11 @@ namespace SimpleSSD {
 
 // Defined in sim/simulator.hh
 Simulator *sim = nullptr;
+HIL::HIL* Simulator::simHIL = nullptr;
+ICL::ICL* Simulator::simICL = nullptr;
+FTL::FTL* Simulator::simFTL = nullptr;
+PAL::PAL* Simulator::simPAL = nullptr;
+CPU::CPU* Simulator::simCPU = nullptr;
 
 void setSimulator(Simulator *p) {
   sim = p;

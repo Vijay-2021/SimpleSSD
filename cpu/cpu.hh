@@ -44,6 +44,7 @@
 #include "cpu/riscv_em/src/soc/riscv_example_soc.h"
 #include "cpu/riscv_em/src/core/riscv_helper.h"
 #include "cpu/riscv_em/src/peripherals/uart/simple_uart.h"
+#include "util/simplessd.hh"
 
 namespace SimpleSSD {
 
@@ -87,7 +88,6 @@ class CPU : public StatObject {
     CoreStat();
   };
   Event csdCycleEvent; // cycle for computational storage device
-
   class Core {
    private:
     bool busy;
@@ -114,6 +114,7 @@ class CPU : public StatObject {
   };
 
   ConfigReader &conf;
+  
   uint64_t lastResetStat;
 
   uint64_t clockSpeed;
@@ -133,29 +134,29 @@ class CPU : public StatObject {
   bool csd_in_progress;
 
   public:
-  CPU(ConfigReader &);
-  ~CPU();
+    CPU(ConfigReader &);
+    ~CPU();
 
-  void execute(NAMESPACE, FUNCTION, DMAFunction &, void * = nullptr,
-               uint64_t = 0);
-  uint64_t applyLatency(NAMESPACE, FUNCTION);
+    void execute(NAMESPACE, FUNCTION, DMAFunction &, void * = nullptr,
+                uint64_t = 0);
+    uint64_t applyLatency(NAMESPACE, FUNCTION);
 
-  void getStatList(std::vector<Stats> &, std::string) override;
-  void getStatValues(std::vector<double> &) override;
-  void resetStatValues() override;
-  void startCSD();
-  void stopCSD();
-  void initCSD();
-  void intCSDFS();
-  void printLastStat();
+    void getStatList(std::vector<Stats> &, std::string) override;
+    void getStatValues(std::vector<double> &) override;
+    void resetStatValues() override;
+    void startCSD();
+    void stopCSD();
+    void initCSD();
+    void initFS();
+    void printLastStat();
 };
 
 }  // namespace CPU
 
 }  // namespace SimpleSSD
 
-uint8_t* read_flash(uint8_t* buffer, uint32_t offset , uint32_t len); // for the flash functions
+uint8_t read_flash(uint8_t* buffer, uint32_t offset , uint32_t len); // for the flash functions
 
-uint8_t* write_flash(uint8_t* buffer, uint32_t offset , uint32_t len);
+uint8_t write_flash(uint8_t* buffer, uint32_t offset , uint32_t len);
 
 #endif

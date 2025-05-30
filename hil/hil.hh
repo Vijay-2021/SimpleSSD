@@ -69,6 +69,11 @@ class HIL : public StatObject {
   void getStatList(std::vector<Stats> &, std::string) override;
   void getStatValues(std::vector<double> &) override;
   void resetStatValues() override;
+
+  ICL::ICL *getICL() {
+    return pICL;
+  }
+  
 };
 
 }  // namespace HIL

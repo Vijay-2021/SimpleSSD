@@ -116,7 +116,7 @@ class Controller : public StatObject {
   bool checkQueue(SQueue *, DMAFunction &, void *);
 
  public:
-  Controller(Interface *, CPU::CPU cpu, ConfigReader &);
+  Controller(Interface *, CPU::CPU* , ConfigReader &);
   ~Controller();
 
   void readRegister(uint64_t, uint64_t, uint8_t *, uint64_t &);

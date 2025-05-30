@@ -20,9 +20,13 @@
 #include "cpu/cpu.hh"
 
 #include <limits>
-
+#include "icl/icl.hh"
 #include "sim/trace.hh"
 #include <stdlib.h>
+
+static uint64_t global_req_id = 0;
+static uint32_t page_size = 16834; // Default page size for SimpleSSD
+
 namespace SimpleSSD {
 
 namespace CPU {
@@ -154,6 +158,10 @@ CPU::CPU(ConfigReader &c) : conf(c), lastResetStat(0) {
   csdCycleEvent = allocate([this](uint64_t) {
     csdCycle();
   });
+  initFS(); // initialize the file system for the csd cores
+  page_size = Simulator::simPAL->getInfo()->pageSize;
+  // unsigned char buffer[256];
+  // read_flash(buffer, 4096, 4096);
   // schedule(csdCycleEvent, getTick()); // start the csd core(s) as soon as possible
   // Initialize CPU table
   cpi.insert({FTL, std::unordered_map<uint16_t, InstStat>()});
@@ -315,19 +323,22 @@ CPU::~CPU() {
 }
 
 void CPU::startCSD() {
-  bool csd_in_progress = true;
-  csd.read = read_flash;
-  csd.write = write_flash;
+  csd_in_progress = true;
   schedule(csdCycleEvent, getTick());
 }
 
 void CPU::stopCSD() {
   uint64_t csdCycleTick = 0;
-  isScheduled(csdCycleEvent, csdCycleTick)
+  scheduled(csdCycleEvent, &csdCycleTick);
   if (csdCycleTick >= getTick()) {
     deschedule(csdCycleEvent);
   }
   csd_in_progress = false;
+}
+
+void CPU::initFS() {
+  csd.read = read_flash;
+  csd.write = write_flash;
 }
 
 void CPU::calculatePower(Power &power) {
@@ -1031,16 +1042,47 @@ void CPU::printLastStat() {
   }
 }
 
-uint8_t* read_flash(uint8_t* buffer, uint32_t offset , uint32_t len) {
-  int temp = buffer + offset + len;
-  return temp;
-}
-
-uint8_t* write_flash(uint8_t* buffer, uint32_t offset , uint32_t len) {
-  int temp = buffer + offset + len;
-  return temp;
-}
 
 }  // namespace CPU
 
 }  // namespace SimpleSSD
+
+uint8_t read_flash(uint8_t* buffer, uint32_t offset , uint32_t len) {
+  debugprint(SimpleSSD::LOG_CPU, "Read flash from CSD at offset %u, length %u",
+             offset, len);
+  SimpleSSD::ICL::Request req;
+  SimpleSSD::LPNRange lpnRange;
+  lpnRange.slpn = offset / page_size;
+  lpnRange.nlp = (len + page_size - 1) / page_size;
+  req.range = lpnRange;
+  req.offset = 0;
+  req.length = len;
+  req.reqID = global_req_id++;
+  req.reqSubID = 0;
+  uint64_t reqTick = SimpleSSD::getTick();
+  debugprint(SimpleSSD::LOG_CPU, "Request ID %u at tick %llu", req.reqID, reqTick);
+  SimpleSSD::Simulator::Simulator::simICL->read(req, reqTick);
+  debugprint(SimpleSSD::LOG_CPU, "Request ID %u completed at tick %llu",
+             req.reqID, reqTick);
+  return buffer[0];
+}
+
+uint8_t write_flash(uint8_t* buffer, uint32_t offset , uint32_t len) {
+  debugprint(SimpleSSD::LOG_CPU, "Write flash from CSD at offset %u, length %u",
+      offset, len);
+  SimpleSSD::ICL::Request req;
+  SimpleSSD::LPNRange lpnRange;
+  lpnRange.slpn = offset / page_size;
+  lpnRange.nlp = (len + page_size - 1) / page_size;
+  req.range = lpnRange;
+  req.offset = 0;
+  req.length = len;
+  req.reqID = global_req_id++;
+  req.reqSubID = 0;
+  uint64_t reqTick = SimpleSSD::getTick();
+  debugprint(SimpleSSD::LOG_CPU, "Request ID %u at tick %llu", req.reqID, reqTick);
+  SimpleSSD::Simulator::Simulator::simICL->read(req, reqTick);
+  debugprint(SimpleSSD::LOG_CPU, "Request ID %u completed at tick %llu",
+              req.reqID, reqTick);
+  return buffer[0];
+}

@@ -64,6 +64,10 @@ class FTL : public StatObject {
   void getStatList(std::vector<Stats> &, std::string) override;
   void getStatValues(std::vector<double> &) override;
   void resetStatValues() override;
+
+  PAL::PAL *getPAL() {
+    return pPAL;
+  }
 };
 
 }  // namespace FTL
