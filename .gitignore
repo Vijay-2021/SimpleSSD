@@ -15,6 +15,7 @@ x64/
 *.o
 cpu/riscv_em/build/
 cpu/riscv_em/riscv_em
+cpu/riscv_em/firmware/fs/build/
 *.bin
 *.elf
 
