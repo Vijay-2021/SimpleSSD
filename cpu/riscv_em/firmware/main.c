@@ -1,10 +1,12 @@
 #include <stdint.h>
 #include <stddef.h>
-#include "../src/core/comp_storage/cs_instructions.h"
+#include "cs_instructions.h"
+#include "ext2.h"
 
 #define reg_uart_data (*(volatile uint8_t*)0x3000000UL)
 
 static char* test = "Hello World from a simple RV32I ISA emulator v2!\n";
+
 
 void putchar(char c)
 {
@@ -19,10 +21,9 @@ void print(const char *p)
 
 int main(void)
 {
-    perase(17, 18, 19);
-    perase(7, 8, 9);
-    pread(1, 2, 3);
-    pwrite(4, 5, 6);
-    print(test);
+	ext2_priv_data priv;
+    ext2_probe(&priv);
+	ext2_mount(&priv);
+	ext2_touch("/home/test_csd.txt", &priv);
     return 0;
 }

@@ -17,62 +17,57 @@
  * along with SimpleSSD.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "sim/simulator.hh"
+ #include "sim/simulator.hh"
 
-namespace SimpleSSD {
-
-// Defined in sim/simulator.hh
-Simulator *sim = nullptr;
-HIL::HIL* Simulator::simHIL = nullptr;
-ICL::ICL* Simulator::simICL = nullptr;
-FTL::FTL* Simulator::simFTL = nullptr;
-PAL::PAL* Simulator::simPAL = nullptr;
-CPU::CPU* Simulator::simCPU = nullptr;
-
-void setSimulator(Simulator *p) {
-  sim = p;
-}
-
-uint64_t getTick() {
-  if (sim) {
-    return sim->getCurrentTick();
-  }
-
-  return 0;
-}
-
-Event allocate(EventFunction f) {
-  if (sim) {
-    return sim->allocateEvent(f);
-  }
-
-  return 0;
-}
-
-void schedule(Event e, uint64_t t) {
-  if (sim) {
-    sim->scheduleEvent(e, t);
-  }
-}
-
-void deschedule(Event e) {
-  if (sim) {
-    sim->descheduleEvent(e);
-  }
-}
-
-bool scheduled(Event e, uint64_t *p) {
-  if (sim) {
-    return sim->isScheduled(e, p);
-  }
-
-  return false;
-}
-
-void deallocate(Event e) {
-  if (sim) {
-    sim->deallocateEvent(e);
-  }
-}
-
-}  // namespace SimpleSSD
+ namespace SimpleSSD {
+ 
+ // Defined in sim/simulator.hh
+ Simulator *sim = nullptr;
+ 
+ void setSimulator(Simulator *p) {
+   sim = p;
+ }
+ 
+ uint64_t getTick() {
+   if (sim) {
+     return sim->getCurrentTick();
+   }
+ 
+   return 0;
+ }
+ 
+ Event allocate(EventFunction f) {
+   if (sim) {
+     return sim->allocateEvent(f);
+   }
+ 
+   return 0;
+ }
+ 
+ void schedule(Event e, uint64_t t) {
+   if (sim) {
+     sim->scheduleEvent(e, t);
+   }
+ }
+ 
+ void deschedule(Event e) {
+   if (sim) {
+     sim->descheduleEvent(e);
+   }
+ }
+ 
+ bool scheduled(Event e, uint64_t *p) {
+   if (sim) {
+     return sim->isScheduled(e, p);
+   }
+ 
+   return false;
+ }
+ 
+ void deallocate(Event e) {
+   if (sim) {
+     sim->deallocateEvent(e);
+   }
+ }
+ 
+ }  // namespace SimpleSSD

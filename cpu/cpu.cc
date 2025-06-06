@@ -20,12 +20,15 @@
 #include "cpu/cpu.hh"
 
 #include <limits>
+#include <stddef.h>
 #include "icl/icl.hh"
+#include "ftl/ftl.hh"
+#include "pal/pal.hh"
+
 #include "sim/trace.hh"
 #include <stdlib.h>
 
 static uint64_t global_req_id = 0;
-static uint32_t page_size = 16834; // Default page size for SimpleSSD
 
 namespace SimpleSSD {
 
@@ -146,20 +149,28 @@ void CPU::csdCycle() {
   }
 }
 
-CPU::CPU(ConfigReader &c) : conf(c), lastResetStat(0) {
+CPU::CPU(ConfigReader &c, ICL::ICL *icl, FTL::FTL *ftl, PAL::PAL *pal) : conf(c), pICL(icl), pFTL(ftl), pPAL(pal), lastResetStat(0) {
   clockSpeed = conf.readUint(CONFIG_CPU, CPU_CLOCK);
   clockPeriod = 1000000000000. / clockSpeed;  // in pico-seconds
+  memset(&csd, 0, sizeof(rv_soc_td));
   csd.num_cores = conf.readUint(CONFIG_CPU, CPU_CORE_CSD);
   csd.rv_cores = (rv_core_td*) malloc(csd.num_cores * sizeof(rv_core_td));
   hilCore.resize(conf.readUint(CONFIG_CPU, CPU_CORE_HIL));
   iclCore.resize(conf.readUint(CONFIG_CPU, CPU_CORE_ICL));
   ftlCore.resize(conf.readUint(CONFIG_CPU, CPU_CORE_FTL));
+  debugprint(LOG_CPU,"sizeofs(rv_soc_td): from cpu %zu\n", sizeof(rv_soc_td));
+  debugprint(LOG_CPU,"cpu offsetof(ctx) = %zu\n", offsetof(rv_soc_td, ctx));
+  debugprint(LOG_CPU,"cpu offsetof(read) = %zu\n", offsetof(rv_soc_td, read));
+  debugprint(LOG_CPU,"cpu offsetof(write) = %zu\n", offsetof(rv_soc_td, write));
+
+  initFS(); // initialize the file system for the csd cores
+  debugprint(LOG_CPU, "csd contexts: %p\n", csd.ctx);
   rv_soc_init(&csd, const_cast<char*>(conf.readString(CONFIG_CPU, CPU_FW_PATH).c_str()), nullptr, nullptr); // TO-DO: make this less hacky
   csdCycleEvent = allocate([this](uint64_t) {
     csdCycle();
   });
-  initFS(); // initialize the file system for the csd cores
-  page_size = Simulator::simPAL->getInfo()->pageSize;
+  page_size = pPAL->getInfo()->pageSize;
+  pDisk = new Disk();
   // unsigned char buffer[256];
   // read_flash(buffer, 4096, 4096);
   // schedule(csdCycleEvent, getTick()); // start the csd core(s) as soon as possible
@@ -337,8 +348,13 @@ void CPU::stopCSD() {
 }
 
 void CPU::initFS() {
-  csd.read = read_flash;
-  csd.write = write_flash;
+  csd.ctx = this;
+  csd.read = [](void* ctx, uint8_t* buf, uint32_t addr, uint32_t len) -> uint8_t {
+    return static_cast<CPU*>(ctx)->read_flash(buf, addr, len);
+  };
+  csd.write = [](void* ctx, uint8_t* buf, uint32_t addr, uint32_t len) -> uint8_t {
+    return static_cast<CPU*>(ctx)->write_flash(buf, addr, len);
+  };
 }
 
 void CPU::calculatePower(Power &power) {
@@ -1042,47 +1058,62 @@ void CPU::printLastStat() {
   }
 }
 
+uint8_t CPU::read_flash(uint8_t* buffer, uint32_t offset , uint32_t len) {
+  debugprint(LOG_CPU, "Read flash from CSD at offset %u, length %u",
+             offset, len);
+  ICL::Request req;
+  LPNRange lpnRange;
+  lpnRange.slpn = offset / (page_size / lba_size);
+  lpnRange.nlp = (len / (page_size / lba_size)) + 1;
+  req.range = lpnRange;
+  req.offset = 0;
+  req.length = len;
+  req.reqID = global_req_id++;
+  req.reqSubID = 0;
+  uint64_t reqTick = getTick();
+  debugprint(LOG_CPU, "Request ID %u at tick %llu", req.reqID, reqTick);
+  pICL->read(req, reqTick);
+  debugprint(LOG_CPU, "Request ID %u finished at tick %llu",
+             req.reqID, reqTick);
+  uint64_t slba = offset;
+  uint32_t nlblk = len;
+  pDisk->read(slba, nlblk, buffer);
+  return buffer[0];
+}
+
+uint8_t CPU::write_flash(uint8_t* buffer, uint32_t offset , uint32_t len) {
+  debugprint(SimpleSSD::LOG_CPU, "Write flash from CSD at offset %u, length %u",
+      offset, len);
+  ICL::Request req;
+  LPNRange lpnRange;
+  lpnRange.slpn = offset / page_size;
+  lpnRange.nlp = (len + page_size - 1) / page_size;
+  req.range = lpnRange;
+  req.offset = 0;
+  req.length = len;
+  req.reqID = global_req_id++;
+  req.reqSubID = 0;
+  uint64_t reqTick = getTick();
+  debugprint(LOG_CPU, "Request ID %u at tick %llu", req.reqID, reqTick);
+  pICL->write(req, reqTick);
+  debugprint(LOG_CPU, "Request ID %u completed at tick %llu",
+              req.reqID, reqTick);
+  uint64_t slba = offset / lba_size;
+  uint32_t nlblk = (len + lba_size - 1) / lba_size;
+  uint8_t *tmp_data = (uint8_t*) malloc(sizeof(char) * nlblk * lba_size);
+  pDisk->read(slba, nlblk, tmp_data);
+  memcpy(tmp_data + (offset % lba_size), buffer, len);
+  pDisk->write(slba, nlblk, tmp_data);
+  free(tmp_data);
+  return buffer[0];
+}
+
+void CPU::setDisk(Disk *disk, std::string filename, uint64_t size, uint32_t lba_size) {
+  pDisk = disk;
+  lba_size = lba_size;
+  pDisk->open(filename, size, lba_size);
+}
 
 }  // namespace CPU
 
 }  // namespace SimpleSSD
-
-uint8_t read_flash(uint8_t* buffer, uint32_t offset , uint32_t len) {
-  debugprint(SimpleSSD::LOG_CPU, "Read flash from CSD at offset %u, length %u",
-             offset, len);
-  SimpleSSD::ICL::Request req;
-  SimpleSSD::LPNRange lpnRange;
-  lpnRange.slpn = offset / page_size;
-  lpnRange.nlp = (len + page_size - 1) / page_size;
-  req.range = lpnRange;
-  req.offset = 0;
-  req.length = len;
-  req.reqID = global_req_id++;
-  req.reqSubID = 0;
-  uint64_t reqTick = SimpleSSD::getTick();
-  debugprint(SimpleSSD::LOG_CPU, "Request ID %u at tick %llu", req.reqID, reqTick);
-  SimpleSSD::Simulator::Simulator::simICL->read(req, reqTick);
-  debugprint(SimpleSSD::LOG_CPU, "Request ID %u completed at tick %llu",
-             req.reqID, reqTick);
-  return buffer[0];
-}
-
-uint8_t write_flash(uint8_t* buffer, uint32_t offset , uint32_t len) {
-  debugprint(SimpleSSD::LOG_CPU, "Write flash from CSD at offset %u, length %u",
-      offset, len);
-  SimpleSSD::ICL::Request req;
-  SimpleSSD::LPNRange lpnRange;
-  lpnRange.slpn = offset / page_size;
-  lpnRange.nlp = (len + page_size - 1) / page_size;
-  req.range = lpnRange;
-  req.offset = 0;
-  req.length = len;
-  req.reqID = global_req_id++;
-  req.reqSubID = 0;
-  uint64_t reqTick = SimpleSSD::getTick();
-  debugprint(SimpleSSD::LOG_CPU, "Request ID %u at tick %llu", req.reqID, reqTick);
-  SimpleSSD::Simulator::Simulator::simICL->read(req, reqTick);
-  debugprint(SimpleSSD::LOG_CPU, "Request ID %u completed at tick %llu",
-              req.reqID, reqTick);
-  return buffer[0];
-}

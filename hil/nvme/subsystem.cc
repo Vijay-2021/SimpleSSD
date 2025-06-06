@@ -26,6 +26,11 @@
 #include "util/algorithm.hh"
 #include "sim/simulator.hh"
 
+#include "icl/icl.hh"
+#include "ftl/ftl.hh"
+#include "pal/pal.hh"
+#include "sim/cpu.hh"
+
 namespace SimpleSSD {
 
 namespace HIL {
@@ -46,10 +51,9 @@ const uint32_t lbaSize[nLBAFormat] = {
     4096,  // 4KB
 };
 
-Subsystem::Subsystem(Controller *ctrl, CPU::CPU *cpu, ConfigData &cfg)
+Subsystem::Subsystem(Controller *ctrl, ConfigData &cfg)
     : AbstractSubsystem(ctrl, cfg),
       pHIL(nullptr),
-      pCPU(cpu),
       allocatedLogicalPages(0),
       commandCount(0) {}
 
@@ -62,7 +66,13 @@ Subsystem::~Subsystem() {
 }
 
 void Subsystem::init() {
-  pHIL = Simulator::simHIL;
+  pHIL = new HIL(conf);
+  ICL::ICL *icl = pHIL->getICL();
+  FTL::FTL *ftl = icl->getFTL();
+  PAL::PAL *pal = ftl->getPAL();
+  pCPU = new CPU::CPU(conf, icl, ftl, pal);
+  setCPU(pCPU);
+  
   uint16_t nNamespaces =
       (uint16_t)conf.readUint(CONFIG_NVME, NVME_ENABLE_DEFAULT_NAMESPACE);
 
@@ -102,6 +112,18 @@ void Subsystem::init() {
         panic("Failed to create namespace");
       }
     }
+    std::string filename = conf.readString(CONFIG_NVME, NVME_DISK_IMAGE_PATH + NSID_LOWEST); // use the first disk
+    Disk *disk;
+    if (filename.length() == 0) {
+      disk = new MemDisk();
+    }
+    else if (conf.readBoolean(CONFIG_NVME, NVME_USE_COW_DISK)) {
+      disk = new CoWDisk();
+    }
+    else {
+      disk = new Disk();
+    }
+    pCPU->setDisk(disk, filename, info.size * info.lbaSize, info.lbaSize);
   }
 }
 
@@ -1313,7 +1335,7 @@ bool Subsystem::csdSOCInit(SQEntryWrapper &req, RequestFunction &func) {
              req.entry.namespaceID);
   // start soc
   pCPU->startCSD();
-  pCPU->initFS(); // initialize file system
+  // pCPU->initFS(); 
   // init file system
   func(resp);
   return true; // Not implemented yet

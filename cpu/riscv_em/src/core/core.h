@@ -58,7 +58,7 @@ typedef struct rv_core_struct
 
     int lr_valid;
     rv_uint_xlen lr_address;
-
+    char* ram;
 } rv_core_td;
 
 void rv_core_run(rv_core_td *rv_core);

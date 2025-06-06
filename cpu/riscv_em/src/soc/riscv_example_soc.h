@@ -33,16 +33,11 @@ typedef struct rv_soc_struct
     //superblock_td *fs_superblock; /* Contains superblock of the filesystem */
     clint_td clint;
     plic_td plic;
-
-    #ifdef USE_SIMPLE_UART
-        simple_uart_td uart;
-    #else
-        uart_ns8250_td uart8250;
-    #endif
-
+    simple_uart_td uart;
     rv_soc_mem_access_cb_td mem_access_cbs[6];
-    uint8_t (*read)(uint8_t* buffer, uint32_t offset , uint32_t len);
-	uint8_t (*write)(uint8_t *buffer, uint32_t offset, uint32_t len);
+    void* ctx;
+    uint8_t (*read)(void *ctx, uint8_t* buffer, uint32_t offset , uint32_t len);
+	uint8_t (*write)(void *ctx, uint8_t *buffer, uint32_t offset, uint32_t len);
 } rv_soc_td;
 
 void rv_soc_dump_mem(rv_soc_td *rv_soc);

@@ -2,7 +2,7 @@
 
 set -e
 
-riscv32-unknown-elf-gcc -march=rv32imafd -mabi=ilp32d -Wl,-Bstatic,-T,sections.lds,--strip-debug -ffreestanding -nostdlib -o hello_world_fw.elf start.s main.c
+riscv32-unknown-elf-gcc -march=rv32imafd -mabi=ilp32d -Wl,-Bstatic,-T,sections.lds,--strip-debug -ffreestanding -nostdlib -Ifs -o hello_world_fw.elf start.s main.c -Lfs/build -lmylib
 riscv32-unknown-elf-objcopy -O binary hello_world_fw.elf hello_world_fw.bin
 
 # print text section

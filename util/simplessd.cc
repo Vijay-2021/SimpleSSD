@@ -17,44 +17,29 @@
  * along with SimpleSSD.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "util/simplessd.hh"
-#include "hil/hil.hh"
-#include "icl/icl.hh"
-#include "ftl/ftl.hh"
-#include "pal/pal.hh"
-#include "sim/log.hh"
-#include "cpu/cpu.hh"
+ #include "util/simplessd.hh"
 
-using namespace SimpleSSD;
-
-ConfigReader initSimpleSSDEngine(Simulator *sim, std::ostream *info,
-                                 std::ostream *err, std::string config) {
-  ConfigReader conf;
-
-  setSimulator(sim);
-  initLogSystem(info, err);
-
-  if (!conf.init(config)) {
-    panic("Failed to open configuration file %s", config.c_str());
-  }
-  Simulator::simHIL = new SimpleSSD::HIL::HIL(conf);
-  Simulator::simICL = Simulator::simHIL->getICL();
-  Simulator::simFTL = Simulator::simICL->getFTL();
-  Simulator::simPAL = Simulator::simFTL->getPAL();
-  if (!Simulator::simHIL || !Simulator::simICL || !Simulator::simFTL || !Simulator::simPAL) {
-    panic("Failed to initialize SimpleSSD HIL, ICL, FTL, or PAL");
-  }
-
-  initCPU(conf);
-  if (!Simulator::simCPU) {
-    panic("Failed to initialize SimpleSSD CPU");
-  }
-
-  return conf;
-}
-
-void releaseSimpleSSDEngine() {
-  printCPULastStat();
-
-  deInitCPU();
-}
+ #include "sim/log.hh"
+ 
+ using namespace SimpleSSD;
+ 
+ ConfigReader initSimpleSSDEngine(Simulator *sim, std::ostream *info,
+                                  std::ostream *err, std::string config) {
+   ConfigReader conf;
+ 
+   setSimulator(sim);
+   initLogSystem(info, err);
+ 
+   if (!conf.init(config)) {
+     panic("Failed to open configuration file %s", config.c_str());
+   }
+   // initCPU(conf);
+ 
+   return conf;
+ }
+ 
+ void releaseSimpleSSDEngine() {
+   printCPULastStat();
+ 
+   // deInitCPU();
+ }

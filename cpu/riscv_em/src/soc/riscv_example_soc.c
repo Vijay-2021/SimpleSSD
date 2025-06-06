@@ -2,7 +2,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-
+#include <stddef.h>
 #include "src/core/riscv_helper.h"
 #include "riscv_example_soc.h"
 
@@ -78,6 +78,11 @@ void rv_soc_dump_mem(rv_soc_td *rv_soc)
 
 void rv_soc_init(rv_soc_td *rv_soc, char *fw_file_name, char *dtb_file_name, char *initrd_file_name)
 {
+    printf("rv soc ctx ptr begins: %p\n", rv_soc->ctx);
+    printf("soc  sizeofs(rv_soc_td): %zu\n", sizeof(rv_soc_td));
+    printf("soc  offsetof(ctx) = %zu\n", offsetof(rv_soc_td, ctx));
+    printf("soc  offsetof(read) = %zu\n", offsetof(rv_soc_td, read));
+    printf("soc  offsetof(write) = %zu\n", offsetof(rv_soc_td, write));
     #define RESET_VEC_SIZE 10
     #define MiB 0x100000
 
@@ -93,7 +98,7 @@ void rv_soc_init(rv_soc_td *rv_soc, char *fw_file_name, char *dtb_file_name, cha
     static uint8_t __attribute__((aligned (4))) soc_ram[RAM_SIZE_BYTES] = { 0 };
 
     /* Init everything to zero */
-    memset(rv_soc, 0, sizeof(rv_soc_td));
+    // memset(rv_soc, 0, sizeof(rv_soc_td));
     rv_soc->from = soc_from;
     rv_soc->mrom = soc_mrom;
     rv_soc->ram = soc_ram;
@@ -160,8 +165,7 @@ void rv_soc_init(rv_soc_td *rv_soc, char *fw_file_name, char *dtb_file_name, cha
 
     /* initialize ram and peripheral read write access pointers */
     rv_soc_init_mem_access_cbs(rv_soc);
-
-    DEBUG_PRINT("rv SOC initialized!\n");
+    printf("rv soc ctx ptr end: %p\n", rv_soc->ctx);
 }
 
 void rv_soc_run(rv_soc_td *rv_soc, rv_uint_xlen success_pc, uint64_t num_cycles)
@@ -215,7 +219,7 @@ void rv_soc_tick(rv_soc_td *rv_soc, rv_uint_xlen success_pc, uint64_t num_cycles
     // rv_core_reg_dump(&rv_soc->rv_core0);
     for (uint64_t current_cycle = 0; current_cycle < num_cycles; current_cycle++) {
         for (uint32_t core_id = 0; core_id < rv_soc->num_cores; core_id++) {
-            rv_core_run(&rv_soc->rv_cores[core_id]);
+            rv_core_run(&rv_soc->rv_cores[core_id]); 
         }
 
         /* update peripherals */

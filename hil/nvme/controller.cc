@@ -41,9 +41,8 @@ RegisterTable::_RegisterTable() {
   memset(data, 0, 64);
 }
 
-Controller::Controller(Interface *interface, CPU::CPU *cpu, ConfigReader &c)
+Controller::Controller(Interface *interface, ConfigReader &c)
     : pParent(interface),
-      pCPU(cpu),
       adminQueueInited(false),
       interruptMask(0),
       shutdownReserved(false),
@@ -129,11 +128,11 @@ Controller::Controller(Interface *interface, CPU::CPU *cpu, ConfigReader &c)
 
     switch (ssvid) {
       case OCSSD_SSVID_1_2:
-        pSubsystem = new OpenChannelSSD12(this, cpu, cfgdata);
+        pSubsystem = new OpenChannelSSD12(this, cfgdata);
 
         break;
       case OCSSD_SSVID_2_0:
-        pSubsystem = new OpenChannelSSD20(this, cpu, cfgdata);
+        pSubsystem = new OpenChannelSSD20(this, cfgdata);
 
         break;
       default:
@@ -143,7 +142,7 @@ Controller::Controller(Interface *interface, CPU::CPU *cpu, ConfigReader &c)
     }
   }
   else {
-    pSubsystem = new Subsystem(this, cpu, cfgdata);
+    pSubsystem = new Subsystem(this, cfgdata);
   }
 
   // Initialize Subsystem

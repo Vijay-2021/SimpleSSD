@@ -6,7 +6,7 @@
 #include "riscv_types.h"
 #include "riscv_helper.h"
 #include "riscv_instr.h"
-
+#include "src/soc/riscv_example_soc.h"
 #include "core.h"
 
 // #define CORE_DEBUG
@@ -1294,11 +1294,13 @@ static void instr_SW(rv_core_td *rv_core)
 #endif
 
 void instr_PREAD(rv_core_td* rv_core) {
-    printf("pread called on rd: %d rs1: %d rs2: %d\n", rv_core->x[rv_core->rd], rv_core->x[rv_core->rs1], rv_core->x[rv_core->rs2]);
+    rv_soc_td* soc = rv_core->priv;
+    soc->read(soc->ctx, (uint8_t*) (rv_core->ram + (rv_core->x[rv_core->rd] - RAM_BASE_ADDR)), rv_core->x[rv_core->rs1], rv_core->x[rv_core->rs2]);
 }
 
 void instr_PWRITE(rv_core_td* rv_core) {
-    printf("pwrite called on rd: %d rs1: %d rs2: %d\n", rv_core->x[rv_core->rd], rv_core->x[rv_core->rs1], rv_core->x[rv_core->rs2]);
+    rv_soc_td* soc = rv_core->priv;
+    soc->write(soc->ctx, (uint8_t*) (rv_core->ram + (rv_core->x[rv_core->rd] - RAM_BASE_ADDR)), rv_core->x[rv_core->rs1], rv_core->x[rv_core->rs2]);
 }
 
 void instr_PERASE(rv_core_td* rv_core) {
@@ -1999,10 +2001,16 @@ void rv_core_init(rv_core_td *rv_core,
     rv_core->pc = MROM_BASE_ADDR;
 
     rv_core->priv = priv;
+    printf("Initalized with priv: %p\n", priv);
+    rv_soc_td* rv_soc = (rv_soc_td*)priv;
+    printf("soc num cores : %d\n", rv_soc->num_cores);
+    printf("soc context pointer: %lu\n", (unsigned long)rv_soc->ctx);
+    printf("soc read pointer: %lu\n", (unsigned long)rv_soc->read);
     rv_core->bus_access = bus_access;
 
     trap_init(&rv_core->trap);
     mmu_init(&rv_core->mmu, pmp_checked_bus_access, rv_core);
 
     rv_core_init_csr_regs(rv_core);
+    rv_core->ram =(char*) ((rv_soc_td*)priv)->ram;
 }

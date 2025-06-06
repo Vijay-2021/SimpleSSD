@@ -24,6 +24,9 @@
 #include "hil/nvme/abstract_subsystem.hh"
 #include "cpu/cpu.hh"
 #include "util/simplessd.hh"
+#include "icl/icl.hh"
+#include "ftl/ftl.hh"
+#include "pal/pal.hh"
 
 namespace SimpleSSD {
 
@@ -35,6 +38,7 @@ class Subsystem : public AbstractSubsystem {
  protected:
   HIL *pHIL;
   CPU::CPU *pCPU;
+
   std::list<Namespace *> lNamespaces;
   uint32_t queueAllocated;
 
@@ -71,7 +75,7 @@ class Subsystem : public AbstractSubsystem {
   bool csdAddTask(SQEntryWrapper &, RequestFunction &);
   bool csdPoll(SQEntryWrapper &, RequestFunction &);
  public:
-  Subsystem(Controller *, CPU::CPU *, ConfigData &);
+  Subsystem(Controller *, ConfigData &);
   ~Subsystem();
 
   void init() override;

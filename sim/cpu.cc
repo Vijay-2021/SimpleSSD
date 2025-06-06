@@ -37,18 +37,9 @@ CPUContext::_CPUContext(DMAFunction &f, void *c, CPU::NAMESPACE n,
                         CPU::FUNCTION fc, uint64_t d)
     : func(f), context(c), ns(n), fct(fc), delay(d) {}
 
-void initCPU(ConfigReader &conf) {
-  if (cpu) {
-    delete cpu;
-  }
 
-  cpu = new CPU::CPU(conf);
-  Simulator::simCPU = cpu;
-}
-
-void deInitCPU() {
-  delete cpu;
-  cpu = nullptr;
+void setCPU(CPU::CPU* p) {
+  cpu = p;
 }
 
 void getCPUStatList(std::vector<Stats> &list, std::string prefix) {

@@ -29,6 +29,10 @@
 
 namespace SimpleSSD {
 
+namespace CPU {
+  class CPU;
+}
+
 typedef struct _CPUContext {
   DMAFunction func;
   void *context;
@@ -42,8 +46,8 @@ typedef struct _CPUContext {
   _CPUContext(DMAFunction &, void *, CPU::NAMESPACE, CPU::FUNCTION, uint64_t);
 } CPUContext;
 
-void initCPU(ConfigReader &);
-void deInitCPU();
+void setCPU(CPU::CPU *cpu);
+
 void getCPUStatList(std::vector<Stats> &, std::string);
 void getCPUStatValues(std::vector<double> &);
 void resetCPUStatValues();

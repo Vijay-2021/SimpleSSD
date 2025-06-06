@@ -106,7 +106,6 @@ class OpenChannelSSD12 : public Subsystem {
   PAL::PALOLD *pPALOLD;
 
   Disk *pDisk;
-
   Geometry structure;
   Mask ppaMask;
 
@@ -139,7 +138,7 @@ class OpenChannelSSD12 : public Subsystem {
   void physicalPageRead(SQEntryWrapper &, RequestFunction &);
 
  public:
-  OpenChannelSSD12(Controller *, CPU::CPU *, ConfigData &);
+  OpenChannelSSD12(Controller *, ConfigData &);
   ~OpenChannelSSD12();
 
   void init() override;
@@ -185,7 +184,7 @@ class OpenChannelSSD20 : public OpenChannelSSD12 {
   void vectorChunkReset(SQEntryWrapper &, RequestFunction &);
 
  public:
-  OpenChannelSSD20(Controller *, CPU::CPU *, ConfigData &);
+  OpenChannelSSD20(Controller *, ConfigData &);
   ~OpenChannelSSD20();
 
   void init() override;

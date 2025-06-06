@@ -74,7 +74,6 @@ class Controller : public StatObject {
  private:
   Interface *pParent;             //!< NVMe::Interface passed from constructor
   AbstractSubsystem *pSubsystem;  //!< NVMe::Subsystem allocate in constructor
-  CPU::CPU *pCPU;  //!< CPU pointer to the CPU that runs this controller
   bool bUseOCSSD;
 
   SimpleSSD::DMAInterface *pcieFIFO;
@@ -116,7 +115,7 @@ class Controller : public StatObject {
   bool checkQueue(SQueue *, DMAFunction &, void *);
 
  public:
-  Controller(Interface *, CPU::CPU* , ConfigReader &);
+  Controller(Interface *, ConfigReader &);
   ~Controller();
 
   void readRegister(uint64_t, uint64_t, uint8_t *, uint64_t &);

@@ -41,8 +41,8 @@ BlockData::_BlockData(uint32_t i, uint8_t v) : index(i), value(v) {}
 ChunkUpdateEntry::_ChunkUpdateEntry(ChunkDescriptor *p, uint32_t i)
     : pDesc(p), pageIdx(i) {}
 
-OpenChannelSSD12::OpenChannelSSD12(Controller *c, CPU::CPU *cpu, ConfigData &cfg)
-    : Subsystem(c, cpu, cfg),
+OpenChannelSSD12::OpenChannelSSD12(Controller *c, ConfigData &cfg)
+    : Subsystem(c, cfg),
       lastScheduled(0),
       eraseCount(0),
       readCount(0),
@@ -1169,8 +1169,8 @@ void OpenChannelSSD12::resetStatValues() {
   pPALOLD->resetStatValues();
 }
 
-OpenChannelSSD20::OpenChannelSSD20(Controller *c, CPU::CPU *cpu, ConfigData &cfg)
-    : OpenChannelSSD12(c, cpu, cfg),
+OpenChannelSSD20::OpenChannelSSD20(Controller *c, ConfigData &cfg)
+    : OpenChannelSSD12(c, cfg),
       pDescriptor(nullptr),
       vectorEraseCount(0),
       vectorReadCount(0),

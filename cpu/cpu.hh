@@ -45,8 +45,21 @@
 #include "cpu/riscv_em/src/core/riscv_helper.h"
 #include "cpu/riscv_em/src/peripherals/uart/simple_uart.h"
 #include "util/simplessd.hh"
+#include "util/disk.hh"
 
 namespace SimpleSSD {
+
+namespace ICL {
+  class ICL;
+}
+
+namespace FTL {
+  class FTL;
+}
+
+namespace PAL {
+  class PAL;
+}
 
 namespace CPU {
 
@@ -112,9 +125,14 @@ class CPU : public StatObject {
     uint64_t getJobListSize();
     CoreStat &getStat();
   };
-
+  
   ConfigReader &conf;
   
+  ICL::ICL *pICL;
+  FTL::FTL *pFTL;
+  PAL::PAL *pPAL;
+  Disk *pDisk;
+
   uint64_t lastResetStat;
 
   uint64_t clockSpeed;
@@ -132,9 +150,10 @@ class CPU : public StatObject {
   void calculatePower(Power &);
   void csdCycle();
   bool csd_in_progress;
-
+  uint32_t page_size = 16834; // Default page size for SimpleSSD
+  uint32_t lba_size = 512;
   public:
-    CPU(ConfigReader &);
+    CPU(ConfigReader &, ICL::ICL *, FTL::FTL *, PAL::PAL *pal);
     ~CPU();
 
     void execute(NAMESPACE, FUNCTION, DMAFunction &, void * = nullptr,
@@ -149,14 +168,15 @@ class CPU : public StatObject {
     void initCSD();
     void initFS();
     void printLastStat();
+    uint8_t read_flash(uint8_t* buffer, uint32_t offset , uint32_t len); // for the flash functions
+    uint8_t write_flash(uint8_t* buffer, uint32_t offset , uint32_t len);
+    void setDisk(Disk *disk, std::string filename, uint64_t size, uint32_t lba_size);
+    
 };
 
 }  // namespace CPU
 
 }  // namespace SimpleSSD
 
-uint8_t read_flash(uint8_t* buffer, uint32_t offset , uint32_t len); // for the flash functions
-
-uint8_t write_flash(uint8_t* buffer, uint32_t offset , uint32_t len);
 
 #endif

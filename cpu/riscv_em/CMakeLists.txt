@@ -43,8 +43,9 @@ set(SRC_SOC
 
 
 
-add_executable(riscv_em ${SRC_HELPER} ${SRC_CORE} ${SRC_PERIPH} ${SRC_SOC} src/main.c)
 add_library(riscv_em_lib STATIC ${SRC_HELPER} ${SRC_CORE} ${SRC_PERIPH} ${SRC_SOC})
+add_executable(riscv_em src/main.c)
+
 
 target_include_directories(riscv_em PUBLIC ${PROJECT_SOURCE_DIR})
 target_include_directories(riscv_em_lib PUBLIC ${PROJECT_SOURCE_DIR})
@@ -52,8 +53,8 @@ target_include_directories(riscv_em_lib PUBLIC ${PROJECT_SOURCE_DIR})
 target_compile_options(riscv_em PRIVATE -Wall -Wextra -pedantic -Werror)
 target_compile_options(riscv_em_lib PRIVATE -Wall -Wextra -pedantic -Werror)
 
-target_link_libraries(riscv_em pthread)
 target_link_libraries(riscv_em_lib pthread)
+target_link_libraries(riscv_em pthread riscv_em_lib)
 
 install (TARGETS riscv_em
          ARCHIVE DESTINATION lib
