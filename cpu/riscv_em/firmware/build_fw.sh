@@ -1,8 +1,10 @@
 #/bin/bash
 
 set -e
-
-riscv32-unknown-elf-gcc -march=rv32imafd -mabi=ilp32d -Wl,-Bstatic,-T,sections.lds,--strip-debug -ffreestanding -nostdlib -Ifs -o hello_world_fw.elf start.s main.c -Lfs/build -lmylib
+cd fs
+make
+cd ..
+riscv32-unknown-elf-gcc -march=rv32imafd -mabi=ilp32d -Wl,-Bstatic,-T,sections.lds,--strip-debug -ffreestanding -nostdlib -Ifs start.s main.c -Lfs/build -lmylib -o hello_world_fw.elf
 riscv32-unknown-elf-objcopy -O binary hello_world_fw.elf hello_world_fw.bin
 
 # print text section

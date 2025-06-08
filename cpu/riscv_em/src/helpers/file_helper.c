@@ -29,7 +29,7 @@ long int write_mem_from_file(char *file_name, uint8_t *memory, long int mem_size
     long int result = 0;
 
     lsize = get_file_size(file_name);
-
+    printf("file size for file name %s is %lu\n", file_name, lsize);
     if(lsize > mem_size)
     {
         printf("Not able to load fw file of size %lu, mem space is %lx\n", lsize, mem_size);

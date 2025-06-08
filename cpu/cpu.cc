@@ -1098,20 +1098,14 @@ uint8_t CPU::write_flash(uint8_t* buffer, uint32_t offset , uint32_t len) {
   pICL->write(req, reqTick);
   debugprint(LOG_CPU, "Request ID %u completed at tick %llu",
               req.reqID, reqTick);
-  uint64_t slba = offset / lba_size;
-  uint32_t nlblk = (len + lba_size - 1) / lba_size;
-  uint8_t *tmp_data = (uint8_t*) malloc(sizeof(char) * nlblk * lba_size);
-  pDisk->read(slba, nlblk, tmp_data);
-  memcpy(tmp_data + (offset % lba_size), buffer, len);
-  pDisk->write(slba, nlblk, tmp_data);
-  free(tmp_data);
+  uint64_t slba = offset;
+  uint32_t nlblk = len;
+  pDisk->write(slba, nlblk, buffer);
   return buffer[0];
 }
 
-void CPU::setDisk(Disk *disk, std::string filename, uint64_t size, uint32_t lba_size) {
+void CPU::setDisk(Disk *disk) {
   pDisk = disk;
-  lba_size = lba_size;
-  pDisk->open(filename, size, lba_size);
 }
 
 }  // namespace CPU

@@ -116,5 +116,5 @@ uint8_t ext2_writefile(char *fn, char *buf, uint32_t len, ext2_priv_data *priv);
 uint8_t ext2_exist(char *file, ext2_priv_data *priv);
 uint8_t ext2_probe(ext2_priv_data *priv);
 uint8_t ext2_mount(void *privd);
-
+uint8_t ext2_test(ext2_priv_data *priv);
 #endif

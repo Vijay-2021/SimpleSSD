@@ -13,8 +13,6 @@
 #define DEBUG_PRINT(...) do{ } while ( 0 )
 #endif
 
-#define die_msg(...) { printf(__VA_ARGS__); exit(-1); }
-
 #define ADDR_WITHIN(_addr, _start, _size) ( (_addr >= _start) && (_addr < (_start + _size)) )
 #define ADDR_WITHIN_LEN(_addr, _len, _start, _size) ( (_addr >= _start) && ((_addr + _len) <= (_start + _size)) )
 
@@ -129,4 +127,7 @@ static inline rv_uint_xlen extractxlen(rv_uint_xlen value, int start, int length
     return (value >> start) & (((rv_uint_xlen)-1) >> ((sizeof(rv_uint_xlen)*8) - length));
 }
 
+void die_msg(char* fmt, ...);
+
+int continue_sim();
 #endif /* RISCV_HELPER_H */

@@ -197,4 +197,6 @@ add_library(simplessd STATIC
   ${SRC_SIM}
   ${SRC_UTIL}
 )
+
 target_link_libraries(simplessd mcpat riscv_em_lib)
+add_dependencies(simplessd riscv_em_lib)

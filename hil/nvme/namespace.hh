@@ -121,6 +121,7 @@ class Namespace {
   void datasetManagement(SQEntryWrapper &, RequestFunction &);
 
  public:
+  Disk *getDisk();
   Namespace(Subsystem *, ConfigData &);
   ~Namespace();
 

@@ -62,7 +62,8 @@ static rv_ret rv_soc_bus_access(void *priv, privilege_level priv_level, bus_acce
         }
     }
 
-    die_msg("Invalid Address, or no valid write pointer found, write not executed!\n");
+    die_msg("Invalid Addresses, or no valid write pointer found, write not executed!: Addr: 0x"PRINTF_FMT" Len: %d Cycle: %ld  PC: 0x"PRINTF_FMT" with instruction %x\n", address, len, rv_soc->rv_cores[0].curr_cycle, rv_soc->rv_cores[0].pc, rv_soc->rv_cores[0].instruction);
+    return 0;
 }
 
 void rv_soc_dump_mem(rv_soc_td *rv_soc)
@@ -121,7 +122,10 @@ void rv_soc_init(rv_soc_td *rv_soc, char *fw_file_name, char *dtb_file_name, cha
     }
 
     write_mem_from_file(fw_file_name, soc_ram, sizeof(soc_ram));
-
+    uint32_t* ram_instrs = (uint32_t*) soc_ram;
+    for (int i = 2300; i < 2350; i++) {
+        printf("0x%08x\n", ram_instrs[i]);
+    }
     if (initrd_file_name != NULL) {
         write_mem_from_file(initrd_file_name, soc_from, FROM_SIZE_BYTES);
     }
@@ -170,81 +174,85 @@ void rv_soc_init(rv_soc_td *rv_soc, char *fw_file_name, char *dtb_file_name, cha
 
 void rv_soc_run(rv_soc_td *rv_soc, rv_uint_xlen success_pc, uint64_t num_cycles)
 {
-    uint8_t mei = 0, msi = 0, mti = 0;
-    uint8_t uart_irq_pending = 0;
-    for (uint32_t core_id = 0; core_id < rv_soc->num_cores; core_id++) {
-        rv_core_reg_dump(&rv_soc->rv_cores[core_id]);
-    }
-    while(1)
-    {
+    if (continue_sim()) {
+        uint8_t mei = 0, msi = 0, mti = 0;
+        uint8_t uart_irq_pending = 0;
         for (uint32_t core_id = 0; core_id < rv_soc->num_cores; core_id++) {
-            rv_core_run(&rv_soc->rv_cores[core_id]);
-        }
-
-        /* update peripherals */
-        #ifdef USE_SIMPLE_UART
-            uart_irq_pending = simple_uart_update(&rv_soc->uart);
-        #else
-            uart_irq_pending = uart_update(&rv_soc->uart8250);
-        #endif
-
-        /* update interrupt controllers */
-        plic_update_pending(&rv_soc->plic, 10, uart_irq_pending);
-        mei = plic_update(&rv_soc->plic);
-
-        /* Feed clint and update internall states */    
-        clint_update(&rv_soc->clint, &msi, &mti);
-
-        for (uint32_t core_id = 0; core_id < rv_soc->num_cores; core_id++) {
-            /* update CSRs for actual interrupt processing */
-            rv_core_process_interrupts(&rv_soc->rv_cores[core_id], mei, mti, msi);
-
             rv_core_reg_dump(&rv_soc->rv_cores[core_id]);
-
-            if(rv_soc->rv_cores[core_id].pc == success_pc)
-                break;
-
-            if((num_cycles != 0) && (rv_soc->rv_cores[core_id].curr_cycle >= num_cycles))
-                break;
         }
-    }
+        while(1)
+        {
+            for (uint32_t core_id = 0; core_id < rv_soc->num_cores; core_id++) {
+                rv_core_run(&rv_soc->rv_cores[core_id]);
+            }
+
+            /* update peripherals */
+            #ifdef USE_SIMPLE_UART
+                uart_irq_pending = simple_uart_update(&rv_soc->uart);
+            #else
+                uart_irq_pending = uart_update(&rv_soc->uart8250);
+            #endif
+
+            /* update interrupt controllers */
+            plic_update_pending(&rv_soc->plic, 10, uart_irq_pending);
+            mei = plic_update(&rv_soc->plic);
+
+            /* Feed clint and update internall states */    
+            clint_update(&rv_soc->clint, &msi, &mti);
+
+            for (uint32_t core_id = 0; core_id < rv_soc->num_cores; core_id++) {
+                /* update CSRs for actual interrupt processing */
+                rv_core_process_interrupts(&rv_soc->rv_cores[core_id], mei, mti, msi);
+
+                rv_core_reg_dump(&rv_soc->rv_cores[core_id]);
+
+                if(rv_soc->rv_cores[core_id].pc == success_pc)
+                    break;
+
+                if((num_cycles != 0) && (rv_soc->rv_cores[core_id].curr_cycle >= num_cycles))
+                    break;
+            }
+        }
+    }   
 }
 
 
 void rv_soc_tick(rv_soc_td *rv_soc, rv_uint_xlen success_pc, uint64_t num_cycles)
 {
-    uint8_t mei = 0, msi = 0, mti = 0;
-    uint8_t uart_irq_pending = 0;
+    if (continue_sim()) {
+        uint8_t mei = 0, msi = 0, mti = 0;
+        uint8_t uart_irq_pending = 0;
 
-    // rv_core_reg_dump(&rv_soc->rv_core0);
-    for (uint64_t current_cycle = 0; current_cycle < num_cycles; current_cycle++) {
-        for (uint32_t core_id = 0; core_id < rv_soc->num_cores; core_id++) {
-            rv_core_run(&rv_soc->rv_cores[core_id]); 
-        }
+        // rv_core_reg_dump(&rv_soc->rv_core0);
+        for (uint64_t current_cycle = 0; current_cycle < num_cycles; current_cycle++) {
+            for (uint32_t core_id = 0; core_id < rv_soc->num_cores; core_id++) {
+                rv_core_run(&rv_soc->rv_cores[core_id]); 
+            }
 
-        /* update peripherals */
-        #ifdef USE_SIMPLE_UART
-            uart_irq_pending = simple_uart_update(&rv_soc->uart);
-        #else
-            uart_irq_pending = uart_update(&rv_soc->uart8250);
-        #endif
+            /* update peripherals */
+            #ifdef USE_SIMPLE_UART
+                uart_irq_pending = simple_uart_update(&rv_soc->uart);
+            #else
+                uart_irq_pending = uart_update(&rv_soc->uart8250);
+            #endif
 
-        /* update interrupt controllers */
-        plic_update_pending(&rv_soc->plic, 10, uart_irq_pending);
-        mei = plic_update(&rv_soc->plic);
+            /* update interrupt controllers */
+            plic_update_pending(&rv_soc->plic, 10, uart_irq_pending);
+            mei = plic_update(&rv_soc->plic);
 
-        /* Feed clint and update internall states */    
-        clint_update(&rv_soc->clint, &msi, &mti);
+            /* Feed clint and update internall states */    
+            clint_update(&rv_soc->clint, &msi, &mti);
 
-        /* update CSRs for actual interrupt processing */
-        for (uint32_t core_id = 0; core_id < rv_soc->num_cores; core_id++) {
-            rv_core_process_interrupts(&rv_soc->rv_cores[core_id], mei, mti, msi);
+            /* update CSRs for actual interrupt processing */
+            for (uint32_t core_id = 0; core_id < rv_soc->num_cores; core_id++) {
+                rv_core_process_interrupts(&rv_soc->rv_cores[core_id], mei, mti, msi);
 
-            // rv_core_reg_dump(&rv_soc->rv_core0);
+                // rv_core_reg_dump(&rv_soc->rv_core0);
+                
+                if(rv_soc->rv_cores[core_id].pc == success_pc)
+                    break;
+            }
             
-            if(rv_soc->rv_cores[core_id].pc == success_pc)
-                break;
         }
-        
     }
 }

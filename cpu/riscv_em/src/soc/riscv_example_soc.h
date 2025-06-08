@@ -38,6 +38,7 @@ typedef struct rv_soc_struct
     void* ctx;
     uint8_t (*read)(void *ctx, uint8_t* buffer, uint32_t offset , uint32_t len);
 	uint8_t (*write)(void *ctx, uint8_t *buffer, uint32_t offset, uint32_t len);
+    void (*stop) (void *ctx);
 } rv_soc_td;
 
 void rv_soc_dump_mem(rv_soc_td *rv_soc);

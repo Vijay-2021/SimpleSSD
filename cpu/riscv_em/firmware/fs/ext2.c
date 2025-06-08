@@ -3,6 +3,7 @@
 #include "memory.h"
 #include "string.h"
 #include "cs_instructions.h"
+#include "utils.h"
 
 static inode_t *inode = 0;
 static uint8_t *root_buf = 0;
@@ -15,6 +16,7 @@ void ext2_read_block(uint8_t *buf, uint32_t block, ext2_priv_data *priv)
 	/*// mprint("we want to read block %d which is sectors [%d; %d]\n",
 		block, block*sectors_per_block , block*sectors_per_block + sectors_per_block);*/
 	//// kprintf("  %d", block);
+	printf("reading to buffer %p\n", buf);
 	pread((uint32_t)buf, block*sectors_per_block + DISK_OFFSET, sectors_per_block);
 
 }
@@ -103,23 +105,30 @@ uint32_t ext2_get_inode_block(uint32_t inode, uint32_t *b, uint32_t *ioff, ext2_
 uint32_t ext2_read_directory(char *filename, ext2_dir *dir, ext2_priv_data *priv)
 {
 	while(dir->inode != 0) {
+		printf("looping through dir entries with dir %x and priv %x\n", (uint32_t)dir, (uint32_t)priv);
 		char *name = (char *)malloc(dir->namelength + 1);
 		memcpy(name, &dir->reserved+1, dir->namelength);
+		printf("completed memcpy\n");
 		name[dir->namelength] = 0;
+		printf("setting name to zero?\n");
 		//// kprintf("DIR: %s (%d)\n", name, dir->size);
-		if(filename && strcmp(filename, name) == 0)
+		if(filename && (uint32_t)filename != 1 && strcmp(filename, name) == 0)
 		{
 			/* If we are looking for a file, we had found it */
+			printf("match found\n");
 			ext2_read_inode(inode, dir->inode, priv);
 			// mprint("Found inode %s! %d\n", filename, dir->inode);
 			free(name);
+			printf("returning inode %d for file %s\n", dir->inode, filename);
 			return dir->inode;
 		}
 		if(!filename && (uint32_t)filename != 1) {
 			//// mprint("Found dir entry: %s to inode %d \n", name, dir->inode);
 			// kprintf("%s\n", name);
 		}
+		printf("got down here\n");
 		dir = (ext2_dir *)((uint32_t)dir + dir->size);
+		printf("finished dir propogation\n");
 		free(name);
 	}
 	return 0;
@@ -131,6 +140,7 @@ uint8_t ext2_read_root_directory(char *filename, ext2_priv_data *priv)
 	if(!inode) inode = (inode_t *)malloc(sizeof(inode_t));
 	if(!root_buf) root_buf = (uint8_t *)malloc(priv->blocksize);
 	ext2_read_inode(inode, 2, priv);
+	printf("Priv is: %x\n", (uint32_t)priv);
 	if((inode->type & 0xF000) != INODE_TYPE_DIRECTORY)
 	{
 		// kprintf("FATAL: Root directory is not a directory!\n");
@@ -142,6 +152,7 @@ uint8_t ext2_read_root_directory(char *filename, ext2_priv_data *priv)
 	for(int i = 0;i < 12; i++)
 	{
 		uint32_t b = inode->dbp[i];
+		printf("DBP[%d] = %d\n", i, b);
 		if(b == 0) break;
 		ext2_read_block(root_buf, b, priv);
 		/* Now loop through the entries of the directory */
@@ -308,7 +319,9 @@ void ext2_find_new_inode_id(uint32_t *id, ext2_priv_data *priv)
 	 */
 
 	/* Loop through the block groups */
+	printf("finding new inode id for bgd %d\n", priv->first_bgd);
 	ext2_read_block(root_buf, priv->first_bgd, priv);
+	printf("completed read block\n");
 	block_group_desc_t *bg = (block_group_desc_t *)root_buf;
 	for(int i = 0; i < priv->number_of_bgs; i++)
 	{
@@ -394,6 +407,7 @@ uint8_t ext2_touch(char *file, ext2_priv_data *priv)
 	 * don't forget to update the superblock as well.
 	 */
 	uint32_t id = 0;
+	printf("Addr of id is %p\n", &id);
 	ext2_find_new_inode_id(&id, priv);
 	//// kprintf("Inode id = %d\n", id);
 	entry->inode = id;
@@ -411,6 +425,7 @@ uint8_t ext2_touch(char *file, ext2_priv_data *priv)
 	for(int i = 0;i < ioff; i++)
 		winode++;
 	memcpy(winode, fi, sizeof(inode_t));
+	printf("writing block\n");
 	ext2_write_block(root_buf, block, priv);
 	/* Now, we have added the inode, write the superblock as well. */
 	//ext2_write_block(&priv->sb, priv->sb.superblock_id, priv);
@@ -623,7 +638,6 @@ uint8_t ext2_probe(ext2_priv_data *priv)
 		return 0;
 	}
 	// mprint("Valid EXT2 signature!\n");
-	priv = (ext2_priv_data *)malloc(sizeof(ext2_priv_data));
 	memcpy(&priv->sb, sb, sizeof(superblock_t));
 	uint32_t blocksize = 1024 << sb->blocksize_hint;
 	priv->blocksize = blocksize;
@@ -641,8 +655,13 @@ uint8_t ext2_probe(ext2_priv_data *priv)
 
 uint8_t ext2_mount(void *privd)
 {
+	printf("privd is %x\n", (uint32_t)privd);
 	ext2_priv_data *priv = privd;
 	if(ext2_read_root_directory((char *)1, priv))
 		return 1;
+	return 0;
+}
+
+uint8_t ext2_test(ext2_priv_data *priv) {
 	return 0;
 }

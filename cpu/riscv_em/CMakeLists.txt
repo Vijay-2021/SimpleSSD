@@ -23,6 +23,7 @@ set(SRC_HELPER
 
 set(SRC_CORE 
     src/core/core.c
+    src/core/riscv_helper.c
     src/core/csr/csr.c
     src/core/pmp/pmp.c
     src/core/trap/trap.c

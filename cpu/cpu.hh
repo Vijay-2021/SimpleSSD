@@ -170,7 +170,7 @@ class CPU : public StatObject {
     void printLastStat();
     uint8_t read_flash(uint8_t* buffer, uint32_t offset , uint32_t len); // for the flash functions
     uint8_t write_flash(uint8_t* buffer, uint32_t offset , uint32_t len);
-    void setDisk(Disk *disk, std::string filename, uint64_t size, uint32_t lba_size);
+    void setDisk(Disk *disk);
     
 };
 

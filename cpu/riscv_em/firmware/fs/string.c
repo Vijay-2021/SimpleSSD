@@ -2,7 +2,7 @@
 #include "string.h"
 #include <stddef.h>
 #include <stdint.h>
-
+#include "utils.h"
 
 size_t strlen(const string str)
 {
@@ -90,6 +90,7 @@ size_t str_begins_with(const string str, const string with)
 
 size_t strcmp(string str1, string str2)
 {
+	printf("bello me comparing %x and %x\n", (uint32_t)str1, (uint32_t)str2);
 	size_t res=0;
 	while (!(res = *(unsigned char*)str1 - *(unsigned char*)str2) && *str2)
 		++str1, ++str2;

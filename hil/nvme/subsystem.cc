@@ -112,18 +112,7 @@ void Subsystem::init() {
         panic("Failed to create namespace");
       }
     }
-    std::string filename = conf.readString(CONFIG_NVME, NVME_DISK_IMAGE_PATH + NSID_LOWEST); // use the first disk
-    Disk *disk;
-    if (filename.length() == 0) {
-      disk = new MemDisk();
-    }
-    else if (conf.readBoolean(CONFIG_NVME, NVME_USE_COW_DISK)) {
-      disk = new CoWDisk();
-    }
-    else {
-      disk = new Disk();
-    }
-    pCPU->setDisk(disk, filename, info.size * info.lbaSize, info.lbaSize);
+    pCPU->setDisk(lNamespaces.front()->getDisk());
   }
 }
 

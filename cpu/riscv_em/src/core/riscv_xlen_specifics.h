@@ -14,7 +14,7 @@
 #endif
 
 #ifdef RV64
-    #define PRINTF_FMT "%016lx"
+    #define PRINTF_FMT "%016lx" 
     #define PRINTF_FMTU "%lu"
     #define XLEN_INT_MIN 0x8000000000000000
 
