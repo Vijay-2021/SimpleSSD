@@ -108,6 +108,6 @@ char* malloc(size_t size)
 	last_alloc += 4;
 	memory_used += size + 4 + sizeof(alloc_t);
 	// memset((char *)((uint32_t)alloc + sizeof(alloc_t)), 0, size); this isn't calloc
-	printf("finished malloc and returning %x\n", (uint32_t)alloc + sizeof(alloc_t));
+	printf("finished malloc and returnings %x\n", (uint32_t)alloc + sizeof(alloc_t));
 	return (char *)((uint32_t)alloc + sizeof(alloc_t));
 }

@@ -3,7 +3,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include "utils.h"
-
+#include "memory.h"
 size_t strlen(const string str)
 {
 	size_t i = 0;
@@ -96,4 +96,47 @@ size_t strcmp(string str1, string str2)
 		++str1, ++str2;
 
 	return res;
+}
+
+string strncpy(string dest, const string src, size_t n)
+{
+	return memcpy(dest, src, n);
+}
+
+string strcpy(string dest, string src)
+{
+	return strncpy(dest, src, strlen(src) + 1);
+}
+
+extern int strchr(string delim, char c) {
+    while (*delim) {
+        if (*delim == c) return 1;
+        delim++;
+    }
+    return 0;
+}
+
+string strtok(string str, string delim)
+{
+    static char *next;
+    if (str) next = str;
+    if (!next) return NULL;
+
+    // Skip leading delimiters
+    while (*next && strchr(delim, *next)) next++;
+    if (!*next) return NULL;
+
+    char *start = next;
+
+    // Find end of token
+    while (*next && !strchr(delim, *next)) next++;
+
+    if (*next) {
+        *next = '\0';
+        next++;
+    } else {
+        next = NULL;
+    }
+
+    return start;
 }

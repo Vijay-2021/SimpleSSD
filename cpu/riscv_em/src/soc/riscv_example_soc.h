@@ -36,8 +36,8 @@ typedef struct rv_soc_struct
     simple_uart_td uart;
     rv_soc_mem_access_cb_td mem_access_cbs[6];
     void* ctx;
-    uint8_t (*read)(void *ctx, uint8_t* buffer, uint32_t offset , uint32_t len);
-	uint8_t (*write)(void *ctx, uint8_t *buffer, uint32_t offset, uint32_t len);
+    uint32_t (*read)(void *ctx, uint8_t* buffer, uint32_t offset , uint32_t len);
+	uint32_t (*write)(void *ctx, uint8_t *buffer, uint32_t offset, uint32_t len);
     void (*stop) (void *ctx);
 } rv_soc_td;
 

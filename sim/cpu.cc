@@ -42,6 +42,10 @@ void setCPU(CPU::CPU* p) {
   cpu = p;
 }
 
+void deInitCPU() {
+  cpu->closeDisk();
+}
+
 void getCPUStatList(std::vector<Stats> &list, std::string prefix) {
   if (cpu) {
     cpu->getStatList(list, prefix);

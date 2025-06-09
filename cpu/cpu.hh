@@ -168,10 +168,14 @@ class CPU : public StatObject {
     void initCSD();
     void initFS();
     void printLastStat();
-    uint8_t read_flash(uint8_t* buffer, uint32_t offset , uint32_t len); // for the flash functions
-    uint8_t write_flash(uint8_t* buffer, uint32_t offset , uint32_t len);
+    uint32_t read_flash_icl(uint8_t* buffer, uint32_t offset , uint32_t len); // for the flash functions
+    uint32_t write_flash_icl(uint8_t* buffer, uint32_t offset , uint32_t len);
+    uint32_t read_flash_ftl(uint8_t* buffer, uint32_t offset , uint32_t len);
+    uint32_t write_flash_ftl(uint8_t* buffer, uint32_t offset , uint32_t len);
+    uint32_t read_flash_pal(uint8_t* buffer, uint32_t lpn , uint32_t ppn);
+    uint32_t write_flash_pal(uint8_t* buffer, uint32_t lpn , uint32_t ppn);
     void setDisk(Disk *disk);
-    
+    void closeDisk();
 };
 
 }  // namespace CPU

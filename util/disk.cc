@@ -28,6 +28,8 @@
 #include <unistd.h>
 #endif
 
+#include "sim/trace.hh"
+
 namespace SimpleSSD {
 
 Disk::Disk() : diskSize(0), sectorSize(0) {}
@@ -166,6 +168,9 @@ uint16_t Disk::write(uint64_t slba, uint16_t nlblk, uint8_t *buffer) {
     }
 
     uint64_t offset = disk.tellp();
+    debugprint(LOG_HIL_NVME,
+              "NVM     | WRITE DISK | BYTE %016" PRIX64 " + %X",
+              slba, nlblk * sectorSize);
     disk.write((char *)buffer, sectorSize * nlblk);
     offset = (uint64_t)disk.tellp() - offset;
 

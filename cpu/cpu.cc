@@ -349,11 +349,11 @@ void CPU::stopCSD() {
 
 void CPU::initFS() {
   csd.ctx = this;
-  csd.read = [](void* ctx, uint8_t* buf, uint32_t addr, uint32_t len) -> uint8_t {
-    return static_cast<CPU*>(ctx)->read_flash(buf, addr, len);
+  csd.read = [](void* ctx, uint8_t* buf, uint32_t addr, uint32_t len) -> uint32_t {
+    return static_cast<CPU*>(ctx)->read_flash_icl(buf, addr, len);
   };
-  csd.write = [](void* ctx, uint8_t* buf, uint32_t addr, uint32_t len) -> uint8_t {
-    return static_cast<CPU*>(ctx)->write_flash(buf, addr, len);
+  csd.write = [](void* ctx, uint8_t* buf, uint32_t addr, uint32_t len) -> uint32_t {
+    return static_cast<CPU*>(ctx)->write_flash_icl(buf, addr, len);
   };
 }
 
@@ -1058,7 +1058,7 @@ void CPU::printLastStat() {
   }
 }
 
-uint8_t CPU::read_flash(uint8_t* buffer, uint32_t offset , uint32_t len) {
+uint32_t CPU::read_flash_icl(uint8_t* buffer, uint32_t offset , uint32_t len) {
   debugprint(LOG_CPU, "Read flash from CSD at offset %u, length %u",
              offset, len);
   ICL::Request req;
@@ -1081,13 +1081,14 @@ uint8_t CPU::read_flash(uint8_t* buffer, uint32_t offset , uint32_t len) {
   return buffer[0];
 }
 
-uint8_t CPU::write_flash(uint8_t* buffer, uint32_t offset , uint32_t len) {
+uint32_t CPU::write_flash_icl(uint8_t* buffer, uint32_t offset , uint32_t len) {
   debugprint(SimpleSSD::LOG_CPU, "Write flash from CSD at offset %u, length %u",
       offset, len);
   ICL::Request req;
   LPNRange lpnRange;
-  lpnRange.slpn = offset / page_size;
-  lpnRange.nlp = (len + page_size - 1) / page_size;
+  uint32_t page_per_lba = page_size / lba_size;
+  lpnRange.slpn = offset / page_per_lba;
+  lpnRange.nlp = (len + page_per_lba - 1) / page_per_lba;
   req.range = lpnRange;
   req.offset = 0;
   req.length = len;
@@ -1104,8 +1105,34 @@ uint8_t CPU::write_flash(uint8_t* buffer, uint32_t offset , uint32_t len) {
   return buffer[0];
 }
 
+uint32_t CPU::read_flash_pal(uint8_t* buffer, uint32_t lpn, uint32_t ppn) {
+  PAL::Request req;
+  uint32_t lpn = offset / page_size;
+  uint32_t num_lp = (len + page_size - 1) / page_size;
+  
+  memset(&req, 0, sizeof(req));
+  uint32_t slba = ppn * page_size / lba_size;
+  uint32_t nlblk = page_size / lba_size;
+  pDisk->read(slba, nlblk, buffer);
+}
+
+uint32_t CPU::write_flash_pal(uint8_t* buffer, uint32_t lpn, uint32_t ppn) {
+  PAL::Request req;
+  memset(&req, 0, sizeof(req));
+  uint32_t slba = ppn * page_size / lba_size;
+  uint32_t nlblk = page_size / lba_size;
+  pDisk->write(slba, nlblk, buffer);
+}
+
 void CPU::setDisk(Disk *disk) {
   pDisk = disk;
+}
+
+void CPU::closeDisk() {
+  if (pDisk) {
+    pDisk->close();
+    pDisk = nullptr;
+  }
 }
 
 }  // namespace CPU

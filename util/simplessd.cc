@@ -40,5 +40,5 @@
  
  void releaseSimpleSSDEngine() {
    printCPULastStat();
-   // deInitCPU();
+   deInitCPU();
  }

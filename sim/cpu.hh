@@ -47,7 +47,7 @@ typedef struct _CPUContext {
 } CPUContext;
 
 void setCPU(CPU::CPU *cpu);
-
+void deInitCPU();
 void getCPUStatList(std::vector<Stats> &, std::string);
 void getCPUStatValues(std::vector<double> &);
 void resetCPUStatValues();

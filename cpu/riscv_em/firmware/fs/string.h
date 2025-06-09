@@ -16,5 +16,8 @@ extern size_t str_begins_with(const string str, const string with);
 extern size_t str_backspace(string str, char c);
 extern size_t strcount(string str, char c);
 extern size_t strsplit(string str, char delim);
-
+extern string strcpy(string dest, const string src);
+extern string strncpy(string dest, const string src, size_t n);
+extern string strtok(string str, string delim);
+extern int strchr(string str, char c);
 #endif

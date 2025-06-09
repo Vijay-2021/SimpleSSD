@@ -100,7 +100,6 @@ void _printf(char* format, char** args) {
             break;
         case 's':
             char *str = *args++;
-            print("bello string");
             print(str);
             break;
         default:
