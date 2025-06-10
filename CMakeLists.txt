@@ -42,6 +42,8 @@ if (NOT EXISTS "${PROJECT_SOURCE_DIR}/lib/mcpat/mcpat.h")
 Check you initialized submodules.")
 endif ()
 
+add_compile_definitions(RV64)
+
 # Add subproject
 add_subdirectory(${PROJECT_SOURCE_DIR}/lib/mcpat)
 add_subdirectory(${PROJECT_SOURCE_DIR}/cpu/riscv_em)

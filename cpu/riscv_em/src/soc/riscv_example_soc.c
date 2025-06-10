@@ -256,3 +256,12 @@ void rv_soc_tick(rv_soc_td *rv_soc, rv_uint_xlen success_pc, uint64_t num_cycles
         }
     }
 }
+
+void rv_soc_add_task(char *input_cmd)
+{
+    // This function is not implemented yet, but it should add a task to the CSD
+    // For now, we just print the input command
+    printf("Adding CSD task from soc: %s\n", input_cmd);
+    strtok(input_cmd, " "); // Tokenize the input command if needed
+    // You can implement the actual task addition logic here
+}

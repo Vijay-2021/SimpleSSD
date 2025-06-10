@@ -36,8 +36,8 @@ typedef struct rv_soc_struct
     simple_uart_td uart;
     rv_soc_mem_access_cb_td mem_access_cbs[6];
     void* ctx;
-    uint32_t (*read)(void *ctx, uint8_t* buffer, uint32_t offset , uint32_t len);
-	uint32_t (*write)(void *ctx, uint8_t *buffer, uint32_t offset, uint32_t len);
+    uint64_t (*read)(void *ctx, uint8_t* buffer, uint64_t offset , uint64_t len);
+	uint64_t (*write)(void *ctx, uint8_t *buffer, uint64_t offset, uint64_t len);
     void (*stop) (void *ctx);
 } rv_soc_td;
 
@@ -46,6 +46,7 @@ void rv_soc_init(rv_soc_td *rv_soc, char *fw_file_name, char *dtb_file_name, cha
 void rv_soc_run(rv_soc_td *rv_soc, rv_uint_xlen success_pc, uint64_t num_cycles); // this depends on the stored number of cycles in the core
 void rv_soc_tick(rv_soc_td *rv_soc, rv_uint_xlen success_pc, uint64_t num_cycles); // this just runs for the given number of cycles
 void rv_soc_fs_init(rv_soc_td *rv_soc); 
+void rv_soc_add_task(char *input_cmd);
 #ifdef __cplusplus
 }
 #endif

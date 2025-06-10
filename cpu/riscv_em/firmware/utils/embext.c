@@ -50,7 +50,7 @@ struct file_ent {
     uint32_t magic;
     struct ext2context *context;
     uint32_t flags;
-    int cursor;
+    int64_t cursor;
     uint32_t inode_number;
     struct buffer_object buffer;
     struct inode inode;
@@ -625,7 +625,7 @@ int ext2_lookup_path(struct file_ent *fe, const char *path) {
     return ino;//ext2_open_inode(fe, ino);
 }
 
-static uint32_t ext2_block_from_offset(struct file_ent *fe, uint32_t offset) {
+static uint32_t ext2_block_from_offset(struct file_ent *fe, uint64_t offset) {
     uint32_t block_index = offset / ext2_block_size(fe->context);
     uint32_t block;
     uint32_t indirect_entries = (ext2_block_size(fe->context) / 4);
@@ -1095,7 +1095,7 @@ int ext2_lseek(void *vfe, int offset, int whence) {
         if(offset > INT64_MAX - fe->inode.i_size) {
             return -1;
         }
-        if(offset + fe->inode.i_size < 0) {
+        if(offset + (int64_t)fe->inode.i_size < 0) {
             return -1;
         }
         fe->cursor = fe->inode.i_size + offset;

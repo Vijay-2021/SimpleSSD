@@ -15,17 +15,18 @@
     __asm__ volatile (".word %0" :: "i"(CUSTOM_INSTR_ENCODE(funct7, rs2, rs1, funct3, rd, opcode)))
 
 #define CUSTOM_OPCODE 0x0B
-#define READ_FUNCT3 0x00
-#define WRITE_FUNCT3 0x01
-#define ERASE_FUNCT3 0x02
+    #define FUNC3_FTL 0x0
+        #define FUNC7_INSTR_FREAD 0x00
+        #define FUNC7_INSTR_FWRITE 0x01
+        #define FUNC7_INSTR_FTRIM 0x02
+    #define FUNC3_PAL 0x1
+        #define FUNC7_INSTR_PREAD 0x00
+        #define FUNC7_INSTR_PWRITE 0x01
+        #define FUNC7_INSTR_PERASE 0x02
 
-#define READ_FUNCT7 0x00
-#define WRITE_FUNCT7 0x00
-#define ERASE_FUNCT7 0x00
-
-void pread(uint32_t rd, uint32_t rs1, uint32_t rs2);
-void pwrite(uint32_t rd, uint32_t rs1, uint32_t rs2);
-void perase(uint32_t rd, uint32_t rs1, uint32_t rs2);
+void pread(uint64_t rd, uint64_t rs1, uint64_t rs2);
+void pwrite(uint64_t rd, uint64_t rs1, uint64_t rs2);
+void perase(uint64_t rd, uint64_t rs1, uint64_t rs2);
 
 // we want to write programs that do this kind of thing
 

@@ -6,7 +6,7 @@
 #ifndef _SYS_DIRENT_H
 #define _SYS_DIRENT_H
 
-#include <sys/types.h>
+typedef unsigned long off_t;
 
 #define HAVE_NO_D_NAMLEN	/* no struct dirent->d_namlen */
 #define HAVE_DD_LOCK  		/* have locking mechanism */

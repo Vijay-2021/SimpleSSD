@@ -17,14 +17,16 @@ int main(void)
 	void *fe = ext2_open(context, "/home/test_csd.txt", O_WRONLY | O_APPEND | O_CREAT, 0777);
     if(fe == NULL) {
         printf("open fail\n");
+    } else {
+        printf("open ok\n");
     }
   
-    int result = ext2_write(fe, "Hello world\r\n", 13);
+    int result = ext2_write(fe, "Hello worts\r\n", 13);
     if(result != 13) {
         printf("write fail\n");
     }
     ext2_close(fe);
-    printf("    pass\n");
+    printf(" pass\n");
 	ext2_umount(context);
 	print("finishing firmware\n");
     return 0;

@@ -21,6 +21,7 @@
 #include <iostream>
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 
 #include "hil/nvme/controller.hh"
 #include "util/algorithm.hh"
@@ -1322,8 +1323,10 @@ bool Subsystem::csdSOCInit(SQEntryWrapper &req, RequestFunction &func) {
   CQEntryWrapper resp(req); // create the completion queue response
   debugprint(LOG_HIL_NVME, "ADMIN   | CSD SOC Init | NSID %d",
              req.entry.namespaceID);
+  debugprint(LOG_HIL_NVME, "Data stored is: %s", (char*)req.entry.data);
+  debugprint(LOG_HIL_NVME, "Dword 10 is: %x", req.entry.dword10);
   // start soc
-  pCPU->startCSD();
+  //pCPU->startCSD();
   // pCPU->initFS(); 
   // init file system
   func(resp);
@@ -1339,9 +1342,36 @@ bool Subsystem::csdSOCStop(SQEntryWrapper &req, RequestFunction &func) {
 }
 
 bool Subsystem::csdAddTask(SQEntryWrapper &req, RequestFunction &func) {
+
   CQEntryWrapper resp(req); // create the completion queue response
   debugprint(LOG_HIL_NVME, "ADMIN   | CSD Add Task | NSID %d",
-             req.entry.namespaceID);
+             req.entry.namespaceID);  
+  uint32_t req_size = req.entry.dword10;
+  char* buffer = (char*)calloc(256, sizeof(char));
+  static DMAFunction dmaDone = [this](uint64_t, void *context) {
+    RequestContext *pContext = (RequestContext *)context;
+    pContext->function(pContext->resp);
+    pCPU->addCSDTask((char*)pContext->buffer);
+    delete pContext->dma;
+    delete pContext;
+  };
+
+  DMAFunction csdAddTask = [](uint64_t, void *context) {
+    RequestContext *pContext = (RequestContext *)context;
+    pContext->dma->read(0, 256, pContext->buffer, dmaDone, context);
+  };
+
+  RequestContext *pContext = new RequestContext(func, resp);
+  pContext->buffer = (uint8_t*)buffer;
+  if (req.useSGL) {
+    pContext->dma = new SGL(cfgdata, csdAddTask, pContext, req.entry.data1,
+                            req.entry.data2);
+  }
+  else {
+    pContext->dma =
+        new PRPList(cfgdata, csdAddTask, pContext, req.entry.data1,
+                    req.entry.data2, (uint64_t)req_size);
+  }
   func(resp);
   return true; // Not implemented yet
 }
@@ -1349,8 +1379,34 @@ bool Subsystem::csdAddTask(SQEntryWrapper &req, RequestFunction &func) {
 bool Subsystem::csdPoll(SQEntryWrapper &req, RequestFunction &func) {
   CQEntryWrapper resp(req); // create the completion queue response
   debugprint(LOG_HIL_NVME, "ADMIN   | CSD Poll | NSID %d",
-             req.entry.namespaceID);
-  func(resp);
+                            req.entry.namespaceID);
+  uint32_t req_size = req.entry.dword10; 
+  char* buffer = (char*)calloc(256, sizeof(char));
+  strcpy(buffer, "CSD Poll Response");
+  debugprint(LOG_HIL_NVME, "CSD Polling with buffer: %s and ptr %p", buffer, buffer); 
+  static DMAFunction dmaDone = [](uint64_t, void *context) {
+    RequestContext *pContext = (RequestContext *)context;
+    pContext->function(pContext->resp);
+    free(pContext->buffer);
+    delete pContext->dma;
+    delete pContext;
+  };
+  static DMAFunction csdPoll = [](uint64_t, void *context) {
+    RequestContext *pContext = (RequestContext *)context;
+    pContext->dma->write(0, 256, pContext->buffer, dmaDone, context);
+  };
+  RequestContext *pContext = new RequestContext(func, resp);
+
+  pContext->buffer = (uint8_t*)buffer;
+  if (req.useSGL) {
+    pContext->dma = new SGL(cfgdata, csdPoll, pContext, req.entry.data1,
+                            req.entry.data2);
+  }
+  else {
+    pContext->dma =
+        new PRPList(cfgdata, csdPoll, pContext, req.entry.data1,
+                    req.entry.data2, (uint64_t)req_size);
+  }
   return true; // Not implemented yet
 }
 

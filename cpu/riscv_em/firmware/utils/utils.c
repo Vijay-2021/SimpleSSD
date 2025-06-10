@@ -74,6 +74,7 @@ void _printf(char* format, char** args) {
         }
         // read next char and clear buffer
         char curr = format[++i];
+        char *str;
         memset(value_buffer, 0, 32);
         switch (curr) {
         case 'p':
@@ -99,7 +100,7 @@ void _printf(char* format, char** args) {
             print(value_buffer);
             break;
         case 's':
-            char *str = *args++;
+            str = *args++;
             print(str);
             break;
         default:

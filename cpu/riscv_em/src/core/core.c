@@ -742,7 +742,7 @@ static void instr_SW(rv_core_td *rv_core)
     static void instr_URET(rv_core_td *rv_core)
     {
         CORE_DBG("%s: %x\n", __func__, rv_core->instruction);
-        printf("URET!\n");
+        printf("URET! \n");
         while(1);
         /* not implemented */
         (void)rv_core;
@@ -1304,7 +1304,7 @@ void instr_PWRITE(rv_core_td* rv_core) {
 }
 
 void instr_PERASE(rv_core_td* rv_core) {
-    printf("perase called on rd: %d rs1: %d rs2: %d\n", rv_core->x[rv_core->rd], rv_core->x[rv_core->rs1], rv_core->x[rv_core->rs2]);
+    printf("perase called on rd: %ld rs1: %ld rs2: %ld\n", rv_core->x[rv_core->rd], rv_core->x[rv_core->rs1], rv_core->x[rv_core->rs2]);
 }
 
 
@@ -1665,7 +1665,7 @@ INIT_INSTRUCTION_LIST_DESC(ADD_SUB_SLL_SLT_SLTU_XOR_SRL_SRA_OR_AND_func3_subcode
 #endif
 
 static instruction_hook_td CUSTOM_func3_subcode_list[] = {
-    [FUNC3_INSTR_PREAD] = {NULL, instr_PREAD, NULL},
+    [FUNC3_FTL] = {NULL, instr_PREAD, NULL},
     [FUNC3_INSTR_PWRITE] = {NULL, instr_PWRITE, NULL},
     [FUNC3_INSTR_PERASE] = {NULL, instr_PERASE, NULL}
 };

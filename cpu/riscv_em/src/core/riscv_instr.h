@@ -144,9 +144,14 @@
 
 // custom instructions for interfacing with the ssd simulator
 
-#define INSTR_PREAD_PWRITE_PERASE 0x0B
-    #define FUNC3_INSTR_PREAD 0x0
-    #define FUNC3_INSTR_PWRITE 0x1
-    #define FUNC3_INSTR_PERASE 0x2
+#define INSTR_CSD 0x0B
+    #define FUNC3_FTL 0x0
+        #define FUNC7_FREAD 0x00
+        #define FUNC7_FWRITE 0x01
+        #define FUNC7_FTRIM 0x02
+    #define FUNC3_INSTR_PAL 0x1
+        #define FUNC7_PREAD 0x00
+        #define FUNC7_PWRITE 0x01
+        #define FUNC7_PERASE 0x02
 
 #endif /* RISCV_INSTR_H */
