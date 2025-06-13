@@ -11,7 +11,7 @@ void pread(uint64_t rd, uint64_t rs1, uint64_t rs2) {
       : "r"(rd), "r"(rs1), "r"(rs2)
       : "t0", "t1", "t2"
   ); 
-  EMIT_CUSTOM_INSTR(CUSTOM_OPCODE, PAL_FUNCT3, PREAD_FUNCT7, 5, 6, 7);
+  EMIT_CUSTOM_INSTR(CUSTOM_OPCODE, FUNC3_PHYSADDR, FUNC7_INSTR_PREAD, 5, 6, 7);
   COMPILER_BARRIER();
 }
 
@@ -26,7 +26,7 @@ void pwrite(uint64_t rd, uint64_t rs1, uint64_t rs2) {
       : "r"(rd), "r"(rs1), "r"(rs2)
       : "t0", "t1", "t2"
   ); 
-  EMIT_CUSTOM_INSTR(CUSTOM_OPCODE, PAL_FUNCT3, PWRITE_FUNCT7, 5, 6, 7);
+  EMIT_CUSTOM_INSTR(CUSTOM_OPCODE, FUNC3_PHYSADDR, FUNC7_INSTR_PWRITE, 5, 6, 7);
   COMPILER_BARRIER();
 }
 
@@ -41,11 +41,11 @@ void perase(uint64_t rd, uint64_t rs1, uint64_t rs2) {
       : "r"(rd), "r"(rs1), "r"(rs2)
       : "t0", "t1", "t2"
   ); 
-  EMIT_CUSTOM_INSTR(CUSTOM_OPCODE, PAL_FUNCT3, PERASE_FUNCT7, 5, 6, 7);
+  EMIT_CUSTOM_INSTR(CUSTOM_OPCODE, FUNC3_PHYSADDR, FUNC7_INSTR_PERASE, 5, 6, 7);
   COMPILER_BARRIER();
 }
 
-void fread(uint64_t rd, uint64_t rs1, uint64_t rs2) {
+void lread(uint64_t rd, uint64_t rs1, uint64_t rs2) {
   
   COMPILER_BARRIER();
   __asm__ volatile (
@@ -56,11 +56,11 @@ void fread(uint64_t rd, uint64_t rs1, uint64_t rs2) {
       : "r"(rd), "r"(rs1), "r"(rs2)
       : "t0", "t1", "t2"
   ); 
-  EMIT_CUSTOM_INSTR(CUSTOM_OPCODE, FTL_FUNCT3, FREAD_FUNCT7, 5, 6, 7);
+  EMIT_CUSTOM_INSTR(CUSTOM_OPCODE, FUNC3_LOGADDR, FUNC7_INSTR_LREAD, 5, 6, 7);
   COMPILER_BARRIER();
 }
 
-void fwrite(uint64_t rd, uint64_t rs1, uint64_t rs2) {
+void lwrite(uint64_t rd, uint64_t rs1, uint64_t rs2) {
   
   COMPILER_BARRIER();
   __asm__ volatile (
@@ -71,11 +71,11 @@ void fwrite(uint64_t rd, uint64_t rs1, uint64_t rs2) {
       : "r"(rd), "r"(rs1), "r"(rs2)
       : "t0", "t1", "t2"
   ); 
-  EMIT_CUSTOM_INSTR(CUSTOM_OPCODE, FTL_FUNCT3, FWRITE_FUNCT7, 5, 6, 7);
+  EMIT_CUSTOM_INSTR(CUSTOM_OPCODE, FUNC3_LOGADDR, FUNC7_INSTR_LWRITE, 5, 6, 7);
   COMPILER_BARRIER();
 }
 
-void ftrim(uint64_t rd, uint64_t rs1, uint64_t rs2) {
+void ltrim(uint64_t rd, uint64_t rs1, uint64_t rs2) {
   
   COMPILER_BARRIER();
   __asm__ volatile (
@@ -86,7 +86,7 @@ void ftrim(uint64_t rd, uint64_t rs1, uint64_t rs2) {
       : "r"(rd), "r"(rs1), "r"(rs2)
       : "t0", "t1", "t2"
   ); 
-  EMIT_CUSTOM_INSTR(CUSTOM_OPCODE, FTL_FUNCT3, FTRIM_FUNCT7, 5, 6, 7);
+  EMIT_CUSTOM_INSTR(CUSTOM_OPCODE, FUNC3_LOGADDR, FUNC7_INSTR_LTRIM, 5, 6, 7);
   COMPILER_BARRIER();
 }
 

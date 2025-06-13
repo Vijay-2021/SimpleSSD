@@ -71,7 +71,8 @@ void Subsystem::init() {
   ICL::ICL *icl = pHIL->getICL();
   FTL::FTL *ftl = icl->getFTL();
   PAL::PAL *pal = ftl->getPAL();
-  pCPU = new CPU::CPU(conf, icl, ftl, pal);
+  DRAM::AbstractDRAM *dram = icl->getDRAM();
+  pCPU = new CPU::CPU(conf, icl, ftl, pal, dram);
   setCPU(pCPU);
   
   uint16_t nNamespaces =
@@ -1323,11 +1324,8 @@ bool Subsystem::csdSOCInit(SQEntryWrapper &req, RequestFunction &func) {
   CQEntryWrapper resp(req); // create the completion queue response
   debugprint(LOG_HIL_NVME, "ADMIN   | CSD SOC Init | NSID %d",
              req.entry.namespaceID);
-  debugprint(LOG_HIL_NVME, "Data stored is: %s", (char*)req.entry.data);
-  debugprint(LOG_HIL_NVME, "Dword 10 is: %x", req.entry.dword10);
   // start soc
-  //pCPU->startCSD();
-  // pCPU->initFS(); 
+  pCPU->startCSD();
   // init file system
   func(resp);
   return true; // Not implemented yet

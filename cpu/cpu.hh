@@ -41,9 +41,9 @@
 #include "sim/simulator.hh"
 #include "sim/statistics.hh"
 
-#include "cpu/riscv_em/src/soc/riscv_example_soc.h"
-#include "cpu/riscv_em/src/core/riscv_helper.h"
-#include "cpu/riscv_em/src/peripherals/uart/simple_uart.h"
+#include "rv_src/soc/riscv_example_soc.hh"
+#include "rv_src/core/riscv_helper.hh"
+#include "rv_src/peripherals/uart/simple_uart.hh"
 #include "util/simplessd.hh"
 #include "util/disk.hh"
 
@@ -59,6 +59,10 @@ namespace FTL {
 
 namespace PAL {
   class PAL;
+}
+
+namespace DRAM {
+  class AbstractDRAM;
 }
 
 namespace CPU {
@@ -131,6 +135,7 @@ class CPU : public StatObject {
   ICL::ICL *pICL;
   FTL::FTL *pFTL;
   PAL::PAL *pPAL;
+  DRAM::AbstractDRAM *pDRAM;
   Disk *pDisk;
 
   uint64_t lastResetStat;
@@ -142,7 +147,7 @@ class CPU : public StatObject {
   std::vector<Core> hilCore;
   std::vector<Core> iclCore;
   std::vector<Core> ftlCore;
-  rv_soc_td csd;
+  RISCV::SOC *csd;
   // CPIs
   std::unordered_map<uint16_t, std::unordered_map<uint16_t, InstStat>> cpi;
 
@@ -153,7 +158,7 @@ class CPU : public StatObject {
   uint32_t page_size = 16834; // Default page size for SimpleSSD
   uint32_t lba_size = 512;
   public:
-    CPU(ConfigReader &, ICL::ICL *, FTL::FTL *, PAL::PAL *pal);
+    CPU(ConfigReader &, ICL::ICL *, FTL::FTL *, PAL::PAL *pal, DRAM::AbstractDRAM *dram);
     ~CPU();
 
     void execute(NAMESPACE, FUNCTION, DMAFunction &, void * = nullptr,
@@ -162,16 +167,18 @@ class CPU : public StatObject {
 
     void getStatList(std::vector<Stats> &, std::string) override;
     void getStatValues(std::vector<double> &) override;
+    uint64_t getClockPeriod();
     void resetStatValues() override;
     void startCSD();
     void stopCSD();
     void initCSD();
-    void initFS();
     void printLastStat();
     uint64_t read_flash_icl(uint8_t* buffer, uint64_t offset , uint64_t len); // for the flash functions
     uint64_t write_flash_icl(uint8_t* buffer, uint64_t offset , uint64_t len);
+    uint64_t trim_flash_icl(uint8_t* buffer, uint64_t offset , uint64_t len);
     uint64_t read_flash_pal(uint8_t* buffer, uint64_t lpn , uint64_t ppn);
     uint64_t write_flash_pal(uint8_t* buffer, uint64_t lpn , uint64_t ppn);
+    uint64_t erase_flash_pal(uint8_t* buffer, uint64_t lpn , uint64_t ppn);
     void setDisk(Disk *disk);
     void closeDisk();
     void addCSDTask(char* input_cmd);

@@ -99,6 +99,14 @@ void _printf(char* format, char** args) {
             uitoa(*((unsigned int *)args++), value_buffer, 10);
             print(value_buffer);
             break;
+        case 'l':
+            itoa(*((int64_t *)args++), value_buffer, 10);
+            print(value_buffer);
+            break;
+        case 'lu':
+            itoa(*((uint64_t *)args++), value_buffer, 10);
+            print(value_buffer);
+            break;
         case 's':
             str = *args++;
             print(str);
@@ -114,7 +122,7 @@ void _printf(char* format, char** args) {
 void printf(char *format, ...) {
     va_list args;
     va_start(args, format);
-    _printf(format, args);
+    _printf(format, (char**)args);
     va_end(args);
 }
   

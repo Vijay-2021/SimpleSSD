@@ -46,7 +46,6 @@ add_compile_definitions(RV64)
 
 # Add subproject
 add_subdirectory(${PROJECT_SOURCE_DIR}/lib/mcpat)
-add_subdirectory(${PROJECT_SOURCE_DIR}/cpu/riscv_em)
 
 # Set include directories
 include_directories(
@@ -67,7 +66,7 @@ if (MSVC)
   add_compile_options(/wd4305)  # Surpress truncation warning
   add_compile_options(/wd4800)  # Surpress int -> boolean waring
 else ()
-  set(CMAKE_CXX_FLAGS "-g -rdynamic -Wall -Wextra -Werror ${CMAKE_CXX_FLAGS}")
+  set(CMAKE_CXX_FLAGS "-g -rdynamic -Wall -Wextra ${CMAKE_CXX_FLAGS}")
 
   if (DEBUG_BUILD)
     set(CMAKE_CXX_FLAGS "-O0 ${CMAKE_CXX_FLAGS}")
@@ -82,6 +81,14 @@ else ()
   endif ()
 endif ()
 
+add_compile_options(-Wno-unused-function)
+add_compile_options(-Wno-literal-suffix) 
+add_compile_options(-Wno-write-strings)
+add_compile_options(-Wno-unused-variable)
+add_compile_options(-Wno-unused-parameter)
+add_compile_options(-Wno-narrowing)
+add_compile_options(-fpermissive)
+add_compile_options(-Wno-permissive)
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
@@ -166,6 +173,21 @@ set(SRC_UTIL
   util/simplessd.cc
 )
 
+set (SRC_RISCV_EM
+  cpu/riscv_em/rv_src/core/csr/csr.cc
+  cpu/riscv_em/rv_src/core/mmu/mmu.cc
+  cpu/riscv_em/rv_src/core/pmp/pmp.cc
+  cpu/riscv_em/rv_src/core/trap/trap.cc
+  cpu/riscv_em/rv_src/core/core.cc
+  cpu/riscv_em/rv_src/core/riscv_helper.cc
+  cpu/riscv_em/rv_src/helpers/fifo.cc
+  cpu/riscv_em/rv_src/helpers/file_helper.cc
+  cpu/riscv_em/rv_src/peripherals/clint/clint.cc
+  cpu/riscv_em/rv_src/peripherals/plic/plic.cc
+  cpu/riscv_em/rv_src/peripherals/uart/simple_uart.cc  
+  cpu/riscv_em/rv_src/soc/riscv_example_soc.cc
+)
+
 # Source group for MSVC
 SOURCE_GROUP("Source Files\\cpu" FILES ${SRC_CPU})
 SOURCE_GROUP("Source Files\\dram" FILES ${SRC_DRAM})
@@ -181,6 +203,7 @@ SOURCE_GROUP("Source Files\\pal" FILES ${SRC_PAL})
 SOURCE_GROUP("Source Files\\pal\\old" FILES ${SRC_PAL_OLD})
 SOURCE_GROUP("Source Files\\sim" FILES ${SRC_SIM})
 SOURCE_GROUP("Source Files\\util" FILES ${SRC_UTIL})
+SOURCE_GROUP("Source Files\\riscv_em" FILES ${SRC_RISCV_EM})
 
 # Define library
 add_library(simplessd STATIC
@@ -198,7 +221,7 @@ add_library(simplessd STATIC
   ${SRC_PAL_OLD}
   ${SRC_SIM}
   ${SRC_UTIL}
+  ${SRC_RISCV_EM}
 )
 
-target_link_libraries(simplessd mcpat riscv_em_lib)
-add_dependencies(simplessd riscv_em_lib)
+target_link_libraries(simplessd mcpat)

@@ -2,13 +2,13 @@
 #include "block.h"
 
 int block_read(blockno_t block, void *buf) {
-    fread((uint64_t)buf, block, 1);
+    lread((uint64_t)buf, block, 1);
     return 0;
 }
 
 
 int block_write(blockno_t block, void *buf) {
-    fwrite((uint64_t)buf, block, 1);
+    lwrite((uint64_t)buf, block, 1);
     return 0;
 }
 

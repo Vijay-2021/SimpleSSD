@@ -144,28 +144,19 @@ void CPU::Core::addStat(InstStat &inst) {
 
 void CPU::csdCycle() {
   if (csd_in_progress) {
-    rv_soc_tick(&csd, 0, 1);
+    csd->rv_soc_tick(0, 1);
     schedule(csdCycleEvent, getTick() + clockPeriod);
   }
 }
 
-CPU::CPU(ConfigReader &c, ICL::ICL *icl, FTL::FTL *ftl, PAL::PAL *pal) : conf(c), pICL(icl), pFTL(ftl), pPAL(pal), lastResetStat(0) {
+CPU::CPU(ConfigReader &c, ICL::ICL *icl, FTL::FTL *ftl, PAL::PAL *pal, DRAM::AbstractDRAM *dram) : conf(c), pICL(icl), pFTL(ftl), pPAL(pal), pDRAM(dram), lastResetStat(0) {
   clockSpeed = conf.readUint(CONFIG_CPU, CPU_CLOCK);
   clockPeriod = 1000000000000. / clockSpeed;  // in pico-seconds
-  memset(&csd, 0, sizeof(rv_soc_td));
-  csd.num_cores = conf.readUint(CONFIG_CPU, CPU_CORE_CSD);
-  csd.rv_cores = (rv_core_td*) malloc(csd.num_cores * sizeof(rv_core_td));
   hilCore.resize(conf.readUint(CONFIG_CPU, CPU_CORE_HIL));
   iclCore.resize(conf.readUint(CONFIG_CPU, CPU_CORE_ICL));
   ftlCore.resize(conf.readUint(CONFIG_CPU, CPU_CORE_FTL));
-  debugprint(LOG_CPU,"sizeofs(rv_soc_td): from cpu %zu\n", sizeof(rv_soc_td));
-  debugprint(LOG_CPU,"cpu offsetof(ctx) = %zu\n", offsetof(rv_soc_td, ctx));
-  debugprint(LOG_CPU,"cpu offsetof(read) = %zu\n", offsetof(rv_soc_td, read));
-  debugprint(LOG_CPU,"cpu offsetof(write) = %zu\n", offsetof(rv_soc_td, write));
 
-  initFS(); // initialize the file system for the csd cores
-  debugprint(LOG_CPU, "csd contexts: %p\n", csd.ctx);
-  rv_soc_init(&csd, const_cast<char*>(conf.readString(CONFIG_CPU, CPU_FW_PATH).c_str()), nullptr, nullptr); // TO-DO: make this less hacky
+  csd = new RISCV::SOC(const_cast<char*>(conf.readString(CONFIG_CPU, CPU_FW_PATH).c_str()), nullptr, nullptr, this, conf.readUint(CONFIG_CPU, CPU_CORE_CSD), pDRAM); // TO-DO: make this less hacky
   csdCycleEvent = allocate([this](uint64_t) {
     csdCycle();
   });
@@ -330,7 +321,7 @@ CPU::CPU(ConfigReader &c, ICL::ICL *icl, FTL::FTL *ftl, PAL::PAL *pal) : conf(c)
 }
 
 CPU::~CPU() {
-  free(csd.rv_cores);
+  delete csd;
 }
 
 void CPU::startCSD() {
@@ -345,16 +336,6 @@ void CPU::stopCSD() {
     deschedule(csdCycleEvent);
   }
   csd_in_progress = false;
-}
-
-void CPU::initFS() {
-  csd.ctx = this;
-  csd.read = [](void* ctx, uint8_t* buf, uint64_t addr, uint64_t len) -> uint64_t {
-    return static_cast<CPU*>(ctx)->read_flash_icl(buf, addr, len);
-  };
-  csd.write = [](void* ctx, uint8_t* buf, uint64_t addr, uint64_t len) -> uint64_t {
-    return static_cast<CPU*>(ctx)->write_flash_icl(buf, addr, len);
-  };
 }
 
 void CPU::calculatePower(Power &power) {
@@ -1059,7 +1040,7 @@ void CPU::printLastStat() {
 }
 
 uint64_t CPU::read_flash_icl(uint8_t* buffer, uint64_t offset , uint64_t len) {
-  debugprint(LOG_CPU, "Read flash from CSD at offset %u, length %u",
+  debugprint(LOG_CPU, "Read flash ICL from CSD at offset %u, length %u",
              offset, len);
   ICL::Request req;
   LPNRange lpnRange;
@@ -1082,7 +1063,7 @@ uint64_t CPU::read_flash_icl(uint8_t* buffer, uint64_t offset , uint64_t len) {
 }
 
 uint64_t CPU::write_flash_icl(uint8_t* buffer, uint64_t offset , uint64_t len) {
-  debugprint(SimpleSSD::LOG_CPU, "Write flash from CSD at offset %u, length %u",
+  debugprint(SimpleSSD::LOG_CPU, "Write flash ICL from CSD at offset %u, length %u",
       offset, len);
   ICL::Request req;
   LPNRange lpnRange;
@@ -1105,6 +1086,79 @@ uint64_t CPU::write_flash_icl(uint8_t* buffer, uint64_t offset , uint64_t len) {
   return reqTick;
 }
 
+uint64_t CPU::trim_flash_icl(uint8_t* buffer, uint64_t offset , uint64_t len) {
+  debugprint(SimpleSSD::LOG_CPU, "Trim flash ICL from CSD at offset %u, length %u",
+    offset, len);
+  LPNRange lpnRange;
+  uint32_t page_per_lba = page_size / lba_size;
+  lpnRange.slpn = offset / page_per_lba;
+  lpnRange.nlp = (len + page_per_lba - 1) / page_per_lba;
+  uint64_t reqTick = getTick();
+  pICL->trim(lpnRange, reqTick);
+  return reqTick;
+}
+
+// TO-DO: implement!
+uint64_t CPU::read_flash_pal(uint8_t* buffer, uint64_t offset , uint64_t len) {
+  debugprint(LOG_CPU, "Read flash PAL from CSD at offset %u, length %u",
+             offset, len);
+  ICL::Request req;
+  LPNRange lpnRange;
+  lpnRange.slpn = offset / (page_size / lba_size);
+  lpnRange.nlp = (len / (page_size / lba_size)) + 1;
+  req.range = lpnRange;
+  req.offset = 0;
+  req.length = len;
+  req.reqID = global_req_id++;
+  req.reqSubID = 0;
+  uint64_t reqTick = getTick();
+  debugprint(LOG_CPU, "Request ID %u at tick %llu", req.reqID, reqTick);
+  pICL->read(req, reqTick);
+  uint64_t slba = offset;
+  uint32_t nlblk = len;
+  pDisk->read(slba, nlblk, buffer);
+  return reqTick;
+}
+
+// TO-DO: implement!
+uint64_t CPU::write_flash_pal(uint8_t* buffer, uint64_t offset , uint64_t len) {
+  debugprint(SimpleSSD::LOG_CPU, "Write flash PAL from CSD at offset %u, length %u",
+      offset, len);
+  ICL::Request req;
+  LPNRange lpnRange;
+  uint32_t page_per_lba = page_size / lba_size;
+  lpnRange.slpn = offset / page_per_lba;
+  lpnRange.nlp = (len + page_per_lba - 1) / page_per_lba;
+  req.range = lpnRange;
+  req.offset = 0;
+  req.length = len;
+  req.reqID = global_req_id++;
+  req.reqSubID = 0;
+  uint64_t reqTick = getTick();
+  debugprint(LOG_CPU, "Request ID %u at tick %llu", req.reqID, reqTick);
+  pICL->write(req, reqTick);
+  debugprint(LOG_CPU, "Request ID %u completed at tick %llu",
+              req.reqID, reqTick);
+  uint64_t slba = offset;
+  uint32_t nlblk = len;
+  pDisk->write(slba, nlblk, buffer);
+  return reqTick;
+}
+
+// TO-DO: implement!
+uint64_t CPU::erase_flash_pal(uint8_t* buffer, uint64_t offset , uint64_t len) {
+  debugprint(SimpleSSD::LOG_CPU, "Erase flash PAL from CSD at offset %u, length %u",
+      offset, len);
+  LPNRange lpnRange;
+  uint32_t page_per_lba = page_size / lba_size;
+  lpnRange.slpn = offset / page_per_lba;
+  lpnRange.nlp = (len + page_per_lba - 1) / page_per_lba;
+  uint64_t reqTick = getTick();
+  pICL->trim(lpnRange, reqTick);
+  return reqTick;
+}
+
+
 void CPU::setDisk(Disk *disk) {
   pDisk = disk;
 }
@@ -1117,7 +1171,11 @@ void CPU::closeDisk() {
 }
 
 void CPU::addCSDTask(char* input_command) {
-  rv_soc_add_task(input_command);
+  csd->rv_soc_add_task(input_command);
+}
+
+uint64_t CPU::getClockPeriod() {
+  return clockPeriod;
 }
 
 }  // namespace CPU

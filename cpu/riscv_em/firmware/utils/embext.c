@@ -276,12 +276,14 @@ int ext2_change_allocated(struct ext2context *context,
     
     if(context->sysbuf[(bitmap_offset / 8) % block_get_block_size()] & (1 << (bitmap_offset % 8))) {
         if(allocated == EXT2_ALLOCATED) {
+            printf("already allocated\n");
             return -1;      // can't allocate an already allocated block
         } else {
             context->sysbuf[(bitmap_offset / 8) % block_get_block_size()] &= ~(1 << (bitmap_offset % 8));
         }
     } else {
         if(allocated == EXT2_DEALLOCATED) {
+            printf("deallocating free block?\n");
             return -1;      // can't deallocate an already free block
         } else {
             context->sysbuf[(bitmap_offset / 8) % block_get_block_size()] |= (1 << (bitmap_offset % 8));
@@ -420,6 +422,7 @@ uint32_t ext2_allocate_block(struct file_ent *fe, uint32_t previous_block) {
             }
         }
         if(most_free_blocks == 0) {
+            printf("no free blocks on allocate block\n");
             return 0;
         }
         ext2_get_bg_descriptor(fe->context, &bg, most_free_blocks_group);
@@ -440,12 +443,13 @@ uint32_t ext2_allocate_block(struct file_ent *fe, uint32_t previous_block) {
             block_no = (fe->context->superblock.s_blocks_per_group * most_free_blocks_group + 
                         i * 8 + j + 1);
             if(ext2_change_allocated(fe->context, block_no, EXT2_ALLOCATED, fe->inode.i_mode & EXT2_S_IFDIR ? 1 : 0)) {
+                printf("couldn't change allocated\n");
                 return 0;
             }
             return block_no;
         }
 //     }
-    
+    printf("algorithm failed\n");
     return 0;
 }
     
@@ -678,9 +682,11 @@ int ext2_select_buffer(struct file_ent *fe) {
                 fe->inode.i_block[0] = new_block;
                 ext2_load_buffer(fe, new_block, fe->cursor % ext2_block_size(fe->context));
             } else {
+                printf("select buffer failed to allocate new block\n");
                 return -1;
             }
         } else {
+            printf("select invalid write flag\n");
             return -1;
         }
     }
@@ -703,11 +709,8 @@ int ext2_mount(blockno_t part_start, blockno_t volume_size,
                struct ext2context **context) {
     uint32_t i;
     int n;
-    printf("contexts value: %x\n", (uint32_t) (*context));
     (*context) = (struct ext2context *)malloc(sizeof(struct ext2context));
-    printf("finished this\n");
     (*context)->part_start = part_start;
-    printf("couldn't finish this??\n");
     block_read(part_start+2, (*context)->sysbuf);
     memcpy(&(*context)->superblock, (*context)->sysbuf, sizeof(struct superblock));
     
@@ -1005,22 +1008,27 @@ int ext2_write(void *vfe, const void *buffer, uint32_t count) {
     uint32_t amount_to_copy;
     uint8_t *bt = (uint8_t *)buffer;
     if(fe == NULL) {
+        printf("write null fd\n");
         return -1;
     }
     if(fe->magic != EMBEXT_MAGIC) {
+        printf("write invalid magic\n");
         return -1;
     }
     if(!(fe->flags & EXT2_FLAG_WRITE)) {
+        printf("write but no write flag\n");
         return -1;
     }
     if(fe->flags & EXT2_FLAG_APPEND) {
         if(ext2_lseek(fe, 0, SEEK_END) == -1) {
+            printf("couldn't seek to end of file for write \n");
             return -1;
         }
     }
     while(i < count) {
         /* make sure the right buffer is loaded */
         if(ext2_select_buffer(fe)) {
+            printf("incorrect buffer selected\n");
             return -1;
         }
         
