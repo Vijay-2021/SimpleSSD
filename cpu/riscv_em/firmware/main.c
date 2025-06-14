@@ -14,16 +14,15 @@ int main(void)
 	//ext2_mount(0, block_get_volume_size(), 0, &context);
 	struct ext2context *context;
 	ext2_mount(63, block_get_volume_size(), 0, &context);
-	void *fe = ext2_open(context, "/home/test.sh", O_RDONLY , 0777);
+	void *fe = ext2_open(context, "/home/test_csd.txt", O_WRONLY | O_CREAT | O_APPEND , 0777);
     if(fe == NULL) {
         printf("open fail\n");
         return 0;
     } else {
         printf("open ok\n");
     }
-    char buffer[128];
-    int result = ext2_read(fe, buffer, 128);
-    printf("result %d and resultant buffer: %s\n", result, buffer);
+    int result = ext2_write(fe, "Hello world\r\n", 13);
+    printf("result %d\n", result);
     ext2_close(fe);
 	ext2_umount(context);
 	print("finishing firmware\n");

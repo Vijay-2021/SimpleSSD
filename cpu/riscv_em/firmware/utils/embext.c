@@ -436,6 +436,7 @@ uint32_t ext2_allocate_block(struct file_ent *fe, uint32_t previous_block) {
                 }
             }
             if(j < 8) {
+                printf("broken out of loop with i%u and j%u\n", i, j);
                 break;
             }
         }
