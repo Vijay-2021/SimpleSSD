@@ -1420,6 +1420,9 @@ static uint64_t instr_PERASE(Core * rv_core) {
     return rv_core->pSOC->perase(rv_core->pSOC->get_ram() + ((rv_core->reg_file[rv_core->rd] - RAM_BASE_ADDR)), rv_core->reg_file[rv_core->rs1], rv_core->reg_file[rv_core->rs2]);
 }
 
+static uint64_t instr_FADD(Core *rv_core) {
+    rv_core->float_reg_file[rv_core->rd]
+}
 
 #ifdef ATOMIC_SUPPORT
     static void preparation_func5(Core *rv_core, int32_t *next_subcode)
@@ -1510,6 +1513,74 @@ static void J_type_preparation(Core *rv_core, int32_t *next_subcode)
     *next_subcode = -1;
 }
 
+static void R_float_type_preparation(Core *rv_core, int32_t *next_subcode) {
+    (void) next_subcode;
+    rv_core->rd = ((rv_core->instruction >> 7) & 0x1F);
+    rv_core->func3 = ((rv_core->instruction >> 12) & 0x7);
+    rv_core->rs1 = ((rv_core->instruction >> 15) & 0x1F);
+    rv_core->rs2 = ((rv_core->instruction >> 20) & 0x1F);
+    rv_core->func7 = ((rv_core->instruction >> 25) & 0x7F);
+    uint8_t set_instr = 1;
+    switch((func7 >> 2)) {
+        case FLT_ADD: 
+            rv_core->execute_cb = instr_FADD;
+            break;
+        case FLT_SUB:
+            rv_core->execute_cb = instr_FSUB; 
+            break;
+        case FLT_MUL:
+            rv_core->execute_cb = instr_FMUL;
+            break;
+        case FLT_DIV:
+            rv_core->execute_cb = instr_FDIV;
+            break;
+        case FLT_SQRT:
+            rv_core->execute_Cb = instr_FSQRT;
+            break;
+        case FLT_SGNINJ:
+            if (rv_core->func3 == FLT_SGNJ) {
+                rv_core->execute_cb = instr_FSGNJ;
+            } else if (rv_core->func3 == FLT_SGNJN) {
+                rv_core->execute_cb = instr_FSGNJN;
+            } else if (rv_core->func3 == FLT_SGNJX) {
+                rv_core->execute_cb = instr_FSGNJX; 
+            }
+            break;
+        case FLT_MAX_MIN:
+        default:
+            set_instr = 0;
+            break;
+    } 
+    if (!set_instr) {
+        set_instr = 1;
+        if(rv_core->func7 == FLT_CVT_TO_INT) {
+            if (rv_core->rs2 == FLT_CVT_TO_SINT) {
+                rv_core->execute_cb = instr_FTOSINT;
+            } else if (rv_core->rs2 == FLT_CVT_TO_UINT) {
+                rv_core->execute_cb = instr_FTOUINT;
+            }
+        } else if (rv_core->func7 == FLT_CVT_FROM_INT) {
+            if (rv_core->rs2 == FLT_CVT_FROM_SINT) {
+                rv_core->execute_cb = instr_FFROMSINT;
+            } else if (rv_core->rs2 == FLT_CVT_FROM_UINT) {
+                rv_core->execute_cb = instr_FFROMUINT; 
+            }
+        } else if (rv_core->func3 == FLT_MV_FUNC3) {
+            if (rv_core->func7 == FLT_MV_TO_INT) {
+                rv_core->execute_cb = instr_FMVTOINT;
+            } else if (rv_core->func7 == FLT_MV_FROM_INT) {
+                rv_core->execute_cb = instr_FMVFROMINT;
+            }
+        } else {
+            set_instr = 0;
+        }
+    }
+    if (!set_instr) {
+        printf("failed to set instruction !\n");
+    } else {
+        rv_core->rd = ((rv_core->instruction >> 7) & 0x1F);
+    }
+}
 
 static instruction_hook_td RV_opcode_list[MAX_INSTR_OPCODE] = {};
 INIT_INSTRUCTION_LIST_DESC(RV_opcode_list);
@@ -1762,18 +1833,24 @@ static void init_instruction_hooks() {
     INIT_INSTRUCTION_LIST_DESC(CUSTOM_logical_func7_subcode_list);
 
     static instruction_hook_td CUSTOM_physical_func7_subcode_list[MAX_FUNC7_VALUE] = {};
-    CUSTOM_logical_func7_subcode_list[FUNC7_PREAD] = {NULL, instr_PREAD, NULL};
-    CUSTOM_logical_func7_subcode_list[FUNC7_PWRITE] = {NULL, instr_PWRITE, NULL};
-    CUSTOM_logical_func7_subcode_list[FUNC7_PERASE] = {NULL, instr_PERASE, NULL};
+    CUSTOM_physical_func7_subcode_list[FUNC7_PREAD] = {NULL, instr_PREAD, NULL};
+    CUSTOM_physical_func7_subcode_list[FUNC7_PWRITE] = {NULL, instr_PWRITE, NULL};
+    CUSTOM_physical_func7_subcode_list[FUNC7_PERASE] = {NULL, instr_PERASE, NULL};
     INIT_INSTRUCTION_LIST_DESC(CUSTOM_physical_func7_subcode_list);
 
-    static instruction_hook_td CUSTOM_func3_subcode_list[MAX_FUNC3_VALUE] = {};
+    static instruction_hook_td CUSTOM_soc_interface_func7_subcode_list[MAX_FUNC7_VALUE] = {};
+    CUSTOM_soc_interface_func7_subcode_list[FUNC7_READBUFF] = {NULL, instr_READBUFF, NULL};
+    CUSTOM_soc_interface_func7_subcode_list[FUNC7_STARTSIM] = {NULL, instr_STARTSIM, NULL};
+    CUSTOM_soc_interface_func7_subcode_list[FUNC7_STOPSIM] = {NULL, instr_STOPSIM, NULL};
+    CUSTOM_soc_interface_func7_subcode_list[FUNC7_NEXTTICK] = {NULL, instr_NEXTTICK, NULL};
 
+    static instruction_hook_td CUSTOM_func3_subcode_list[MAX_FUNC3_VALUE] = {};
     CUSTOM_func3_subcode_list[FUNC3_LOGADDR] = {preparation_func7, NULL, &CUSTOM_logical_func7_subcode_list_desc};
     CUSTOM_func3_subcode_list[FUNC3_PHYSADDR] = {preparation_func7, NULL, &CUSTOM_physical_func7_subcode_list_desc};
-
+    CUSTOM_func3_subcode_list[FUNC3_SOC_INTERFACE] = {preparation_func7, NULL, &CUSTOM_soc_interface_func7_subcode_list_desc};
     INIT_INSTRUCTION_LIST_DESC(CUSTOM_func3_subcode_list);
 
+    static instruction_hook_td FLOAT_ARITH_func7_subcode_list[MAX_FUNC7_VALUE] = {}
     RV_opcode_list[INSTR_LUI] = {U_type_preparation, instr_LUI, NULL};
     RV_opcode_list[INSTR_AUIPC] = {U_type_preparation, instr_AUIPC, NULL};
     RV_opcode_list[INSTR_JAL] = {J_type_preparation, instr_JAL, NULL};
@@ -1785,6 +1862,7 @@ static void init_instruction_hooks() {
     RV_opcode_list[INSTR_ADD_SUB_SLL_SLT_SLTU_XOR_SRL_SRA_OR_AND_MUL_MULH_MULHSU_MULHU_DIV_DIVU_REM_REMU] = {R_type_preparation, NULL, &ADD_SUB_SLL_SLT_SLTU_XOR_SRL_SRA_OR_AND_func3_subcode_list_desc};
     RV_opcode_list[INSTR_FENCE_FENCE_I] = {NULL, instr_NOP, NULL};
     RV_opcode_list[INSTR_CSD] = {R_type_preparation, NULL, &CUSTOM_func3_subcode_list_desc};
+    RV_opcode_list[INSTR_FLT_ARITH] = {R_float_type_preparation, NULL, NULL}; // a little to difficult to encode this in map format
     #ifdef RV64
         RV_opcode_list[INSTR_ADDIW_SLLIW_SRLIW_SRAIW] = {I_type_preparation, NULL, &SLLIW_SRLIW_SRAIW_ADDIW_func3_subcode_list_desc};
         RV_opcode_list[INSTR_ADDW_SUBW_SLLW_SRLW_SRAW_MULW_DIVW_DIVUW_REMW_REMUW] = {R_type_preparation, NULL, &ADDW_SUBW_SLLW_SRLW_SRAW_MULW_DIVW_DIVUW_REMW_REMUW_func3_subcode_list_desc};
@@ -2008,6 +2086,12 @@ static void rv_core_init_csr_regs(Core *rv_core)
     #ifdef RV64
         xstatus_warl_bits = (CSR_XLEN_64_BIT << CSR_UXL_BIT_BASE) | (CSR_XLEN_64_BIT << CSR_SXL_BIT_BASE);
     #endif
+
+    // floating point regs
+    INIT_CSR_REG_DEFAULT(rv_core->csr_regs, CSR_ADDR_FFLAGS, CSR_ACCESS_RW(machine_mode) | CSR_ACCESS_RW(supervisor_mode) | CSR_ACCESS_RW(user_mode), 0, CSR_FFLAGS_MASK, CSR_MASK_ZERO);
+    INIT_CSR_REG_DEFAULT(rv_core->csr_regs, CSR_ADDR_FRM, CSR_ACCESS_RW(machine_mode) | CSR_ACCESS_RW(supervisor_mode) | CSR_ACCESS_RW(user_mode), 0, CSR_FRM_MASK, CSR_MASK_ZERO);
+    INIT_CSR_REG_DEFAULT(rv_core->csr_regs, CSR_ADDR_FCSR, CSR_ACCESS_RW(machine_mode) | CSR_ACCESS_RW(supervisor_mode) | CSR_ACCESS_RW(user_mode), 0, CSR_MASK_WR_ALL, CSR_MASK_ZERO);
+   
 
     /* Machine Information Registers */
     INIT_CSR_REG_DEFAULT(rv_core->csr_regs, CSR_ADDR_MVENDORID, CSR_ACCESS_RO(machine_mode), 0, CSR_MASK_ZERO, CSR_MASK_ZERO);

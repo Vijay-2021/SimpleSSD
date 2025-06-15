@@ -136,6 +136,7 @@
 #define INSTR_AMO_W_D_LR_SC_SWAP_ADD_XOR_AND_OR_MIN_MAX_MINU_MAXU 0x2F
     #define FUNC3_INSTR_W_LR_SC_SWAP_ADD_XOR_AND_OR_MIN_MAX_MINU_MAXU 0x2
     #define FUNC3_INSTR_D_LR_SC_SWAP_ADD_XOR_AND_OR_MIN_MAX_MINU_MAXU 0x3
+    #define INSTR_AMO_W_D_LR_SC_SWAP_ADD_XOR_AND_OR_MIN_MAX_MINU_MAXU_SIZE 0x4
         #define FUNC5_INSTR_AMO_LR 0x2
         #define FUNC5_INSTR_AMO_SC 0x3
         #define FUNC5_INSTR_AMO_SWAP 0x1
@@ -148,6 +149,47 @@
         #define FUNC5_INSTR_AMO_MINU 0x18
         #define FUNC5_INSTR_AMO_MAXU 0x1C
 
+#define FLOAT_FMT 0x00
+#define DOUBLE_FMT 0x01
+
+#define RM_NEAREST 0x00
+#define RM_TZERO 0x01 
+#define RM_DOWN 0x02
+#define RM_UP 0x03
+#define RM_NEAREST 0x04
+#define RM_DYNAMIC 0x07
+
+#define INSTR_FLOAT_ARITH 0x53
+    #define FLT_ADD 0x00
+    #define FLT_SUB 0x01
+    #define FLT_MUL 0x02 
+    #define FLT_DIV 0x03 
+    #define FLT_SQRT 0x0B
+    #define FLT_SGNINJ 0x04
+        #define FLT_SGNJ 0x00
+        #define FLT_SGNJN 0x01
+        #define FLT_SGNJX 0x02
+    #define FLT_MAX_MIN 0x05
+        #define FLT_MIN 0x00
+        #define FLT_MAX 0x01
+    #define FLT_CMP 0x14
+        #define FLT_CMPEQ 0x02
+        #define FLT_CMPLT 0x01
+        #define FLT_CMPLE 0x00
+    #define FLT_CLASS_FUNC7 0x1C
+    #define FLT_CLASS_FUNC3 0x01
+    #define FLT_CVT_TO_INT 0x60
+        #define FLT_CVT_TO_SINT 0x00
+        #define FLT_CVT_TO_UINT 0x01
+    #define FLT_CVT_FROM_INT 0x68
+        #define FLT_CVT_FROM_SINT 0x00
+        #define FLT_CVT_FROM_UINT 0x01
+    #define FLT_MV_FUNC3 0x00
+        #define FLT_MV_TO_INT 0x70
+        #define FLT_MV_FROM_INT 0x78
+#define INSTR_FLT_LOAD 0x07
+#define INSTR_FLT_STORE 0x27
+
 // custom instructions for interfacing with the ssd simulator
 
 #define INSTR_CSD 0x0B
@@ -159,5 +201,9 @@
         #define FUNC7_PREAD 0x00
         #define FUNC7_PWRITE 0x01
         #define FUNC7_PERASE 0x02
-
+    #define FUNC3_SOC_INTERFACE 0x2
+        #define FUNC7_READBUFF 0x00
+        #define FUNC7_STARTSIM 0x01 // stop continuos execution
+        #define FUNC7_STOPSIM 0x02 // execute once every cycle
+        #define FUNC7_NEXTSIMTICK 0x03 // sets the next tick
 #endif /* RISCV_INSTR_H */

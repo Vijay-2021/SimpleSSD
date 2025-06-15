@@ -11,6 +11,7 @@
 #include "rv_src/core/mmu/mmu.hh"
 
 #define NR_RVI_REGS 32
+#define NR_RVF_REGS 32
 
 #define INIT_INSTRUCTION_LIST_DESC(_instruction_list) \
     static instruction_desc_td  _instruction_list##_desc = \
@@ -31,6 +32,7 @@ class Core {
 
         /* Registers */
         rv_word_t reg_file[NR_RVI_REGS];
+        rv_word_t float_reg_file[NR_RVF_REGS];
         rv_word_t pc;
         rv_word_t next_pc;
 
@@ -39,11 +41,13 @@ class Core {
         uint8_t rd;
         uint8_t rs1;
         uint8_t rs2;
+        uint8_t rs3; // for fmadd, fmsub, etc
         uint8_t func3;
         uint8_t func7;
         uint8_t func6;
         uint8_t func5;
         uint16_t func12;
+        uint8_t rm; // store the rounding mode for fp opps
         rv_word_t immediate;
         rv_word_t jump_offset;
 

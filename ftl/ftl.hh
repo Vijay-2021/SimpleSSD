@@ -57,7 +57,7 @@ class FTL : public StatObject {
   void trim(Request &, uint64_t &);
 
   void format(LPNRange &, uint64_t &);
-
+  void soc_init();
   Parameter *getInfo();
   uint64_t getUsedPageCount(uint64_t, uint64_t);
 

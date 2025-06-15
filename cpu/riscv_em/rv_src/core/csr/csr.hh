@@ -18,6 +18,10 @@
 #define EPC_REG    0x41
 #define CAUSE_REG  0x42
 
+#define CSR_ADDR_FFLAGS  0x001
+#define CSR_ADDR_FRM     0x002
+#define CSR_ADDR_FCSR    0x003
+
 #define CSR_ADDR_MVENDORID 0xF11
 #define CSR_ADDR_MARCHID   0xF12
 #define CSR_ADDR_MIMPID    0xF13
@@ -123,6 +127,9 @@
 #define CSR_SIDELEG_MASK CSR_SIP_SIE_MASK
 /* In particular, sedeleg[11:9] are all hardwired to zero. */
 #define CSR_SEDELEG_MASK 0xF1FF
+
+#define CSR_FRM_MASK 0xE0 // set bits 7-5
+#define CSR_FFLAGS_MASK 0x1F // set bits 4-0
 
 #define INIT_CSR_REG_DEFAULT(_csr, _index, _access_flags, _init_val, _MASK, _WARL_ALWAYS_ENABLED) { \
     _csr[_index].access_flags = _access_flags; \

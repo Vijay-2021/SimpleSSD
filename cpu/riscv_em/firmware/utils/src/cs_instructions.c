@@ -1,4 +1,5 @@
 #include "cs_instructions.h"
+#include "utils.h"
 
 void pread(uint64_t rd, uint64_t rs1, uint64_t rs2) {
   
@@ -46,7 +47,6 @@ void perase(uint64_t rd, uint64_t rs1, uint64_t rs2) {
 }
 
 void lread(uint64_t rd, uint64_t rs1, uint64_t rs2) {
-  
   COMPILER_BARRIER();
   __asm__ volatile (
       "mv t0, %0\n\t"

@@ -329,13 +329,11 @@ static int ext2_allocate_inode(struct file_ent *fe) {
             most_free_inodes = bg.bg_free_inodes_count;
             most_free_inodes_group = i;
         }
-        printf("%d free inodes in group %d\n", bg.bg_free_inodes_count, i);
     }
     if(most_free_inodes == 0) {
         printf("No free inodes\n");
         return -1;
     }
-    printf("Allocating new inode in group %d\n", most_free_inodes_group);
     ext2_get_bg_descriptor(fe->context, &bg, most_free_inodes_group);
     
     for(i=0;i<fe->context->superblock.s_inodes_per_group/8;i++) {
@@ -360,11 +358,11 @@ static int ext2_allocate_inode(struct file_ent *fe) {
         ext2_write_bg_descriptor(fe->context, &bg, most_free_inodes_group);
         fe->context->superblock.s_free_inodes_count -= 1;
         ext2_flush_superblock(fe->context);
-        printf("Allocating new inode %d\n", fe->inode_number);
     } else {
         // this should never happen because we've already determined that there are free
         // inodes in this block group.  So this must be an error in the filesystem or the
         // driver.
+        printf("file system or driver error in allocate!\n");
         return -1;
     }
     
@@ -436,15 +434,15 @@ uint32_t ext2_allocate_block(struct file_ent *fe, uint32_t previous_block) {
                 }
             }
             if(j < 8) {
-                printf("broken out of loop with i%u and j%u\n", i, j);
                 break;
             }
         }
+        
         if((i < fe->context->superblock.s_blocks_per_group/8) && (j < 8)) {
             block_no = (fe->context->superblock.s_blocks_per_group * most_free_blocks_group + 
                         i * 8 + j + 1);
             if(ext2_change_allocated(fe->context, block_no, EXT2_ALLOCATED, fe->inode.i_mode & EXT2_S_IFDIR ? 1 : 0)) {
-                printf("couldn't change allocated\n");
+                printf("couldn't change allocated block(likely filesystem error)\n");
                 return 0;
             }
             return block_no;
@@ -847,7 +845,6 @@ void *ext2_open(struct ext2context *context, const char *name, int flags, int mo
             }
             for(i=strlen(name)-1;i>-1;i--) {
                 if(name[i] == '/') {
-                    printf("Found last separator in\n%s\nat %d\n", name, i);
                     local_path = (char *)malloc(i+1);
                     local_name = (char *)malloc(strlen(name) - i);
                     strncpy(local_path, name, i);
