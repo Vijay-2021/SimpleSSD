@@ -156,10 +156,10 @@
 #define RM_TZERO 0x01 
 #define RM_DOWN 0x02
 #define RM_UP 0x03
-#define RM_NEAREST 0x04
+#define RM_NEAREST_MAX 0x04
 #define RM_DYNAMIC 0x07
 
-#define INSTR_FLOAT_ARITH 0x53
+#define INSTR_FLT_ARITH 0x53
     #define FLT_ADD 0x00
     #define FLT_SUB 0x01
     #define FLT_MUL 0x02 
@@ -187,8 +187,14 @@
     #define FLT_MV_FUNC3 0x00
         #define FLT_MV_TO_INT 0x70
         #define FLT_MV_FROM_INT 0x78
+
 #define INSTR_FLT_LOAD 0x07
 #define INSTR_FLT_STORE 0x27
+
+#define INSTR_FMADD 0x43
+#define INSTR_FMSUB 0x47
+#define INSTR_FMNSUB 0x4B
+#define INSTR_FMNADD 0x4F
 
 // custom instructions for interfacing with the ssd simulator
 

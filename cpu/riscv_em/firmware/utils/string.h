@@ -20,4 +20,6 @@ extern string strcpy(string dest, const string src);
 extern string strncpy(string dest, const string src, size_t n);
 extern string strtok(string str, string delim);
 extern int strchr(string str, char c);
+
+extern void reverse(string str, int len);
 #endif

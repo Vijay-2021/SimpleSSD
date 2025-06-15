@@ -139,3 +139,16 @@ string strtok(string str, string delim)
 
     return start;
 }
+
+// Reverses a string 'str' of length 'len' 
+void reverse(string str, int len) 
+{ 
+    int i = 0, j = len - 1, temp; 
+    while (i < j) { 
+        temp = str[i]; 
+        str[i] = str[j]; 
+        str[j] = temp; 
+        i++; 
+        j--; 
+    } 
+} 

@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <cmath> 
 
 #include "riscv_types.hh"
 #include "riscv_helper.hh"
@@ -1420,8 +1421,169 @@ static uint64_t instr_PERASE(Core * rv_core) {
     return rv_core->pSOC->perase(rv_core->pSOC->get_ram() + ((rv_core->reg_file[rv_core->rd] - RAM_BASE_ADDR)), rv_core->reg_file[rv_core->rs1], rv_core->reg_file[rv_core->rs2]);
 }
 
+static uint64_t instr_READBUFF(Core *rv_core) {
+    return getTick() + rv_core->pSOC->get_period();
+}
+
+static uint64_t instr_STARTSIM(Core *rv_core) {
+    return getTick() + rv_core->pSOC->get_period();
+}
+
+static uint64_t instr_STOPSIM(Core *rv_core) {
+    return getTick() + rv_core->pSOC->get_period();
+}
+
+static uint64_t instr_NEXTSIMTICK(Core *rv_core) {
+    return getTick() + rv_core->pSOC->get_period();
+}
+
 static uint64_t instr_FADD(Core *rv_core) {
-    rv_core->float_reg_file[rv_core->rd]
+    rv_core->float_reg_file[rv_core->rd] = rv_core->float_reg_file[rv_core->rs1] + rv_core->float_reg_file[rv_core->rs2];
+    return getTick() + rv_core->pSOC->get_period();
+}
+
+static uint64_t instr_FSUB(Core *rv_core) {
+    rv_core->float_reg_file[rv_core->rd] = rv_core->float_reg_file[rv_core->rs1] - rv_core->float_reg_file[rv_core->rs2];
+    return getTick() + rv_core->pSOC->get_period();
+}
+
+static uint64_t instr_FMUL(Core *rv_core) {
+    rv_core->float_reg_file[rv_core->rd] = rv_core->float_reg_file[rv_core->rs1] * rv_core->float_reg_file[rv_core->rs2];
+    return getTick() + rv_core->pSOC->get_period();
+}
+
+static uint64_t instr_FDIV(Core *rv_core) {
+    rv_core->float_reg_file[rv_core->rd] = rv_core->float_reg_file[rv_core->rs1] / rv_core->float_reg_file[rv_core->rs2];
+    return getTick() + rv_core->pSOC->get_period();
+}
+
+static uint64_t instr_FSQRT(Core *rv_core) {
+    rv_core->float_reg_file[rv_core->rd] = std::sqrt(rv_core->float_reg_file[rv_core->rs1]);
+    printf("executing float sqrt on %f and %f for result %f\n",  rv_core->float_reg_file[rv_core->rs1], rv_core->float_reg_file[rv_core->rs2], rv_core->float_reg_file[rv_core->rd]);
+    return getTick() + rv_core->pSOC->get_period();
+}
+
+static uint64_t instr_FSGNJ(Core *rv_core) {
+    rv_core->float_reg_file[rv_core->rd] = std::copysign(rv_core->float_reg_file[rv_core->rs1], rv_core->float_reg_file[rv_core->rs2]);
+    printf("executing float sign injunction on %f and %f for result %f\n",  rv_core->float_reg_file[rv_core->rs1], rv_core->float_reg_file[rv_core->rs2], rv_core->float_reg_file[rv_core->rd]);
+    return getTick() + rv_core->pSOC->get_period();
+}
+
+static uint64_t instr_FSGNJN(Core *rv_core) {
+    rv_core->float_reg_file[rv_core->rd] = std::copysign(rv_core->float_reg_file[rv_core->rs1], -rv_core->float_reg_file[rv_core->rs2]);
+    return getTick() + rv_core->pSOC->get_period();
+}
+
+// TO-DO implement
+static uint64_t instr_FSGNJX(Core *rv_core) {
+    // rv_core->float_reg_file[rv_core->rd] = std::copysign(rv_core->float_reg_file[rv_core->rs1], rv_core->float_reg_file[rv_core->rs2]);
+    return getTick() + rv_core->pSOC->get_period();
+}
+
+static uint64_t instr_FMIN(Core *rv_core) {
+    rv_core->float_reg_file[rv_core->rd] = std::min(rv_core->float_reg_file[rv_core->rs1], rv_core->float_reg_file[rv_core->rs2]);
+    printf("executing float min on %f and %f for result %f\n",  rv_core->float_reg_file[rv_core->rs1], rv_core->float_reg_file[rv_core->rs2], rv_core->float_reg_file[rv_core->rd]);
+    return getTick() + rv_core->pSOC->get_period();
+}
+
+static uint64_t instr_FMAX(Core *rv_core) {
+    rv_core->float_reg_file[rv_core->rd] = std::max(rv_core->float_reg_file[rv_core->rs1], rv_core->float_reg_file[rv_core->rs2]);
+    printf("executing float max on %f and %f for result %f\n",  rv_core->float_reg_file[rv_core->rs1], rv_core->float_reg_file[rv_core->rs2], rv_core->float_reg_file[rv_core->rd]);
+    return getTick() + rv_core->pSOC->get_period();
+}
+
+static uint64_t instr_FEQ(Core *rv_core) {
+    rv_core->float_reg_file[rv_core->rd] = (rv_core->float_reg_file[rv_core->rs1] == rv_core->float_reg_file[rv_core->rs2]);
+    printf("executing float equal on %f and %f for result %f\n",  rv_core->float_reg_file[rv_core->rs1], rv_core->float_reg_file[rv_core->rs2], rv_core->float_reg_file[rv_core->rd]);
+    return getTick() + rv_core->pSOC->get_period();
+}
+
+static uint64_t instr_FLT(Core *rv_core) {
+    rv_core->float_reg_file[rv_core->rd] = (rv_core->float_reg_file[rv_core->rs1] < rv_core->float_reg_file[rv_core->rs2]);
+    printf("executing float less than on %f and %f for result %f\n",  rv_core->float_reg_file[rv_core->rs1], rv_core->float_reg_file[rv_core->rs2], rv_core->float_reg_file[rv_core->rd]);
+    return getTick() + rv_core->pSOC->get_period();
+}
+
+static uint64_t instr_FLE(Core *rv_core) {
+    rv_core->float_reg_file[rv_core->rd] = (rv_core->float_reg_file[rv_core->rs1] <= rv_core->float_reg_file[rv_core->rs2]);
+    printf("executing float equal on %f and %f for result %f\n",  rv_core->float_reg_file[rv_core->rs1], rv_core->float_reg_file[rv_core->rs2], rv_core->float_reg_file[rv_core->rd]);
+    return getTick() + rv_core->pSOC->get_period();
+}
+
+// TO-DO implement
+static uint64_t instr_CLASSIFY(Core *rv_core) {
+    return getTick() + rv_core->pSOC->get_period();
+}
+
+static uint64_t instr_FLW(Core *rv_core) {
+    float tmp_load_val = 0;
+    rv_sword_t signed_offset = SIGNEX_BIT_11(rv_core->immediate);
+    rv_sword_t address = rv_core->reg_file[rv_core->rs1] + signed_offset;
+    uint64_t ret_val = mmu_checked_bus_access(rv_core, rv_core->curr_priv_mode, bus_read_access, address, &tmp_load_val, 4);
+    if (ret_val != getTick())
+        rv_core->float_reg_file[rv_core->rd] = tmp_load_val;
+    return ret_val;
+}
+
+static uint64_t instr_FSW(Core *rv_core) {
+    rv_sword_t signed_offset = SIGNEX_BIT_11(rv_core->immediate);
+    rv_word_t address = rv_core->reg_file[rv_core->rs1] + signed_offset;
+    float value_to_write = rv_core->float_reg_file[rv_core->rs2];
+    return mmu_checked_bus_access(rv_core, rv_core->curr_priv_mode, bus_write_access, address, &value_to_write, 4); 
+}
+
+static uint64_t instr_FTOSINT(Core *rv_core) {
+    rv_core->reg_file[rv_core->rd] = (rv_sword_t)rv_core->float_reg_file[rv_core->rs1];
+    printf("executing float to signed int on %f and %f for result %f\n",  rv_core->float_reg_file[rv_core->rs1], rv_core->float_reg_file[rv_core->rs2], rv_core->float_reg_file[rv_core->rd]);
+    return getTick() + rv_core->pSOC->get_period();
+}
+
+static uint64_t instr_FTOUINT(Core *rv_core) {
+    rv_core->reg_file[rv_core->rd] = (rv_word_t)rv_core->float_reg_file[rv_core->rs1];
+    printf("executing float unsigned int on %f and %f for result %f\n",  rv_core->float_reg_file[rv_core->rs1], rv_core->float_reg_file[rv_core->rs2], rv_core->float_reg_file[rv_core->rd]);
+    return getTick() + rv_core->pSOC->get_period();
+}
+
+static uint64_t instr_FFROMSINT(Core *rv_core) {
+    rv_core->float_reg_file[rv_core->rd] = (float)rv_core->reg_file[rv_core->rs1];
+    return getTick() + rv_core->pSOC->get_period();
+}
+
+static uint64_t instr_FFROMUINT(Core *rv_core) {
+    rv_core->float_reg_file[rv_core->rd] = (float)rv_core->float_reg_file[rv_core->rs1];
+    return getTick() + rv_core->pSOC->get_period();
+}
+
+static uint64_t instr_FMVTOINT(Core *rv_core) {
+    memcpy(rv_core->reg_file + rv_core->rs1, rv_core->float_reg_file + rv_core->rd, sizeof(float));
+    printf("executing float move to int on %f and %f for result %f\n",  rv_core->float_reg_file[rv_core->rs1], rv_core->float_reg_file[rv_core->rs2], rv_core->float_reg_file[rv_core->rd]);
+    return getTick() + rv_core->pSOC->get_period();
+}
+
+static uint64_t instr_FMVFROMINT(Core *rv_core) {
+    memcpy(rv_core->float_reg_file + rv_core->rd, rv_core->reg_file + rv_core->rs1, sizeof(int));
+    printf("executing float from int on %f and %f for result %f\n",  rv_core->float_reg_file[rv_core->rs1], rv_core->float_reg_file[rv_core->rs2], rv_core->float_reg_file[rv_core->rd]);
+    return getTick() + rv_core->pSOC->get_period();
+}
+
+static uint64_t instr_FMADD(Core *rv_core) {
+    rv_core->float_reg_file[rv_core->rd] = rv_core->float_reg_file[rv_core->rs1]*rv_core->float_reg_file[rv_core->rs2] + rv_core->float_reg_file[rv_core->rs3];
+    return getTick() + rv_core->pSOC->get_period();
+}
+
+static uint64_t instr_FMSUB(Core *rv_core) {
+    rv_core->float_reg_file[rv_core->rd] = rv_core->float_reg_file[rv_core->rs1]*rv_core->float_reg_file[rv_core->rs2] - rv_core->float_reg_file[rv_core->rs3];
+    return getTick() + rv_core->pSOC->get_period();
+}
+
+static uint64_t instr_FMNADD(Core *rv_core) {
+    rv_core->float_reg_file[rv_core->rd] = -(rv_core->float_reg_file[rv_core->rs1]*rv_core->float_reg_file[rv_core->rs2] + rv_core->float_reg_file[rv_core->rs3]);
+    return getTick() + rv_core->pSOC->get_period();
+}
+
+static uint64_t instr_FMNSUB(Core *rv_core) {
+    rv_core->float_reg_file[rv_core->rd] = -(rv_core->float_reg_file[rv_core->rs1]*rv_core->float_reg_file[rv_core->rs2] - rv_core->float_reg_file[rv_core->rs3]);
+    return getTick() + rv_core->pSOC->get_period();
 }
 
 #ifdef ATOMIC_SUPPORT
@@ -1443,13 +1605,17 @@ static uint64_t instr_FADD(Core *rv_core) {
 static void preparation_func7(Core *rv_core, int32_t *next_subcode)
 {
     rv_core->func7 = ((rv_core->instruction >> 25) & 0x7F);
-    *next_subcode = rv_core->func7;
+    if (next_subcode != NULL) {
+        *next_subcode = rv_core->func7;
+    }
 }
 
 static void preparation_func7_func12_sub5_extended(Core *rv_core, int32_t *next_subcode)
 {
     rv_core->func5 = ((rv_core->instruction >> 20) & 0x1F);
-    *next_subcode = rv_core->func5;
+    if (next_subcode != NULL) {
+        *next_subcode = rv_core->func5;
+    }
 }
 
 static void R_type_preparation(Core *rv_core, int32_t *next_subcode)
@@ -1458,7 +1624,9 @@ static void R_type_preparation(Core *rv_core, int32_t *next_subcode)
     rv_core->func3 = ((rv_core->instruction >> 12) & 0x7);
     rv_core->rs1 = ((rv_core->instruction >> 15) & 0x1F);
     rv_core->rs2 = ((rv_core->instruction >> 20) & 0x1F);
-    *next_subcode = rv_core->func3;
+    if (next_subcode != NULL) {
+        *next_subcode = rv_core->func3;
+    }
 }
 
 static void I_type_preparation(Core *rv_core, int32_t *next_subcode)
@@ -1467,7 +1635,9 @@ static void I_type_preparation(Core *rv_core, int32_t *next_subcode)
     rv_core->func3 = ((rv_core->instruction >> 12) & 0x7);
     rv_core->rs1 = ((rv_core->instruction >> 15) & 0x1F);
     rv_core->immediate = ((rv_core->instruction >> 20) & 0xFFF);
-    *next_subcode = rv_core->func3;
+    if (next_subcode != NULL) {
+        *next_subcode = rv_core->func3;
+    }
 }
 
 static void S_type_preparation(Core *rv_core, int32_t *next_subcode)
@@ -1476,7 +1646,9 @@ static void S_type_preparation(Core *rv_core, int32_t *next_subcode)
     rv_core->rs1 = ((rv_core->instruction >> 15) & 0x1F);
     rv_core->rs2 = ((rv_core->instruction >> 20) & 0x1F);
     rv_core->immediate = (((rv_core->instruction >> 25) << 5) | ((rv_core->instruction >> 7) & 0x1F));
-    *next_subcode = rv_core->func3;
+    if (next_subcode != NULL) {
+        *next_subcode = rv_core->func3;
+    }
 }
 
 static void B_type_preparation(Core *rv_core, int32_t *next_subcode)
@@ -1490,7 +1662,9 @@ static void B_type_preparation(Core *rv_core, int32_t *next_subcode)
                           (extract32(rv_core->instruction, 7, 1) << 11) |
                           (extract32(rv_core->instruction, 31, 1) << 12) );
     rv_core->jump_offset = SIGNEX_BIT_12(rv_core->jump_offset);
-    *next_subcode = rv_core->func3;
+    if (next_subcode != NULL) {
+        *next_subcode = rv_core->func3;
+    }
 }
 
 static void U_type_preparation(Core *rv_core, int32_t *next_subcode)
@@ -1498,7 +1672,9 @@ static void U_type_preparation(Core *rv_core, int32_t *next_subcode)
     rv_core->rd = ((rv_core->instruction >> 7) & 0x1F);
     rv_core->immediate = ((rv_core->instruction >> 12) & 0xFFFFF);
     rv_core->immediate = SIGNEX_BIT_19(rv_core->immediate);
-    *next_subcode = -1;
+    if (next_subcode != NULL) {
+        *next_subcode = -1;
+    }
 }
 
 static void J_type_preparation(Core *rv_core, int32_t *next_subcode)
@@ -1510,7 +1686,21 @@ static void J_type_preparation(Core *rv_core, int32_t *next_subcode)
                           (extract32(rv_core->instruction, 31, 1) << 20));
     /* sign extend the 20 bit number */
     rv_core->jump_offset = SIGNEX_BIT_20(rv_core->jump_offset);
-    *next_subcode = -1;
+    if (next_subcode != NULL) {
+        *next_subcode = -1;
+    }
+}
+
+static void R4_type_preparation(Core *rv_core, int32_t *next_subcode) {
+    (void) next_subcode;
+    rv_core->rd = ((rv_core->instruction >> 7) & 0x1F);
+    rv_core->func3 = ((rv_core->instruction >> 12) & 0x7);
+    rv_core->rs1 = ((rv_core->instruction >> 15) & 0x1F);
+    rv_core->rs2 = ((rv_core->instruction >> 20) & 0x1F);
+    rv_core->rs3 = ((rv_core->instruction >> 27) & 0x1F);
+    if (next_subcode != NULL) {
+        *next_subcode = -1;
+    }
 }
 
 static void R_float_type_preparation(Core *rv_core, int32_t *next_subcode) {
@@ -1521,7 +1711,7 @@ static void R_float_type_preparation(Core *rv_core, int32_t *next_subcode) {
     rv_core->rs2 = ((rv_core->instruction >> 20) & 0x1F);
     rv_core->func7 = ((rv_core->instruction >> 25) & 0x7F);
     uint8_t set_instr = 1;
-    switch((func7 >> 2)) {
+    switch((rv_core->func7 >> 2)) {
         case FLT_ADD: 
             rv_core->execute_cb = instr_FADD;
             break;
@@ -1535,7 +1725,7 @@ static void R_float_type_preparation(Core *rv_core, int32_t *next_subcode) {
             rv_core->execute_cb = instr_FDIV;
             break;
         case FLT_SQRT:
-            rv_core->execute_Cb = instr_FSQRT;
+            rv_core->execute_cb = instr_FSQRT;
             break;
         case FLT_SGNINJ:
             if (rv_core->func3 == FLT_SGNJ) {
@@ -1575,12 +1765,9 @@ static void R_float_type_preparation(Core *rv_core, int32_t *next_subcode) {
             set_instr = 0;
         }
     }
-    if (!set_instr) {
-        printf("failed to set instruction !\n");
-    } else {
-        rv_core->rd = ((rv_core->instruction >> 7) & 0x1F);
-    }
 }
+
+
 
 static instruction_hook_td RV_opcode_list[MAX_INSTR_OPCODE] = {};
 INIT_INSTRUCTION_LIST_DESC(RV_opcode_list);
@@ -1842,7 +2029,8 @@ static void init_instruction_hooks() {
     CUSTOM_soc_interface_func7_subcode_list[FUNC7_READBUFF] = {NULL, instr_READBUFF, NULL};
     CUSTOM_soc_interface_func7_subcode_list[FUNC7_STARTSIM] = {NULL, instr_STARTSIM, NULL};
     CUSTOM_soc_interface_func7_subcode_list[FUNC7_STOPSIM] = {NULL, instr_STOPSIM, NULL};
-    CUSTOM_soc_interface_func7_subcode_list[FUNC7_NEXTTICK] = {NULL, instr_NEXTTICK, NULL};
+    CUSTOM_soc_interface_func7_subcode_list[FUNC7_NEXTSIMTICK] = {NULL, instr_NEXTSIMTICK, NULL};
+    INIT_INSTRUCTION_LIST_DESC(CUSTOM_soc_interface_func7_subcode_list);
 
     static instruction_hook_td CUSTOM_func3_subcode_list[MAX_FUNC3_VALUE] = {};
     CUSTOM_func3_subcode_list[FUNC3_LOGADDR] = {preparation_func7, NULL, &CUSTOM_logical_func7_subcode_list_desc};
@@ -1850,7 +2038,6 @@ static void init_instruction_hooks() {
     CUSTOM_func3_subcode_list[FUNC3_SOC_INTERFACE] = {preparation_func7, NULL, &CUSTOM_soc_interface_func7_subcode_list_desc};
     INIT_INSTRUCTION_LIST_DESC(CUSTOM_func3_subcode_list);
 
-    static instruction_hook_td FLOAT_ARITH_func7_subcode_list[MAX_FUNC7_VALUE] = {}
     RV_opcode_list[INSTR_LUI] = {U_type_preparation, instr_LUI, NULL};
     RV_opcode_list[INSTR_AUIPC] = {U_type_preparation, instr_AUIPC, NULL};
     RV_opcode_list[INSTR_JAL] = {J_type_preparation, instr_JAL, NULL};
@@ -1863,6 +2050,12 @@ static void init_instruction_hooks() {
     RV_opcode_list[INSTR_FENCE_FENCE_I] = {NULL, instr_NOP, NULL};
     RV_opcode_list[INSTR_CSD] = {R_type_preparation, NULL, &CUSTOM_func3_subcode_list_desc};
     RV_opcode_list[INSTR_FLT_ARITH] = {R_float_type_preparation, NULL, NULL}; // a little to difficult to encode this in map format
+    RV_opcode_list[INSTR_FLT_LOAD] = {I_type_preparation, instr_FLW, NULL};
+    RV_opcode_list[INSTR_FLT_STORE] = {S_type_preparation, instr_FSW, NULL};
+    RV_opcode_list[INSTR_FMADD] = {R4_type_preparation, instr_FMADD, NULL};
+    RV_opcode_list[INSTR_FMSUB] = {R4_type_preparation, instr_FMSUB, NULL};
+    RV_opcode_list[INSTR_FMNSUB] = {R4_type_preparation, instr_FMNSUB, NULL};
+    RV_opcode_list[INSTR_FMNADD] = {R4_type_preparation, instr_FMNADD, NULL};
     #ifdef RV64
         RV_opcode_list[INSTR_ADDIW_SLLIW_SRLIW_SRAIW] = {I_type_preparation, NULL, &SLLIW_SRLIW_SRAIW_ADDIW_func3_subcode_list_desc};
         RV_opcode_list[INSTR_ADDW_SUBW_SLLW_SRLW_SRAW_MULW_DIVW_DIVUW_REMW_REMUW] = {R_type_preparation, NULL, &ADDW_SUBW_SLLW_SRLW_SRAW_MULW_DIVW_DIVUW_REMW_REMUW_func3_subcode_list_desc};

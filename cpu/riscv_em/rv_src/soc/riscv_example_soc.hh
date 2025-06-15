@@ -66,10 +66,6 @@ class SOC {
         void stop();
         void start();
         void init_mem_access_struct(int entry, bus_access_func bus_access, void* _priv, rv_word_t addr_start, rv_word_t mem_size);
-        typedef enum SIM_STATE {
-            
-        };
-        
 };
 
 

@@ -62,7 +62,7 @@ void itoa(int num, char *buffer, int base) {
 
 void uitoa(unsigned int num, char *buffer, int base) {
     _itoa(num, buffer, base, 0);
-}
+} 
 
 // internal printf helper
 void _printf(char* format, char** args) {

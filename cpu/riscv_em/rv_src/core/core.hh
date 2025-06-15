@@ -32,7 +32,7 @@ class Core {
 
         /* Registers */
         rv_word_t reg_file[NR_RVI_REGS];
-        rv_word_t float_reg_file[NR_RVF_REGS];
+        double float_reg_file[NR_RVF_REGS];
         rv_word_t pc;
         rv_word_t next_pc;
 
