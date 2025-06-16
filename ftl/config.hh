@@ -28,45 +28,45 @@ namespace FTL {
 
 typedef enum {
   /* Common FTL configuration */
-  FTL_MAPPING_MODE,
-  FTL_OVERPROVISION_RATIO,
-  FTL_GC_THRESHOLD_RATIO,
-  FTL_BAD_BLOCK_THRESHOLD,
-  FTL_FILLING_MODE,
-  FTL_FILL_RATIO,
-  FTL_INVALID_PAGE_RATIO,
-  FTL_GC_MODE,
-  FTL_GC_RECLAIM_BLOCK,
-  FTL_GC_RECLAIM_THRESHOLD,
-  FTL_GC_EVICT_POLICY,
-  FTL_GC_D_CHOICE_PARAM,
-  FTL_USE_RANDOM_IO_TWEAK,
+  FTL_MAPPING_MODE          = 0,
+  FTL_OVERPROVISION_RATIO   = 1,
+  FTL_GC_THRESHOLD_RATIO    = 2,
+  FTL_BAD_BLOCK_THRESHOLD   = 3,
+  FTL_FILLING_MODE          = 4,
+  FTL_FILL_RATIO            = 5,
+  FTL_INVALID_PAGE_RATIO    = 6,
+  FTL_GC_MODE               = 7,
+  FTL_GC_RECLAIM_BLOCK      = 8,
+  FTL_GC_RECLAIM_THRESHOLD  = 9,
+  FTL_GC_EVICT_POLICY       = 10,
+  FTL_GC_D_CHOICE_PARAM     = 11,
+  FTL_USE_RANDOM_IO_TWEAK   = 12,
 
   /* N+K Mapping configuration*/
-  FTL_NKMAP_N,
-  FTL_NKMAP_K,
+  FTL_NKMAP_N               = 13,
+  FTL_NKMAP_K               = 14,
 } FTL_CONFIG;
 
 typedef enum {
-  PAGE_MAPPING,
+  PAGE_MAPPING = 0,
 } MAPPING;
 
 typedef enum {
-  GC_MODE_0,  // Reclaim fixed number of blocks
-  GC_MODE_1,  // Reclaim blocks until threshold
+  GC_MODE_0 = 0,  // Reclaim fixed number of blocks
+  GC_MODE_1 = 1,  // Reclaim blocks until threshold
 } GC_MODE;
 
 typedef enum {
-  FILLING_MODE_0,
-  FILLING_MODE_1,
-  FILLING_MODE_2,
+  FILLING_MODE_0 = 0,
+  FILLING_MODE_1 = 1,
+  FILLING_MODE_2 = 2,
 } FILLING_MODE;
 
 typedef enum {
-  POLICY_GREEDY,  // Select the block with the least valid pages
-  POLICY_COST_BENEFIT,
-  POLICY_RANDOM,  // Select the block randomly
-  POLICY_DCHOICE,
+  POLICY_GREEDY        = 0,  // Select the block with the least valid pages
+  POLICY_COST_BENEFIT  = 1,
+  POLICY_RANDOM        = 2,  // Select the block randomly
+  POLICY_DCHOICE       = 3,
 } EVICT_POLICY;
 
 class Config : public BaseConfig {

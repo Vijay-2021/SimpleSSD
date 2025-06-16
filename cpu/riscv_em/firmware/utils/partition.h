@@ -29,6 +29,10 @@
 #ifndef PARTITION_H
 #define PARTITION_H 1
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /**
  * \defgroup PARTITION_TABLE_ADDRESSES Offset into the volume for each partition table entry
  * @{
@@ -104,5 +108,10 @@ struct partition {
  * \returns the number of valid partitions found 0 = none, 4 = all four are valid
  **/
 int read_partition_table(uint8_t *mbr, blockno_t volume_size, struct partition **retlist);
+
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* ifndef PARTITION_H */

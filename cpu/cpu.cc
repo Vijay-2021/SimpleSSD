@@ -162,6 +162,24 @@ CPU::CPU(ConfigReader &c, ICL::ICL *icl, FTL::FTL *ftl, PAL::PAL *pal, DRAM::Abs
   });
   page_size = pPAL->getInfo()->pageSize;
   pDisk = new Disk();
+  
+  fw_params.totalPhysicalBlocks = pFTL->getInfo()->totalPhysicalBlocks;
+  fw_params.totalLogicalBlocks = pFTL->getInfo()->totalLogicalBlocks;
+  fw_params.pagesInBlock = pFTL->getInfo()->pagesInBlock;
+  fw_params.pageSize = pFTL->getInfo()->pageSize;
+  fw_params.ioUnitInPage = pFTL->getInfo()->ioUnitInPage;
+  fw_params.pageCountToMaxPerf = pFTL->getInfo()->pageCountToMaxPerf;
+  fw_params.bRandomTweak = conf.readBoolean(CONFIG_FTL, SimpleSSD::FTL::FTL_USE_RANDOM_IO_TWEAK);
+  fw_params.ftl_fill_ratio = conf.readFloat(CONFIG_FTL, SimpleSSD::FTL::FTL_FILL_RATIO);
+  fw_params.ftl_invalid_page_ratio = conf.readFloat(CONFIG_FTL, SimpleSSD::FTL::FTL_INVALID_PAGE_RATIO);
+  fw_params.ftl_filling_mode = (FTL::FILLING_MODE)conf.readInt(CONFIG_FTL, SimpleSSD::FTL::FTL_FILLING_MODE);
+  fw_params.ftl_gc_threshold_ratio = conf.readFloat(CONFIG_FTL, SimpleSSD::FTL::FTL_GC_THRESHOLD_RATIO);
+  fw_params.ftl_gc_mode = (FTL::GC_MODE)conf.readInt(CONFIG_FTL, SimpleSSD::FTL::FTL_GC_MODE);
+  fw_params.ftl_evict_policy = (FTL::EVICT_POLICY)conf.readInt(CONFIG_FTL, SimpleSSD::FTL::FTL_GC_EVICT_POLICY);
+  fw_params.choiceParam = conf.readInt(CONFIG_FTL, SimpleSSD::FTL::FTL_GC_D_CHOICE_PARAM);
+  fw_params.ftl_gc_reclaim_block = conf.readInt(CONFIG_FTL, SimpleSSD::FTL::FTL_GC_RECLAIM_BLOCK);
+  fw_params.ftl_gc_reclaim_threshold = conf.readFloat(CONFIG_FTL, SimpleSSD::FTL::FTL_GC_RECLAIM_BLOCK);
+  fw_params.bad_block_threshold = conf.readInt(CONFIG_FTL, SimpleSSD::FTL::FTL_BAD_BLOCK_THRESHOLD);
   // unsigned char buffer[256];
   // read_flash(buffer, 4096, 4096);
   // schedule(csdCycleEvent, getTick()); // start the csd core(s) as soon as possible
@@ -1174,6 +1192,15 @@ void CPU::addCSDTask(char* input_command) {
   csd->rv_soc_add_task(input_command);
 }
 
+uint64_t CPU::read_buffer(uint8_t* buffer, uint64_t req_type) {
+  printf("fw params bad block threshold %lu\n", fw_params.bad_block_threshold);
+  printf("fw params page size %lu\n", fw_params.pageSize);
+  printf("fw params pages in block %lu\n", fw_params.pagesInBlock);
+  if (req_type == FIRMWARE_REQ) {
+    memcpy(buffer, &fw_params, sizeof(firmware_params_td));
+  }
+  return getTick() + clockPeriod;
+}
 uint64_t CPU::getClockPeriod() {
   return clockPeriod;
 }

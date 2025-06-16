@@ -67,6 +67,31 @@ namespace DRAM {
 
 namespace CPU {
 
+typedef enum {
+    FIRMWARE_REQ = 0
+} DATA_REQ;
+
+
+typedef struct firmware_params {
+	uint64_t totalPhysicalBlocks;
+  uint64_t totalLogicalBlocks;
+  uint64_t pagesInBlock;
+  uint32_t pageSize;
+  uint32_t ioUnitInPage;
+  uint32_t pageCountToMaxPerf;  
+	bool bRandomTweak;
+	float ftl_fill_ratio;
+	float ftl_invalid_page_ratio;
+	FTL::FILLING_MODE ftl_filling_mode; // or FILLING_MODE
+	float ftl_gc_threshold_ratio;
+	FTL::GC_MODE ftl_gc_mode;
+	FTL::EVICT_POLICY ftl_evict_policy;
+	uint32_t choiceParam;
+	uint64_t ftl_gc_reclaim_block;
+	float ftl_gc_reclaim_threshold;
+	uint64_t bad_block_threshold;
+} firmware_params_td;
+
 typedef struct _InstStat {
   // Instruction count
   uint64_t branch;
@@ -157,6 +182,8 @@ class CPU : public StatObject {
   bool csd_in_progress;
   uint32_t page_size = 16834; // Default page size for SimpleSSD
   uint32_t lba_size = 512;
+  firmware_params_td fw_params;
+  
   public:
     CPU(ConfigReader &, ICL::ICL *, FTL::FTL *, PAL::PAL *pal, DRAM::AbstractDRAM *dram);
     ~CPU();
@@ -179,6 +206,7 @@ class CPU : public StatObject {
     uint64_t read_flash_pal(uint8_t* buffer, uint64_t lpn , uint64_t ppn);
     uint64_t write_flash_pal(uint8_t* buffer, uint64_t lpn , uint64_t ppn);
     uint64_t erase_flash_pal(uint8_t* buffer, uint64_t lpn , uint64_t ppn);
+    uint64_t read_buffer(uint8_t *buffer, uint64_t req_type);
     void setDisk(Disk *disk);
     void closeDisk();
     void addCSDTask(char* input_cmd);

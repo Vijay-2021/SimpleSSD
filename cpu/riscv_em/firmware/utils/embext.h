@@ -1,6 +1,8 @@
 #ifndef EMBEXT2_H
 #define EMBEXT2_H 1
-
+#ifdef __cplusplus
+extern "C" {
+#endif
 #include "block.h"
 
 #define MAX_PATH_LEN 1024
@@ -167,5 +169,9 @@ struct dirent *ext2_readdir(void *vfe);
 
 void ext2_print_inode(void *vfe);
 void ext2_print_bg1_bitmap(struct ext2context *context);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* ifndef EMBEXT2_H */

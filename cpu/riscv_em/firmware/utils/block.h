@@ -31,6 +31,9 @@
 #ifndef BLOCK_H
 #define BLOCK_H 1
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 /**
  * #BLOCK_SIZE is the number of bytes per logical block on the storage medium.  Only 512 has been
  * tested but other sizes are theoretically possible.  This affects both the amount of data read
@@ -133,5 +136,9 @@ int block_get_device_read_only();
  * \return non zero to indicate an error, errors are block driver specific.
  **/
 int block_get_error();
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* ifndef BLOCK_H */

@@ -1422,6 +1422,7 @@ static uint64_t instr_PERASE(Core * rv_core) {
 }
 
 static uint64_t instr_READBUFF(Core *rv_core) {
+    return rv_core->pSOC->read_buffer(rv_core->pSOC->get_ram() + ((rv_core->reg_file[rv_core->rd] - RAM_BASE_ADDR)), rv_core->reg_file[rv_core->rs1]);
     return getTick() + rv_core->pSOC->get_period();
 }
 

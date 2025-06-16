@@ -1,6 +1,8 @@
 #pragma once
 #include <stdint.h>
-
+#ifdef __cplusplus
+extern "C" {
+#endif
 #define COMPILER_BARRIER() { __asm__ __volatile__("" ::: "memory");}
 
 #define CUSTOM_INSTR_ENCODE(funct7, rs2, rs1, funct3, rd, opcode) \
@@ -23,6 +25,11 @@
         #define FUNC7_INSTR_PREAD 0x00
         #define FUNC7_INSTR_PWRITE 0x01
         #define FUNC7_INSTR_PERASE 0x02
+    #define FUNC3_SOC_INTERFACE 0x2
+        #define FUNC7_READBUFF 0x00
+        #define FUNC7_STARTSIM 0x01 // stop continuos execution
+        #define FUNC7_STOPSIM 0x02 // execute once every cycle
+        #define FUNC7_NEXTSIMTICK 0x03 // sets the next tick
 
 void pread(uint64_t rd, uint64_t rs1, uint64_t rs2);
 void pwrite(uint64_t rd, uint64_t rs1, uint64_t rs2);
@@ -31,6 +38,15 @@ void perase(uint64_t rd, uint64_t rs1, uint64_t rs2);
 void lread(uint64_t rd, uint64_t rs1, uint64_t rs2);
 void lwrite(uint64_t rd, uint64_t rs1, uint64_t rs2);
 void ltrim(uint64_t rd, uint64_t rs1, uint64_t rs2);
+
+void read_buffer(uint64_t rd, uint64_t rs1);
+void start_sim();
+void stop_sim();
+void next_tick(uint64_t rs1);
+
+#ifdef __cplusplus
+}
+#endif
 // we want to write programs that do this kind of thing
 
 // should add some support for open/close/read/write

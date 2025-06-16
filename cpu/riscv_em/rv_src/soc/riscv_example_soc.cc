@@ -288,6 +288,10 @@ uint64_t SOC::perase(uint8_t* buffer, uint64_t offset , uint64_t len) {
     return pCPU->erase_flash_pal(buffer, offset, len);
 }
 
+uint64_t SOC::read_buffer(uint8_t *buffer, uint64_t req_type) {
+    return pCPU->read_buffer(buffer, req_type);
+}
+
 uint64_t SOC::get_period() {
     return clock_period;
 }

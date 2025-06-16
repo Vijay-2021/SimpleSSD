@@ -6,6 +6,10 @@
 #ifndef _SYS_DIRENT_H
 #define _SYS_DIRENT_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef unsigned long off_t;
 
 #define HAVE_NO_D_NAMLEN	/* no struct dirent->d_namlen */
@@ -53,5 +57,9 @@ int scandir (const char *__dir,
 
 int alphasort (const struct dirent **__a, const struct dirent **__b);
 #endif /* _POSIX_SOURCE */
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

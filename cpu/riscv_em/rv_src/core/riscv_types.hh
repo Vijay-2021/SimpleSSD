@@ -47,4 +47,18 @@ typedef enum
 
 typedef uint64_t (*bus_access_func)(void *priv, privilege_level priv_level, bus_access_type access_type, rv_word_t addr, void *value, uint8_t len);
 
+#define FLOAT_FMT 0x00
+#define DOUBLE_FMT 0x01
+
+#define RM_NEAREST 0x00
+#define RM_TZERO 0x01 
+#define RM_DOWN 0x02
+#define RM_UP 0x03
+#define RM_NEAREST_MAX 0x04
+#define RM_DYNAMIC 0x07
+
+#define RD_SOC_CONFIG 0x00
+#define RD_SOC_LOG 0x01
+// add more
+
 #endif /* RISCV_TYPES_H */

@@ -77,43 +77,39 @@ void _printf(char* format, char** args) {
         char *str;
         memset(value_buffer, 0, 32);
         switch (curr) {
-        case 'p':
-            print("0x");
-            uitoa(*((int *)args++), value_buffer, 16);
-            // write leading zeros
-            for (size_t i = 0; i < PTR_WIDTH_TERMINAL - strlen(value_buffer); i++) {
-                putchar('0');
-            }
-            print(value_buffer);
-            break;
-        case 'x':
-            print("0x");
-            uitoa(*((int *)args++), value_buffer, 16);
-            print(value_buffer);
-            break;
-        case 'd':
-            itoa(*((int *)args++), value_buffer, 10);
-            print(value_buffer);
-            break;
-        case 'u':
-            uitoa(*((unsigned int *)args++), value_buffer, 10);
-            print(value_buffer);
-            break;
-        case 'l':
-            itoa(*((int64_t *)args++), value_buffer, 10);
-            print(value_buffer);
-            break;
-        case 'lu':
-            itoa(*((uint64_t *)args++), value_buffer, 10);
-            print(value_buffer);
-            break;
-        case 's':
-            str = *args++;
-            print(str);
-            break;
-        default:
-            print("error in printf\n");
-            break;
+            case 'p':
+                print("0x");
+                uitoa(*((int *)args++), value_buffer, 16);
+                // write leading zeros
+                for (size_t i = 0; i < PTR_WIDTH_TERMINAL - strlen(value_buffer); i++) {
+                    putchar('0');
+                }
+                print(value_buffer);
+                break;
+            case 'x':
+                print("0x");
+                uitoa(*((int *)args++), value_buffer, 16);
+                print(value_buffer);
+                break;
+            case 'd':
+                itoa(*((int *)args++), value_buffer, 10);
+                print(value_buffer);
+                break;
+            case 'u':
+                uitoa(*((uint64_t *)args++), value_buffer, 10);
+                print(value_buffer);
+                break;
+            case 'l':
+                itoa(*((int64_t *)args++), value_buffer, 10);
+                print(value_buffer);
+                break;
+            case 's':
+                str = *args++;
+                print(str);
+                break;
+            default:
+                print("error in printf\n");
+                break;
         
         }
     }

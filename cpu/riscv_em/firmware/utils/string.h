@@ -4,6 +4,10 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef char* string;
 
 extern size_t strlen(const string str);
@@ -22,4 +26,9 @@ extern string strtok(string str, string delim);
 extern int strchr(string str, char c);
 
 extern void reverse(string str, int len);
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif

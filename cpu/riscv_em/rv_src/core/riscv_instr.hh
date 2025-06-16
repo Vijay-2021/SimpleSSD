@@ -149,16 +149,6 @@
         #define FUNC5_INSTR_AMO_MINU 0x18
         #define FUNC5_INSTR_AMO_MAXU 0x1C
 
-#define FLOAT_FMT 0x00
-#define DOUBLE_FMT 0x01
-
-#define RM_NEAREST 0x00
-#define RM_TZERO 0x01 
-#define RM_DOWN 0x02
-#define RM_UP 0x03
-#define RM_NEAREST_MAX 0x04
-#define RM_DYNAMIC 0x07
-
 #define INSTR_FLT_ARITH 0x53
     #define FLT_ADD 0x00
     #define FLT_SUB 0x01
