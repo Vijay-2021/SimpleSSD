@@ -46,7 +46,7 @@
 #include "rv_src/peripherals/uart/simple_uart.hh"
 #include "util/simplessd.hh"
 #include "util/disk.hh"
-
+#include "util/def.hh"
 namespace SimpleSSD {
 
 namespace ICL {
@@ -68,7 +68,8 @@ namespace DRAM {
 namespace CPU {
 
 typedef enum {
-    FIRMWARE_REQ = 0
+    FIRMWARE_PARAMS = 0, 
+    FIRMWARE_QUEUE = 1,
 } DATA_REQ;
 
 
@@ -183,7 +184,7 @@ class CPU : public StatObject {
   uint32_t page_size = 16834; // Default page size for SimpleSSD
   uint32_t lba_size = 512;
   firmware_params_td fw_params;
-  
+  std::vector<FTL::Request> req_buffer;
   public:
     CPU(ConfigReader &, ICL::ICL *, FTL::FTL *, PAL::PAL *pal, DRAM::AbstractDRAM *dram);
     ~CPU();
@@ -197,6 +198,7 @@ class CPU : public StatObject {
     uint64_t getClockPeriod();
     void resetStatValues() override;
     void startCSD();
+    bool socIsPaused();
     void stopCSD();
     void initCSD();
     void printLastStat();
@@ -210,6 +212,10 @@ class CPU : public StatObject {
     void setDisk(Disk *disk);
     void closeDisk();
     void addCSDTask(char* input_cmd);
+    uint64_t submitReadRequest(FTL::Request &req);
+    uint64_t submitWriteRequest(FTL::Request &req);
+    uint64_t submitTrimRequest(FTL::Request &req);
+    uint64_t submitFormatRequest(FTL::Request &range);
 };
 
 }  // namespace CPU

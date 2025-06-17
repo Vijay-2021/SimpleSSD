@@ -121,4 +121,14 @@ void printf(char *format, ...) {
     _printf(format, (char**)args);
     va_end(args);
 }
+
+void panic(char *format, ...) {
+    va_list args;
+    va_start(args, format);
+    _printf(format, (char**)args);
+    va_end(args);
+    while (1) {
+        // infinite loop to stop execution, will replace with something better later
+    }
+}
   

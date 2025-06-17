@@ -74,7 +74,8 @@ void Subsystem::init() {
   DRAM::AbstractDRAM *dram = icl->getDRAM();
   pCPU = new CPU::CPU(conf, icl, ftl, pal, dram);
   setCPU(pCPU);
-  
+  ftl->setCPU(pCPU);
+  pCPU->startCSD();
   uint16_t nNamespaces =
       (uint16_t)conf.readUint(CONFIG_NVME, NVME_ENABLE_DEFAULT_NAMESPACE);
 

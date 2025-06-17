@@ -1193,11 +1193,10 @@ void CPU::addCSDTask(char* input_command) {
 }
 
 uint64_t CPU::read_buffer(uint8_t* buffer, uint64_t req_type) {
-  printf("fw params bad block threshold %lu\n", fw_params.bad_block_threshold);
-  printf("fw params page size %lu\n", fw_params.pageSize);
-  printf("fw params pages in block %lu\n", fw_params.pagesInBlock);
-  if (req_type == FIRMWARE_REQ) {
+  if (req_type == FIRMWARE_PARAMS) {
     memcpy(buffer, &fw_params, sizeof(firmware_params_td));
+  } else if (req_type == FIRMWARE_QUEUE) {
+    memcpy(buffer, &req_buffer[0], sizeof(FTL::Request));
   }
   return getTick() + clockPeriod;
 }
@@ -1205,6 +1204,39 @@ uint64_t CPU::getClockPeriod() {
   return clockPeriod;
 }
 
-}  // namespace CPU
+bool CPU::socIsPaused() {
+  return csd_in_progress;
+}
 
-}  // namespace SimpleSSD
+uint64_t CPU::submitReadRequest(FTL::Request &req) {
+  req.reqType = FTL_REQ_READ;
+  req_buffer.clear(); // TO-DO: implement a queue properly
+  req_buffer.push_back(req);
+  return getTick() + clockPeriod;
+}
+
+uint64_t CPU::submitWriteRequest(FTL::Request &req) {
+  req.reqType = FTL_REQ_WRITE;
+  req_buffer.clear(); // TO-DO: implement a queue properly
+  req_buffer.push_back(req);
+  return getTick() + clockPeriod;
+}
+
+uint64_t CPU::submitTrimRequest(FTL::Request &req) {
+  req.reqType = FTL_REQ_TRIM;
+  req_buffer.clear(); // TO-DO: implement a queue properly
+  req_buffer.push_back(req);
+  return getTick() + clockPeriod;
+}  
+
+uint64_t CPU::submitFormatRequest(FTL::Request &req) {
+  req.reqType = FTL_REQ_FORMAT;
+  req_buffer.clear(); // TO-DO: implement a queue properly
+  req_buffer.push_back(req);
+  return getTick() + clockPeriod;
+
+}
+
+} // namespace CPU
+
+} // namespace SimpleSSD

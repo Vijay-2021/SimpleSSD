@@ -15,7 +15,7 @@ void uitoa(unsigned int num, char *buffer, int base);
 void putchar(char c);
 void print(const char *p);
 void printf(char *format, ...);
-
+void panic(char *format, ...);
 #ifdef __cplusplus
 }
 #endif

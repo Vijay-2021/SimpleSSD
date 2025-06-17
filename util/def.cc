@@ -69,13 +69,13 @@ Request::_Request(HIL::Request &r)
 namespace FTL {
 
 Request::_Request(uint32_t iocount)
-    : reqID(0), reqSubID(0), lpn(0), ioFlag(iocount) {}
+    : reqID(0), reqSubID(0), lpn(0), ioFlag(iocount), reqType(FTL_REQ_EMPTY) {}
 
 Request::_Request(uint32_t iocount, ICL::Request &r)
     : reqID(r.reqID),
       reqSubID(r.reqSubID),
       lpn(r.range.slpn / iocount),
-      ioFlag(iocount) {
+      ioFlag(iocount), reqType(FTL_REQ_EMPTY) {
   ioFlag.set(r.range.slpn % iocount);
 }
 

@@ -42,6 +42,9 @@ class SOC {
         uint64_t lwrite(uint8_t *buffer, uint64_t offset, uint64_t len);
         uint64_t ltrim(uint8_t *buffer, uint64_t offset, uint64_t len);
         uint64_t read_buffer(uint8_t *buffer, uint64_t req_type);
+        void start_simulation();
+        void stop_simulation();
+        void next_simulation_tick(uint64_t next_tick);
         typedef struct rv_soc_mem_access_cb_struct
         {
             bus_access_func bus_access;

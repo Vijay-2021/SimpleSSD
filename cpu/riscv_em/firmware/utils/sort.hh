@@ -75,18 +75,18 @@ int randPartition(Iterator begin, Iterator end, Compare comp)
     return partition(begin, end, comp);
 }
 
- template <typename Iterator, typename Compare>
- void introsort(Iterator begin, Iterator end, Compare comp) {
-        // perform insertion sort if partition size is 16 or smaller
-        if ((end - begin) < 16) {
-            insertionsort(begin, end, comp);
-        }
-        else {
-            // otherwise, perform Quicksort
-            auto pivot = randPartition(begin, end, comp);
-            introsort(begin, begin + pivot - 1, comp);
-            introsort(begin + pivot + 1, end, comp);
-        }
- }
+template <typename Iterator, typename Compare>
+void introsort(Iterator begin, Iterator end, Compare comp) {
+    // perform insertion sort if partition size is 16 or smaller
+    if ((end - begin) < 16) {
+        insertionsort(begin, end, comp);
+    }
+    else {
+        // otherwise, perform Quicksort
+        auto pivot = randPartition(begin, end, comp);
+        introsort(begin, begin + pivot - 1, comp);
+        introsort(begin + pivot + 1, end, comp);
+    }
+}
 
 #endif

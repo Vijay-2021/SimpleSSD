@@ -15,7 +15,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with SimpleSSD.  If not, see <http://www.gnu.org/licenses/>.
-
+ */
 
 #ifndef __FTL_COMMON_BLOCK__
 #define __FTL_COMMON_BLOCK__
@@ -24,10 +24,6 @@
 #include <vector>
 
 #include "util/bitset.hh"
-
-namespace SimpleSSD {
-
-namespace FTL {
 
 class Block {
  private:
@@ -42,8 +38,8 @@ class Block {
   uint64_t *pLPNs;
 
   // Following variables are used when ioUnitInPage > 1
-  std::vector<Bitset> validBits;
-  std::vector<Bitset> erasedBits;
+  Vector<Bitset> validBits;
+  Vector<Bitset> erasedBits;
   uint64_t **ppLPNs;
 
   uint64_t lastAccessed;
@@ -66,16 +62,11 @@ class Block {
   uint32_t getDirtyPageCount();
   uint32_t getNextWritePageIndex();
   uint32_t getNextWritePageIndex(uint32_t);
-  bool getPageInfo(uint32_t, std::vector<uint64_t> &, Bitset &);
+  bool getPageInfo(uint32_t, Vector<uint64_t> &, Bitset &);
   bool read(uint32_t, uint32_t, uint64_t);
   bool write(uint32_t, uint64_t, uint32_t, uint64_t);
   void erase();
   void invalidate(uint32_t, uint32_t);
 };
 
-}  // namespace FTL
-
-}  // namespace SimpleSSD
-
 #endif
-*/

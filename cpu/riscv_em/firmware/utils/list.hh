@@ -55,6 +55,15 @@ class List {
         }
         ~List() { clear(); free(sentinel); }
 
+        int reserve(size_t n) {
+            if (n < length_) return -1; // Cannot reserve less than current length
+            while (length_ < n) {
+                emplace_back(T());
+                length_++;
+            }
+            return 0;
+        }
+        
         void clear() {
             Node* cur = sentinel->next;
             while (cur != sentinel) {

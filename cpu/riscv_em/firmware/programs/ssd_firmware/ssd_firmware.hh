@@ -27,87 +27,55 @@
 
 
 class Firmware {
+  
   private:
-    typedef enum {
-      /* Common FTL configuration */
-      FTL_MAPPING_MODE          = 0,
-      FTL_OVERPROVISION_RATIO   = 1,
-      FTL_GC_THRESHOLD_RATIO    = 2,
-      FTL_BAD_BLOCK_THRESHOLD   = 3,
-      FTL_FILLING_MODE          = 4,
-      FTL_FILL_RATIO            = 5,
-      FTL_INVALID_PAGE_RATIO    = 6,
-      FTL_GC_MODE               = 7,
-      FTL_GC_RECLAIM_BLOCK      = 8,
-      FTL_GC_RECLAIM_THRESHOLD  = 9,
-      FTL_GC_EVICT_POLICY       = 10,
-      FTL_GC_D_CHOICE_PARAM     = 11,
-      FTL_USE_RANDOM_IO_TWEAK   = 12,
+    Map<uint64_t, Vector<std::pair<uint32_t, uint32_t>>>
+        table;
+    Map<uint32_t, Block> blocks;
+    List<Block> freeBlocks;
+    uint32_t nFreeBlocks;  // For some libraries which List::size() is O(n)
+    Vector<uint32_t> lastFreeBlock;
+    Bitset lastFreeBlockIOMap;
+    uint32_t lastFreeBlockIndex;
 
-      /* N+K Mapping configuration*/
-      FTL_NKMAP_N               = 13,
-      FTL_NKMAP_K               = 14,
-    } FTL_CONFIG;
+    bool bReclaimMore;
+    bool bRandomTweak;
+    uint32_t bitsetSize;
 
-    typedef enum {
-      PAGE_MAPPING = 0,
-    } MAPPING;
-
-    typedef enum {
-      GC_MODE_0 = 0,  // Reclaim fixed number of blocks
-      GC_MODE_1 = 1,  // Reclaim blocks until threshold
-    } GC_MODE;
-
-    typedef enum {
-      FILLING_MODE_0 = 0,
-      FILLING_MODE_1 = 1,
-      FILLING_MODE_2 = 2,
-    } FILLING_MODE;
-
-    typedef enum {
-      POLICY_GREEDY        = 0,  // Select the block with the least valid pages
-      POLICY_COST_BENEFIT  = 1,
-      POLICY_RANDOM        = 2,  // Select the block randomly
-      POLICY_DCHOICE       = 3,
-    } EVICT_POLICY;
-
-    typedef enum {
-        FIRMWARE_REQ = 0
-    } DATA_REQ;
-    typedef struct firmware_params {
-      uint64_t totalPhysicalBlocks;
-      uint64_t totalLogicalBlocks;
-      uint64_t pagesInBlock;
-      uint32_t pageSize;
-      uint32_t ioUnitInPage;
-      uint32_t pageCountToMaxPerf;  
-      bool bRandomTweak;
-      float ftl_fill_ratio;
-      float ftl_invalid_page_ratio;
-      FILLING_MODE ftl_filling_mode; // or FILLING_MODE
-      float ftl_gc_threshold_ratio;
-      GC_MODE ftl_gc_mode;
-      EVICT_POLICY ftl_evict_policy;
-      uint32_t choiceParam;
-      uint64_t ftl_gc_reclaim_block;
-      float ftl_gc_reclaim_threshold;
-      uint64_t bad_block_threshold;
-    } firmware_params_td;
-
-  
-  
-  public:
-    Firmware();
-    ~Firmware();
-    void print_status();
-    uint64_t read();
-    uint64_t write();
-    uint64_t trim();
+    struct {
+      uint64_t gcCount;
+      uint64_t reclaimedBlocks;
+      uint64_t validSuperPageCopies;
+      uint64_t validPageCopies;
+    } stat;
     
-  private:
-    firmware_params_td ssd_params;
-    Vector<int> lastFreeBlock;
-    List<Pair<int, int>> test;
+    firmware_params param;
+    float freeBlockRatio();
+    uint32_t convertBlockIdx(uint32_t);
+    uint32_t getFreeBlock(uint32_t);
+    uint32_t getLastFreeBlock(Bitset &);
+    void calculateVictimWeight(Vector<std::pair<uint32_t, float>> &,
+                              const EVICT_POLICY, uint64_t);
+    void selectVictimBlock(Vector<uint32_t> &, uint64_t &);
+    void doGarbageCollection(Vector<uint32_t> &, uint64_t &);
+
+    float calculateWearLeveling();
+    void calculateTotalPages(uint64_t &, uint64_t &);
+
+    void readInternal(Request &, uint64_t &);
+    void writeInternal(Request &, uint64_t &, bool = true);
+    void trimInternal(Request &, uint64_t &);
+    void eraseInternal(PAL::Request &, uint64_t &);
+
+ public:
+    Firmware(firmware_params& ssd_params);
+    ~Firmware();
+
+    bool initialize() override;
+
+    void read(Request &, uint64_t &) override;
+    void write(Request &, uint64_t &) override;
+    void trim(Request &, uint64_t &) override;
 };
 
 

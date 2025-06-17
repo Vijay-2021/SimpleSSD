@@ -68,37 +68,35 @@ FTL::~FTL() {
 
 void FTL::read(Request &req, uint64_t &tick) {
   debugprint(LOG_FTL, "READ  | LPN %" PRIu64, req.lpn);
-  if (cpu->socIsPaused()) {
-    cpu->startSOC();
+  if (pCPU->socIsPaused()) {
+    pCPU->startCSD();
   }
-  tick += cpu->submitReadRequest(req, tick);
+  tick = pCPU->submitReadRequest(req);
 }
 
 void FTL::write(Request &req, uint64_t &tick) {
   debugprint(LOG_FTL, "WRITE | LPN %" PRIu64, req.lpn);
-  if (cpu->socIsPaused()) {
-    cpu->startSOC();
+  if (pCPU->socIsPaused()) {
+    pCPU->startCSD();
   }
-  tick = cpu->submitWriteRequest(req, tick);
-  pFTL->write(req, tick);
-
+  tick = pCPU->submitWriteRequest(req);
 }
 
 void FTL::trim(Request &req, uint64_t &tick) {
   debugprint(LOG_FTL, "TRIM  | LPN %" PRIu64, req.lpn);
-  if (cpu->socIsPaused()) {
-    cpu->startSOC();
+  if (pCPU->socIsPaused()) {
+    pCPU->startCSD();
   }
-  tick = cpu->submitTrimRequest(req, tick);
+  tick = pCPU->submitTrimRequest(req);
 }
 
 void FTL::format(LPNRange &range, uint64_t &tick) {
-  debugprint(LOG_FTL, "FORMAT  | LPN %" PRIu64, req.lpn);
-  pFTL->format(range, tick);
-  if (cpu->socIsPaused()) {
-    cpu->startSOC();
+  // debugprint(LOG_FTL, "FORMAT  | LPN %" PRIu64, req.lpn);
+  if (pCPU->socIsPaused()) {
+    pCPU->startCSD();
   }
-  tick += cpu->submitFormatRequest(range, tick);
+  //tick = cpu->submitFormatRequest(range);
+  pFTL->format(range, tick); // we don't really support this yet
 }
 
 Parameter *FTL::getInfo() {

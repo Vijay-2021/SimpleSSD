@@ -300,6 +300,19 @@ uint8_t* SOC::get_ram() {
     return ram;
 }
 
+void SOC::start_simulation() {
+    pCPU->startCSD();
+}
+
+void SOC::stop_simulation() {
+    pCPU->stopCSD();
+
+}
+
+void SOC::next_simulation_tick(uint64_t next_tick) {
+    // To-do
+}
+
 } // namespace RISCV
 
 } // namespace CPU
