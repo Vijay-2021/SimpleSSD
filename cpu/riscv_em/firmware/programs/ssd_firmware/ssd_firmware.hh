@@ -20,8 +20,10 @@
 #ifndef __RISCV_FTL_FW__
 #define __RISCV_FTL_FW__
 
-#include "vector.hh"
 #include "cs_instructions.h"
+#include "vector.hh"
+#include "list.hh"
+#include "pair.hh"
 
 
 class Firmware {
@@ -98,8 +100,14 @@ class Firmware {
     Firmware();
     ~Firmware();
     void print_status();
+    uint64_t read();
+    uint64_t write();
+    uint64_t trim();
+    
   private:
     firmware_params_td ssd_params;
+    Vector<int> lastFreeBlock;
+    List<Pair<int, int>> test;
 };
 
 

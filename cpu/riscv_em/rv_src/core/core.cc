@@ -1427,14 +1427,17 @@ static uint64_t instr_READBUFF(Core *rv_core) {
 }
 
 static uint64_t instr_STARTSIM(Core *rv_core) {
+    rv_core->pSOC->start_simulation();
     return getTick() + rv_core->pSOC->get_period();
 }
 
 static uint64_t instr_STOPSIM(Core *rv_core) {
+    rv_core->pSOC->stop_simulation();
     return getTick() + rv_core->pSOC->get_period();
 }
 
 static uint64_t instr_NEXTSIMTICK(Core *rv_core) {
+    rv_core->pSOC->next_simulation_tick(rv_core->reg_file[rv_core->rs1]);
     return getTick() + rv_core->pSOC->get_period();
 }
 

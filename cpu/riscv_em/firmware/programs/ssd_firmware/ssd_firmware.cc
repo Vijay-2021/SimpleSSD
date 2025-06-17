@@ -25,14 +25,10 @@ Firmware::Firmware() {
   printf("ssd params bad block threshold %u\n", ssd_params.bad_block_threshold);
   printf("ssd params page size %u\n", ssd_params.pageSize);
   printf("ssd params pages in block %u\n", ssd_params.pagesInBlock);
-  Vector<uint32_t> test(64);
-  for(uint32_t i = 0; i < 64; i++) {
-    test.push_back(i);
+  for(uint32_t i = 0; i < ssd_params.pageCountToMaxPerf; i++) {
+    lastFreeBlock.push_back(0);
   }
-  for (uint32_t i = 0; i < test.size(); i++) {
-    printf("test at %u is %u", i, test[i]);
-  }
-  printf("\n");
+  test.emplace_back(Pair<int,int>(1, 2));
 }
 
 Firmware::~Firmware() {

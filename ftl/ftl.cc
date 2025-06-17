@@ -20,6 +20,7 @@
 #include "ftl/ftl.hh"
 
 #include "ftl/page_mapping.hh"
+#include "cpu/cpu.hh"
 
 namespace SimpleSSD {
 
@@ -67,32 +68,37 @@ FTL::~FTL() {
 
 void FTL::read(Request &req, uint64_t &tick) {
   debugprint(LOG_FTL, "READ  | LPN %" PRIu64, req.lpn);
-
-  pFTL->read(req, tick);
-
-  tick += applyLatency(CPU::FTL, CPU::READ);
+  if (cpu->socIsPaused()) {
+    cpu->startSOC();
+  }
+  tick += cpu->submitReadRequest(req, tick);
 }
 
 void FTL::write(Request &req, uint64_t &tick) {
   debugprint(LOG_FTL, "WRITE | LPN %" PRIu64, req.lpn);
-
+  if (cpu->socIsPaused()) {
+    cpu->startSOC();
+  }
+  tick = cpu->submitWriteRequest(req, tick);
   pFTL->write(req, tick);
 
-  tick += applyLatency(CPU::FTL, CPU::WRITE);
 }
 
 void FTL::trim(Request &req, uint64_t &tick) {
   debugprint(LOG_FTL, "TRIM  | LPN %" PRIu64, req.lpn);
-
-  pFTL->trim(req, tick);
-
-  tick += applyLatency(CPU::FTL, CPU::TRIM);
+  if (cpu->socIsPaused()) {
+    cpu->startSOC();
+  }
+  tick = cpu->submitTrimRequest(req, tick);
 }
 
 void FTL::format(LPNRange &range, uint64_t &tick) {
+  debugprint(LOG_FTL, "FORMAT  | LPN %" PRIu64, req.lpn);
   pFTL->format(range, tick);
-
-  tick += applyLatency(CPU::FTL, CPU::FORMAT);
+  if (cpu->socIsPaused()) {
+    cpu->startSOC();
+  }
+  tick += cpu->submitFormatRequest(range, tick);
 }
 
 Parameter *FTL::getInfo() {

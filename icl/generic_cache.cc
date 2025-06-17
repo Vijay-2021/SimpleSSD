@@ -591,7 +591,7 @@ bool GenericCache::write(Request &req, uint64_t &tick) {
       }
 
       // Update last accessed time
-      cacheData[setIdx][wayIdx].dirty = dirty;
+      cacheData[setIdx][wayIdx].dirty = dirty; 
 
       // DRAM access
       pDRAM->write(&cacheData[setIdx][wayIdx], req.length, tick);

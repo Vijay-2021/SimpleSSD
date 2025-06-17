@@ -38,6 +38,15 @@ public:
         }
     }
 
+    Vector(Vector<T>&& rhs) {
+        capacity_ = rhs.capacity_;
+        data_ = rhs.data_;
+        size_ = rhs.size_;
+        rhs.data_ = nullptr;
+        rhs.capacity_ = 0;
+        rhs.size_ = 0;
+    }
+
     ~Vector() {
         free(data_);
     }
@@ -58,6 +67,20 @@ public:
         }
         return *this;
     }
+    Vector<T>& operator=(Vector<T>&& rhs) noexcept {
+        if (this != &rhs) {
+            free(data_);
+            data_ = rhs.data_;
+            size_ = rhs.size_;
+            capacity_ = rhs.capacity_;
+
+            rhs.data_ = nullptr;
+            rhs.size_ = 0;
+            rhs.capacity_ = 0;
+        }
+        return *this;
+    }
+
     int push_back(const T& value) {
         if (size_ == capacity_) {
             size_t newCap = capacity_ ? capacity_ * 2 : 1;
@@ -98,6 +121,12 @@ public:
         size_ = newSize;
         return 0;
     }
+
+    using iterator = T*;
+    iterator begin() { return data_; }
+    iterator end() { return data_ + size_; }
+    iterator cbegin() const { return data_; }
+    iterator cend() const { return data_ + size_; }
 };
 
 

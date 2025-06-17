@@ -26,6 +26,10 @@
 
 namespace SimpleSSD {
 
+namespace CPU {
+  class CPU;
+}
+
 namespace FTL {
 
 class AbstractFTL;
@@ -47,7 +51,7 @@ class FTL : public StatObject {
   ConfigReader &conf;
   AbstractFTL *pFTL;
   DRAM::AbstractDRAM *pDRAM;
-
+  CPU::CPU *pCPU;
  public:
   FTL(ConfigReader &, DRAM::AbstractDRAM *);
   ~FTL();
@@ -67,6 +71,10 @@ class FTL : public StatObject {
 
   PAL::PAL *getPAL() {
     return pPAL;
+  }
+
+  void setCPU(CPU::CPU *cpu) {
+    pCPU = cpu;
   }
 };
 

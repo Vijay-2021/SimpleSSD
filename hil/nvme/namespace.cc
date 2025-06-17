@@ -684,9 +684,9 @@ void Namespace::datasetManagement(SQEntryWrapper &req, RequestFunction &func) {
 
 Disk *Namespace::getDisk() {
   return pDisk;
-}  // namespace NVMe
+}  
 
-} 
+} // namespace NVMe
 
 }  // namespace HIL
 
