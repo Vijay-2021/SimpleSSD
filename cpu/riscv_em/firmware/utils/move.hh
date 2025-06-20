@@ -1,5 +1,5 @@
 #ifndef __RISCV_MOVE__
-#define __RISCV_MODE__
+#define __RISCV_MOVE__
 
 template<typename T>
 struct remove_reference {

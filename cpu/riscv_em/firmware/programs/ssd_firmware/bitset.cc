@@ -17,11 +17,12 @@
  * along with SimpleSSD.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "util/bitset.hh"
-
+#include "bitset.hh"
+#include "move.hh"
 #include "memory.h"
 #include "string.h"
 #include "firmware_utils.h"
+#include "def.hh"
 
 Bitset::Bitset() : data(nullptr), dataSize(0), allocSize(0) {}
 

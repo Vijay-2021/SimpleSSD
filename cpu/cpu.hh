@@ -70,6 +70,7 @@ namespace CPU {
 typedef enum {
     FIRMWARE_PARAMS = 0, 
     FIRMWARE_QUEUE = 1,
+    FIRMWARE_TICK = 2,
 } DATA_REQ;
 
 

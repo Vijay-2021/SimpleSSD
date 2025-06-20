@@ -23,15 +23,18 @@
 #include "cs_instructions.h"
 #include "vector.hh"
 #include "list.hh"
+#include "map.hh"
 #include "pair.hh"
-
+#include "def.hh"
+#include "block.hh"
+#include "limits.hh"
 
 class Firmware {
   
   private:
-    Map<uint64_t, Vector<std::pair<uint32_t, uint32_t>>>
+    HashMap<uint64_t, Vector<Pair<uint32_t, uint32_t>>>
         table;
-    Map<uint32_t, Block> blocks;
+    HashMap<uint32_t, Block> blocks;
     List<Block> freeBlocks;
     uint32_t nFreeBlocks;  // For some libraries which List::size() is O(n)
     Vector<uint32_t> lastFreeBlock;
@@ -49,12 +52,12 @@ class Firmware {
       uint64_t validPageCopies;
     } stat;
     
-    firmware_params param;
+    firmware_params params;
     float freeBlockRatio();
     uint32_t convertBlockIdx(uint32_t);
     uint32_t getFreeBlock(uint32_t);
     uint32_t getLastFreeBlock(Bitset &);
-    void calculateVictimWeight(Vector<std::pair<uint32_t, float>> &,
+    void calculateVictimWeight(Vector<Pair<uint32_t, float>> &,
                               const EVICT_POLICY, uint64_t);
     void selectVictimBlock(Vector<uint32_t> &, uint64_t &);
     void doGarbageCollection(Vector<uint32_t> &, uint64_t &);
@@ -62,20 +65,20 @@ class Firmware {
     float calculateWearLeveling();
     void calculateTotalPages(uint64_t &, uint64_t &);
 
-    void readInternal(Request &, uint64_t &);
-    void writeInternal(Request &, uint64_t &, bool = true);
-    void trimInternal(Request &, uint64_t &);
+    void readInternal(FTL::Request &, uint64_t &);
+    void writeInternal(FTL::Request &, uint64_t &, bool = true);
+    void trimInternal(FTL::Request &, uint64_t &);
     void eraseInternal(PAL::Request &, uint64_t &);
 
  public:
     Firmware(firmware_params& ssd_params);
     ~Firmware();
 
-    bool initialize() override;
+    bool initialize();
 
-    void read(Request &, uint64_t &) override;
-    void write(Request &, uint64_t &) override;
-    void trim(Request &, uint64_t &) override;
+    void read(FTL::Request &, uint64_t &);
+    void write(FTL::Request &, uint64_t &);
+    void trim(FTL::Request &, uint64_t &);
 };
 
 

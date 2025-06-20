@@ -66,7 +66,7 @@ template <typename Iterator, typename Compare>
 int randPartition(Iterator begin, Iterator end, Compare comp)
 {
     // choose a random index between `[begin, end]`
-    auto pivotIndex = begin + (rand() % (end - begin + 1));
+    auto pivotIndex = begin + (rand64() % (end - begin + 1));
  
     // swap the end element with the element present at a random index
     swap(pivotIndex, end);

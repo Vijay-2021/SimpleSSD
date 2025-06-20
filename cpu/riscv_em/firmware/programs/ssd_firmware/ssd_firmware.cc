@@ -19,23 +19,25 @@
 
 #include "ssd_firmware.hh"
 #include "utils.h"
+#include "firmware_utils.h"
+#include "move.hh"
+#include "random.h"
+#include "sort.hh"
 
-Firmware::Firmware(firmware_params &ssd_param) : param(ssd_params), lastFreeBlock(param.pageCountToMaxPerf),
-      lastFreeBlockIOMap(param.ioUnitInPage),
-      bReclaimMore(false) { 
-  blocks.reserve(param.totalPhysicalBlocks);
-  table.reserve(param.totalLogicalBlocks * param.pagesInBlock);
+Firmware::Firmware(firmware_params &ssd_params) : params(ssd_params), lastFreeBlock(params.pageCountToMaxPerf),
+      lastFreeBlockIOMap(params.ioUnitInPage), bReclaimMore(false), blocks(params.totalPhysicalBlocks), 
+      table(params.totalLogicalBlocks * params.pagesInBlock) {
 
-  for (uint32_t i = 0; i < param.totalPhysicalBlocks; i++) {
-    freeBlocks.emplace_back(Block(i, param.pagesInBlock, param.ioUnitInPage));
+  for (uint32_t i = 0; i < params.totalPhysicalBlocks; i++) {
+    freeBlocks.emplace_back(Block(i, params.pagesInBlock, params.ioUnitInPage));
   }
 
-  nFreeBlocks = param.totalPhysicalBlocks;
+  nFreeBlocks = params.totalPhysicalBlocks;
 
-  status.totalLogicalPages = param.totalLogicalBlocks * param.pagesInBlock;
+  // status.totalLogicalPages = params.totalLogicalBlocks * params.pagesInBlock;
 
   // Allocate free blocks
-  for (uint32_t i = 0; i < param.pageCountToMaxPerf; i++) {
+  for (uint32_t i = 0; i < params.pageCountToMaxPerf; i++) {
     lastFreeBlock.at(i) = getFreeBlock(i);
   }
 
@@ -43,12 +45,13 @@ Firmware::Firmware(firmware_params &ssd_param) : param(ssd_params), lastFreeBloc
 
   memset(&stat, 0, sizeof(stat));
 
-  bRandomTweak = conf.readBoolean(CONFIG_FTL, FTL_USE_RANDOM_IO_TWEAK);
-  bitsetSize = bRandomTweak ? param.ioUnitInPage : 1;
+  bRandomTweak = params.bRandomTweak;
+  bitsetSize = bRandomTweak ? params.ioUnitInPage : 1;
+  initialize();
 }
 
 Firmware::~Firmware() {}
-
+ 
 bool Firmware::initialize() {
   uint64_t nPagesToWarmup;
   uint64_t nPagesToInvalidate;
@@ -59,36 +62,26 @@ bool Firmware::initialize() {
   uint64_t invalid;
   FILLING_MODE mode;
 
-  Request req(param.ioUnitInPage);
+  FTL::Request req(params.ioUnitInPage);
 
-  debugprint(LOG_FTL_PAGE_MAPPING, "Initialization started");
+  print("Initialization started\n");
 
-  nTotalLogicalPages = param.totalLogicalBlocks * param.pagesInBlock;
+  nTotalLogicalPages = params.totalLogicalBlocks * params.pagesInBlock;
   nPagesToWarmup =
-      nTotalLogicalPages * param.ftl_fill_ratio;
+      nTotalLogicalPages * params.ftl_fill_ratio;
   nPagesToInvalidate =
-      nTotalLogicalPages * param.ftl_invalid_page_ratio;
-  mode = (FILLING_MODE)conf.readUint(CONFIG_FTL, FTL_FILLING_MODE);
+      nTotalLogicalPages * params.ftl_invalid_page_ratio;
+  mode = params.ftl_filling_mode;
   maxPagesBeforeGC =
-      param.pagesInBlock *
-      (param.totalPhysicalBlocks *
-           (1 - conf.readFloat(CONFIG_FTL, FTL_GC_THRESHOLD_RATIO)) -
-       param.pageCountToMaxPerf);  // # free blocks to maintain
+      params.pagesInBlock *
+      (params.totalPhysicalBlocks *
+           (1 - params.ftl_gc_threshold_ratio) -
+       params.pageCountToMaxPerf);  // # free blocks to maintain
 
   if (nPagesToWarmup + nPagesToInvalidate > maxPagesBeforeGC) {
-    warn("ftl: Too high filling ratio. Adjusting invalidPageRatio.");
+    print("ftl: Too high filling ratio. Adjusting invalidPageRatio.\n");
     nPagesToInvalidate = maxPagesBeforeGC - nPagesToWarmup;
   }
-
-  debugprint(LOG_FTL_PAGE_MAPPING, "Total logical pages: %" PRIu64,
-             nTotalLogicalPages);
-  debugprint(LOG_FTL_PAGE_MAPPING,
-             "Total logical pages to fill: %" PRIu64 " (%.2f %%)",
-             nPagesToWarmup, nPagesToWarmup * 100.f / nTotalLogicalPages);
-  debugprint(LOG_FTL_PAGE_MAPPING,
-             "Total invalidated pages to create: %" PRIu64 " (%.2f %%)",
-             nPagesToInvalidate,
-             nPagesToInvalidate * 100.f / nTotalLogicalPages);
 
   req.ioFlag.set();
 
@@ -96,20 +89,16 @@ bool Firmware::initialize() {
   if (mode == FILLING_MODE_0 || mode == FILLING_MODE_1) {
     // Sequential
     for (uint64_t i = 0; i < nPagesToWarmup; i++) {
-      tick = 0;
       req.lpn = i;
       writeInternal(req, tick, false);
     }
   }
   else {
     // Random
-    std::random_device rd;
-    std::mt19937_64 gen(rd());
-    std::uniform_int_distribution<uint64_t> dist(0, nTotalLogicalPages - 1);
 
     for (uint64_t i = 0; i < nPagesToWarmup; i++) {
       tick = 0;
-      req.lpn = dist(gen);
+      req.lpn = rand64_range(0, nTotalLogicalPages - 1);
       writeInternal(req, tick, false);
     }
   }
@@ -124,101 +113,69 @@ bool Firmware::initialize() {
     }
   }
   else if (mode == FILLING_MODE_1) {
-    // Random
-    // We can successfully restrict range of LPN to create exact number of
-    // invalid pages because we wrote in sequential mannor in step 1.
-    std::random_device rd;
-    std::mt19937_64 gen(rd());
-    std::uniform_int_distribution<uint64_t> dist(0, nPagesToWarmup - 1);
 
     for (uint64_t i = 0; i < nPagesToInvalidate; i++) {
       tick = 0;
-      req.lpn = dist(gen);
+      req.lpn = rand64_range(0, nPagesToWarmup - 1);
       writeInternal(req, tick, false);
     }
   }
   else {
     // Random
-    std::random_device rd;
-    std::mt19937_64 gen(rd());
-    std::uniform_int_distribution<uint64_t> dist(0, nTotalLogicalPages - 1);
 
     for (uint64_t i = 0; i < nPagesToInvalidate; i++) {
       tick = 0;
-      req.lpn = dist(gen);
+      req.lpn = rand64_range(0, nTotalLogicalPages - 1);
       writeInternal(req, tick, false);
     }
   }
 
   // Report
   calculateTotalPages(valid, invalid);
-  debugprint(LOG_FTL_PAGE_MAPPING, "Filling finished. Page status:");
-  debugprint(LOG_FTL_PAGE_MAPPING,
-             "  Total valid physical pages: %" PRIu64
-             " (%.2f %%, target: %" PRIu64 ", error: %" PRId64 ")",
-             valid, valid * 100.f / nTotalLogicalPages, nPagesToWarmup,
-             (int64_t)(valid - nPagesToWarmup));
-  debugprint(LOG_FTL_PAGE_MAPPING,
-             "  Total invalid physical pages: %" PRIu64
-             " (%.2f %%, target: %" PRIu64 ", error: %" PRId64 ")",
-             invalid, invalid * 100.f / nTotalLogicalPages, nPagesToInvalidate,
-             (int64_t)(invalid - nPagesToInvalidate));
-  debugprint(LOG_FTL_PAGE_MAPPING, "Initialization finished");
+  printf("Filling finished.\n");
 
   return true;
 }
 
-void Firmware::read(Request &req, uint64_t &tick) {
+void Firmware::read(FTL::Request &req, uint64_t &tick) {
   uint64_t begin = tick;
 
   if (req.ioFlag.count() > 0) {
     readInternal(req, tick);
 
-    debugprint(LOG_FTL_PAGE_MAPPING,
-               "READ  | LPN %" PRIu64 " | %" PRIu64 " - %" PRIu64 " (%" PRIu64
-               ")",
-               req.lpn, begin, tick, tick - begin);
+    printf("FTL READ | LPN %u | %u - %u (%u)\n", req.lpn, begin, tick, tick - begin);
   }
   else {
-    warn("FTL got empty request");
+    print("FTL got empty request\n");
   }
 
-  tick += applyLatency(CPU::FTL__PAGE_MAPPING, CPU::READ);
 }
 
-void Firmware::write(Request &req, uint64_t &tick) {
+void Firmware::write(FTL::Request &req, uint64_t &tick) {
   uint64_t begin = tick;
 
   if (req.ioFlag.count() > 0) {
     writeInternal(req, tick);
 
-    debugprint(LOG_FTL_PAGE_MAPPING,
-               "WRITE | LPN %" PRIu64 " | %" PRIu64 " - %" PRIu64 " (%" PRIu64
-               ")",
-               req.lpn, begin, tick, tick - begin);
+    printf("FTL WRITE  | LPN %u | %u - %u (%u)\n", req.lpn, begin, tick, tick - begin);
   }
   else {
-    warn("FTL got empty request");
+    print("FTL got empty request\n");
   }
 
-  tick += applyLatency(CPU::FTL__PAGE_MAPPING, CPU::WRITE);
 }
 
-void Firmware::trim(Request &req, uint64_t &tick) {
+void Firmware::trim(FTL::Request &req, uint64_t &tick) {
   uint64_t begin = tick;
 
   trimInternal(req, tick);
 
-  debugprint(LOG_FTL_PAGE_MAPPING,
-             "TRIM  | LPN %" PRIu64 " | %" PRIu64 " - %" PRIu64 " (%" PRIu64
-             ")",
-             req.lpn, begin, tick, tick - begin);
-
-  tick += applyLatency(CPU::FTL__PAGE_MAPPING, CPU::TRIM);
+  printf("FTL TRIM  | LPN %u | %u - %u (%u)\n", req.lpn, begin, tick, tick - begin);
 }
 
+/** 
 void Firmware::format(LPNRange &range, uint64_t &tick) {
-  PAL::Request req(param.ioUnitInPage);
+  PAL::Request req(params.ioUnitInPage);
   Vector<uint32_t> list;
 
   req.ioFlag.set();
@@ -250,58 +207,40 @@ void Firmware::format(LPNRange &range, uint64_t &tick) {
   }
 
   // Get blocks to erase
-  std::sort(list.begin(), list.end());
-  auto last = std::unique(list.begin(), list.end());
+  Sort(list.begin(), list.end(), [](const uint32_t &a, const uint32_t &b) {
+    return a < b;
+  });
+  auto last = Unique(list.begin(), list.end());
   list.erase(last, list.end());
 
   // Do GC only in specified blocks
   doGarbageCollection(list, tick);
 
-  tick += applyLatency(CPU::FTL__PAGE_MAPPING, CPU::FORMAT);
-}
-
-Status *Firmware::getStatus(uint64_t lpnBegin, uint64_t lpnEnd) {
-  status.freePhysicalBlocks = nFreeBlocks;
-
-  if (lpnBegin == 0 && lpnEnd >= status.totalLogicalPages) {
-    status.mappedLogicalPages = table.size();
-  }
-  else {
-    status.mappedLogicalPages = 0;
-
-    for (uint64_t lpn = lpnBegin; lpn < lpnEnd; lpn++) {
-      if (table.count(lpn) > 0) {
-        status.mappedLogicalPages++;
-      }
-    }
-  }
-
-  return &status;
-}
+} */
 
 float Firmware::freeBlockRatio() {
-  return (float)nFreeBlocks / param.totalPhysicalBlocks;
+  return (float)nFreeBlocks / params.totalPhysicalBlocks;
 }
 
 uint32_t Firmware::convertBlockIdx(uint32_t blockIdx) {
-  return blockIdx % param.pageCountToMaxPerf;
+  return blockIdx % params.pageCountToMaxPerf;
 }
 
 uint32_t Firmware::getFreeBlock(uint32_t idx) {
   uint32_t blockIndex = 0;
 
-  if (idx >= param.pageCountToMaxPerf) {
+  if (idx >= params.pageCountToMaxPerf) {
     panic("Index out of range");
   }
 
   if (nFreeBlocks > 0) {
-    // Search block which is blockIdx % param.pageCountToMaxPerf == idx
+    // Search block which is blockIdx % params.pageCountToMaxPerf == idx
     auto iter = freeBlocks.begin();
 
-    for (; iter != freeBlocks.end(); iter++) {
+    for (; iter != freeBlocks.end(); ++iter) {
       blockIndex = iter->getBlockIndex();
 
-      if (blockIndex % param.pageCountToMaxPerf == idx) {
+      if (blockIndex % params.pageCountToMaxPerf == idx) {
         break;
       }
     }
@@ -318,7 +257,7 @@ uint32_t Firmware::getFreeBlock(uint32_t idx) {
       panic("Corrupted");
     }
 
-    blocks.emplace(blockIndex, std::move(*iter));
+    blocks.emplace(blockIndex, move(*iter));
 
     // Remove found block from free block list
     freeBlocks.erase(iter);
@@ -336,7 +275,7 @@ uint32_t Firmware::getLastFreeBlock(Bitset &iomap) {
     // Update lastFreeBlockIndex
     lastFreeBlockIndex++;
 
-    if (lastFreeBlockIndex == param.pageCountToMaxPerf) {
+    if (lastFreeBlockIndex == params.pageCountToMaxPerf) {
       lastFreeBlockIndex = 0;
     }
 
@@ -354,7 +293,7 @@ uint32_t Firmware::getLastFreeBlock(Bitset &iomap) {
   }
 
   // If current free block is full, get next block
-  if (freeBlock->second.getNextWritePageIndex() == param.pagesInBlock) {
+  if (freeBlock->second.getNextWritePageIndex() == params.pagesInBlock) {
     lastFreeBlock.at(lastFreeBlockIndex) = getFreeBlock(lastFreeBlockIndex);
 
     bReclaimMore = true;
@@ -365,7 +304,7 @@ uint32_t Firmware::getLastFreeBlock(Bitset &iomap) {
 
 // calculate weight of each block regarding victim selection policy
 void Firmware::calculateVictimWeight(
-    Vector<std::pair<uint32_t, float>> &weight, const EVICT_POLICY policy,
+    Vector<Pair<uint32_t, float>> &weight, const EVICT_POLICY policy,
     uint64_t tick) {
   float temp;
 
@@ -375,8 +314,8 @@ void Firmware::calculateVictimWeight(
     case POLICY_GREEDY:
     case POLICY_RANDOM:
     case POLICY_DCHOICE:
-      for (auto &iter : blocks) {
-        if (iter.second.getNextWritePageIndex() != param.pagesInBlock) {
+      for (auto iter : blocks) {
+        if (iter.second.getNextWritePageIndex() != params.pagesInBlock) {
           continue;
         }
 
@@ -385,12 +324,12 @@ void Firmware::calculateVictimWeight(
 
       break;
     case POLICY_COST_BENEFIT:
-      for (auto &iter : blocks) {
-        if (iter.second.getNextWritePageIndex() != param.pagesInBlock) {
+      for (auto iter : blocks) {
+        if (iter.second.getNextWritePageIndex() != params.pagesInBlock) {
           continue;
         }
 
-        temp = (float)(iter.second.getValidPageCountRaw()) / param.pagesInBlock;
+        temp = (float)(iter.second.getValidPageCountRaw()) / params.pagesInBlock;
 
         weight.push_back(
             {iter.first,
@@ -405,13 +344,11 @@ void Firmware::calculateVictimWeight(
 
 void Firmware::selectVictimBlock(Vector<uint32_t> &list,
                                     uint64_t &tick) {
-  static const GC_MODE mode = (GC_MODE)conf.readInt(CONFIG_FTL, FTL_GC_MODE);
-  static const EVICT_POLICY policy =
-      (EVICT_POLICY)conf.readInt(CONFIG_FTL, FTL_GC_EVICT_POLICY);
-  static uint32_t dChoiceParam =
-      conf.readUint(CONFIG_FTL, FTL_GC_D_CHOICE_PARAM);
-  uint64_t nBlocks = conf.readUint(CONFIG_FTL, FTL_GC_RECLAIM_BLOCK);
-  Vector<std::pair<uint32_t, float>> weight;
+  static const GC_MODE mode = params.ftl_gc_mode;
+  static const EVICT_POLICY policy = params.ftl_evict_policy;
+  static uint32_t dChoiceParam = params.choiceParam;
+  uint64_t nBlocks = params.ftl_gc_reclaim_block;
+  Vector<Pair<uint32_t, float>> weight;
 
   list.clear();
 
@@ -420,9 +357,9 @@ void Firmware::selectVictimBlock(Vector<uint32_t> &list,
     // DO NOTHING
   }
   else if (mode == GC_MODE_1) {
-    static const float t = conf.readFloat(CONFIG_FTL, FTL_GC_RECLAIM_THRESHOLD);
+    static const float t = params.ftl_gc_reclaim_threshold;
 
-    nBlocks = param.totalPhysicalBlocks * t - nFreeBlocks;
+    nBlocks = params.totalPhysicalBlocks * t - nFreeBlocks;
   }
   else {
     panic("Invalid GC mode");
@@ -430,7 +367,7 @@ void Firmware::selectVictimBlock(Vector<uint32_t> &list,
 
   // reclaim one more if last free block fully used
   if (bReclaimMore) {
-    nBlocks += param.pageCountToMaxPerf;
+    nBlocks += params.pageCountToMaxPerf;
 
     bReclaimMore = false;
   }
@@ -441,27 +378,24 @@ void Firmware::selectVictimBlock(Vector<uint32_t> &list,
   if (policy == POLICY_RANDOM || policy == POLICY_DCHOICE) {
     uint64_t randomRange =
         policy == POLICY_RANDOM ? nBlocks : dChoiceParam * nBlocks;
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::uniform_int_distribution<uint64_t> dist(0, weight.size() - 1);
-    Vector<std::pair<uint32_t, float>> selected;
+    Vector<Pair<uint32_t, float>> selected;
 
     while (selected.size() < randomRange) {
-      uint64_t idx = dist(gen);
+      uint64_t idx = rand64_range(0, weight.size() - 1);
 
-      if (weight.at(idx).first < std::numeric_limits<uint32_t>::max()) {
+      if (weight.at(idx).first < 0xFFFFFFFF) {
         selected.push_back(weight.at(idx));
-        weight.at(idx).first = std::numeric_limits<uint32_t>::max();
+        weight.at(idx).first = 0xFFFFFFFF;  // Mark as selected
       }
     }
 
-    weight = std::move(selected);
+    weight = move(selected);
   }
 
   // Sort weights
-  std::sort(
+  introsort(
       weight.begin(), weight.end(),
-      [](std::pair<uint32_t, float> a, std::pair<uint32_t, float> b) -> bool {
+      [](Pair<uint32_t, float> a, Pair<uint32_t, float> b) -> bool {
         return a.second < b.second;
       });
 
@@ -472,17 +406,16 @@ void Firmware::selectVictimBlock(Vector<uint32_t> &list,
     list.push_back(weight.at(i).first);
   }
 
-  tick += applyLatency(CPU::FTL__PAGE_MAPPING, CPU::SELECT_VICTIM_BLOCK);
 }
 
 void Firmware::doGarbageCollection(Vector<uint32_t> &blocksToReclaim,
                                       uint64_t &tick) {
-  PAL::Request req(param.ioUnitInPage);
+  PAL::Request req(params.ioUnitInPage);
   Vector<PAL::Request> readRequests;
   Vector<PAL::Request> writeRequests;
   Vector<PAL::Request> eraseRequests;
   Vector<uint64_t> lpns;
-  Bitset bit(param.ioUnitInPage);
+  Bitset bit(params.ioUnitInPage);
   uint64_t beginAt;
   uint64_t readFinishedAt = tick;
   uint64_t writeFinishedAt = tick;
@@ -501,7 +434,7 @@ void Firmware::doGarbageCollection(Vector<uint32_t> &blocksToReclaim,
     }
 
     // Copy valid pages to free block
-    for (uint32_t pageIndex = 0; pageIndex < param.pagesInBlock; pageIndex++) {
+    for (uint32_t pageIndex = 0; pageIndex < params.pagesInBlock; pageIndex++) {
       // Valid?
       if (block->second.getPageInfo(pageIndex, lpns, bit)) {
         if (!bRandomTweak) {
@@ -531,8 +464,6 @@ void Firmware::doGarbageCollection(Vector<uint32_t> &blocksToReclaim,
             if (mappingList == table.end()) {
               panic("Invalid mapping table entry");
             }
-
-            pDRAM->read(&(*mappingList), 8 * param.ioUnitInPage, tick);
 
             auto &mapping = mappingList->second.at(idx);
 
@@ -577,16 +508,16 @@ void Firmware::doGarbageCollection(Vector<uint32_t> &blocksToReclaim,
   // This handles PAL2 limitation (SIGSEGV, infinite loop, or so-on)
   for (auto &iter : readRequests) {
     beginAt = tick;
-
-    pPAL->read(iter, beginAt);
+    pread((uint64_t) &iter, 0, 0);
+    //pPAL->read(iter, beginAt);
 
     readFinishedAt = MAX(readFinishedAt, beginAt);
   }
 
   for (auto &iter : writeRequests) {
     beginAt = readFinishedAt;
-
-    pPAL->write(iter, beginAt);
+    pwrite((uint64_t) &iter, 0, 0);
+    // pPAL->write(iter, beginAt);
 
     writeFinishedAt = MAX(writeFinishedAt, beginAt);
   }
@@ -600,10 +531,9 @@ void Firmware::doGarbageCollection(Vector<uint32_t> &blocksToReclaim,
   }
 
   tick = MAX(writeFinishedAt, eraseFinishedAt);
-  tick += applyLatency(CPU::FTL__PAGE_MAPPING, CPU::DO_GARBAGE_COLLECTION);
 }
 
-void Firmware::readInternal(Request &req, uint64_t &tick) {
+void Firmware::readInternal(FTL::Request &req, uint64_t &tick) {
   PAL::Request palRequest(req);
   uint64_t beginAt;
   uint64_t finishedAt = tick;
@@ -611,19 +541,13 @@ void Firmware::readInternal(Request &req, uint64_t &tick) {
   auto mappingList = table.find(req.lpn);
 
   if (mappingList != table.end()) {
-    if (bRandomTweak) {
-      pDRAM->read(&(*mappingList), 8 * req.ioFlag.count(), tick);
-    }
-    else {
-      pDRAM->read(&(*mappingList), 8, tick);
-    }
 
     for (uint32_t idx = 0; idx < bitsetSize; idx++) {
       if (req.ioFlag.test(idx) || !bRandomTweak) {
         auto &mapping = mappingList->second.at(idx);
 
-        if (mapping.first < param.totalPhysicalBlocks &&
-            mapping.second < param.pagesInBlock) {
+        if (mapping.first < params.totalPhysicalBlocks &&
+            mapping.second < params.pagesInBlock) {
           palRequest.blockIndex = mapping.first;
           palRequest.pageIndex = mapping.second;
 
@@ -644,7 +568,8 @@ void Firmware::readInternal(Request &req, uint64_t &tick) {
           beginAt = tick;
 
           block->second.read(palRequest.pageIndex, idx, beginAt);
-          pPAL->read(palRequest, beginAt);
+          pread((uint64_t) &palRequest, 0, 0);
+          // pPAL->read(palRequest, beginAt);
 
           finishedAt = MAX(finishedAt, beginAt);
         }
@@ -652,13 +577,12 @@ void Firmware::readInternal(Request &req, uint64_t &tick) {
     }
 
     tick = finishedAt;
-    tick += applyLatency(CPU::FTL__PAGE_MAPPING, CPU::READ_INTERNAL);
   }
 }
 
-void Firmware::writeInternal(Request &req, uint64_t &tick, bool sendToPAL) {
+void Firmware::writeInternal(FTL::Request &req, uint64_t &tick, bool sendToPAL) {
   PAL::Request palRequest(req);
-  std::unordered_map<uint32_t, Block>::iterator block;
+  HashMap<uint32_t, Block>::iterator block;
   auto mappingList = table.find(req.lpn);
   uint64_t beginAt;
   uint64_t finishedAt = tick;
@@ -669,8 +593,8 @@ void Firmware::writeInternal(Request &req, uint64_t &tick, bool sendToPAL) {
       if (req.ioFlag.test(idx) || !bRandomTweak) {
         auto &mapping = mappingList->second.at(idx);
 
-        if (mapping.first < param.totalPhysicalBlocks &&
-            mapping.second < param.pagesInBlock) {
+        if (mapping.first < params.totalPhysicalBlocks &&
+            mapping.second < params.pagesInBlock) {
           block = blocks.find(mapping.first);
 
           // Invalidate current page
@@ -683,8 +607,8 @@ void Firmware::writeInternal(Request &req, uint64_t &tick, bool sendToPAL) {
     // Create empty mapping
     auto ret = table.emplace(
         req.lpn,
-        Vector<std::pair<uint32_t, uint32_t>>(
-            bitsetSize, {param.totalPhysicalBlocks, param.pagesInBlock}));
+        Vector<Pair<uint32_t, uint32_t>>(
+            bitsetSize, {params.totalPhysicalBlocks, params.pagesInBlock}));
 
     if (!ret.second) {
       panic("Failed to insert new mapping");
@@ -698,17 +622,6 @@ void Firmware::writeInternal(Request &req, uint64_t &tick, bool sendToPAL) {
 
   if (block == blocks.end()) {
     panic("No such block");
-  }
-
-  if (sendToPAL) {
-    if (bRandomTweak) {
-      pDRAM->read(&(*mappingList), 8 * req.ioFlag.count(), tick);
-      pDRAM->write(&(*mappingList), 8 * req.ioFlag.count(), tick);
-    }
-    else {
-      pDRAM->read(&(*mappingList), 8, tick);
-      pDRAM->write(&(*mappingList), 8, tick);
-    }
   }
 
   if (!bRandomTweak && !req.ioFlag.all()) {
@@ -735,8 +648,8 @@ void Firmware::writeInternal(Request &req, uint64_t &tick, bool sendToPAL) {
         // We don't need to read old data
         palRequest.ioFlag = req.ioFlag;
         palRequest.ioFlag.flip();
-
-        pPAL->read(palRequest, beginAt);
+        pread((uint64_t) &palRequest, 0, 0);
+        //pPAL->read(palRequest, beginAt);
       }
 
       // update mapping to table
@@ -754,8 +667,8 @@ void Firmware::writeInternal(Request &req, uint64_t &tick, bool sendToPAL) {
         else {
           palRequest.ioFlag.set();
         }
-
-        pPAL->write(palRequest, beginAt);
+        pwrite((uint64_t) &palRequest, 0, 0);
+        //pPAL->write(palRequest, beginAt);
       }
 
       finishedAt = MAX(finishedAt, beginAt);
@@ -765,12 +678,11 @@ void Firmware::writeInternal(Request &req, uint64_t &tick, bool sendToPAL) {
   // Exclude CPU operation when initializing
   if (sendToPAL) {
     tick = finishedAt;
-    tick += applyLatency(CPU::FTL__PAGE_MAPPING, CPU::WRITE_INTERNAL);
   }
 
   // GC if needed
   // I assumed that init procedure never invokes GC
-  static float gcThreshold = conf.readFloat(CONFIG_FTL, FTL_GC_THRESHOLD_RATIO);
+  static float gcThreshold = params.ftl_gc_threshold_ratio;;
 
   if (freeBlockRatio() < gcThreshold) {
     if (!sendToPAL) {
@@ -782,30 +694,21 @@ void Firmware::writeInternal(Request &req, uint64_t &tick, bool sendToPAL) {
 
     selectVictimBlock(list, beginAt);
 
-    debugprint(LOG_FTL_PAGE_MAPPING,
-               "GC   | On-demand | %u blocks will be reclaimed", list.size());
+    printf("GC   | On-demand | %u blocks will be reclaimed", list.size());
 
     doGarbageCollection(list, beginAt);
 
-    debugprint(LOG_FTL_PAGE_MAPPING,
-               "GC   | Done | %" PRIu64 " - %" PRIu64 " (%" PRIu64 ")", tick,
-               beginAt, beginAt - tick);
+    printf(" GC Done | %u - %u (%u)", tick, beginAt, beginAt - tick);
 
     stat.gcCount++;
     stat.reclaimedBlocks += list.size();
   }
 }
 
-void Firmware::trimInternal(Request &req, uint64_t &tick) {
+void Firmware::trimInternal(FTL::Request &req, uint64_t &tick) {
   auto mappingList = table.find(req.lpn);
 
   if (mappingList != table.end()) {
-    if (bRandomTweak) {
-      pDRAM->read(&(*mappingList), 8 * req.ioFlag.count(), tick);
-    }
-    else {
-      pDRAM->read(&(*mappingList), 8, tick);
-    }
 
     // Do trim
     for (uint32_t idx = 0; idx < bitsetSize; idx++) {
@@ -822,13 +725,11 @@ void Firmware::trimInternal(Request &req, uint64_t &tick) {
     // Remove mapping
     table.erase(mappingList);
 
-    tick += applyLatency(CPU::FTL__PAGE_MAPPING, CPU::TRIM_INTERNAL);
   }
 }
 
 void Firmware::eraseInternal(PAL::Request &req, uint64_t &tick) {
-  static uint64_t threshold =
-      conf.readUint(CONFIG_FTL, FTL_BAD_BLOCK_THRESHOLD);
+  static uint64_t threshold = params.bad_block_threshold;
   auto block = blocks.find(req.blockIndex);
 
   // Sanity checks
@@ -842,8 +743,8 @@ void Firmware::eraseInternal(PAL::Request &req, uint64_t &tick) {
 
   // Erase block
   block->second.erase();
-
-  pPAL->erase(req, tick);
+  perase((uint64_t) &req, 0, 0);
+  // pPAL->erase(req, tick);
 
   // Check erase count
   uint32_t erasedCount = block->second.getEraseCount();
@@ -853,11 +754,11 @@ void Firmware::eraseInternal(PAL::Request &req, uint64_t &tick) {
     auto iter = freeBlocks.end();
 
     while (true) {
-      iter--;
+      --iter;
 
       if (iter->getEraseCount() <= erasedCount) {
         // emplace: insert before pos
-        iter++;
+        ++iter;
 
         break;
       }
@@ -868,23 +769,21 @@ void Firmware::eraseInternal(PAL::Request &req, uint64_t &tick) {
     }
 
     // Insert block to free block list
-    freeBlocks.emplace(iter, std::move(block->second));
+    freeBlocks.emplace(iter, move(block->second));
     nFreeBlocks++;
   }
 
   // Remove block from block list
   blocks.erase(block);
-
-  tick += applyLatency(CPU::FTL__PAGE_MAPPING, CPU::ERASE_INTERNAL);
 }
 
 float Firmware::calculateWearLeveling() {
   uint64_t totalEraseCnt = 0;
   uint64_t sumOfSquaredEraseCnt = 0;
-  uint64_t numOfBlocks = param.totalLogicalBlocks;
+  uint64_t numOfBlocks = params.totalLogicalBlocks;
   uint64_t eraseCnt;
 
-  for (auto &iter : blocks) {
+  for (auto iter : blocks) {
     eraseCnt = iter.second.getEraseCount();
     totalEraseCnt += eraseCnt;
     sumOfSquaredEraseCnt += eraseCnt * eraseCnt;
@@ -892,7 +791,7 @@ float Firmware::calculateWearLeveling() {
 
   // freeBlocks is sorted
   // Calculate from backward, stop when eraseCnt is zero
-  for (auto riter = freeBlocks.rbegin(); riter != freeBlocks.rend(); riter++) {
+  for (auto riter = freeBlocks.rbegin(); riter != freeBlocks.rend(); ++riter) {
     eraseCnt = riter->getEraseCount();
 
     if (eraseCnt == 0) {
@@ -915,48 +814,8 @@ void Firmware::calculateTotalPages(uint64_t &valid, uint64_t &invalid) {
   valid = 0;
   invalid = 0;
 
-  for (auto &iter : blocks) {
+  for (auto iter : blocks) {
     valid += iter.second.getValidPageCount();
     invalid += iter.second.getDirtyPageCount();
   }
-}
-
-void Firmware::getStatList(Vector<Stats> &list, std::string prefix) {
-  Stats temp;
-
-  temp.name = prefix + "page_mapping.gc.count";
-  temp.desc = "Total GC count";
-  list.push_back(temp);
-
-  temp.name = prefix + "page_mapping.gc.reclaimed_blocks";
-  temp.desc = "Total reclaimed blocks in GC";
-  list.push_back(temp);
-
-  temp.name = prefix + "page_mapping.gc.superpage_copies";
-  temp.desc = "Total copied valid superpages during GC";
-  list.push_back(temp);
-
-  temp.name = prefix + "page_mapping.gc.page_copies";
-  temp.desc = "Total copied valid pages during GC";
-  list.push_back(temp);
-
-  // For the exact definition, see following paper:
-  // Li, Yongkun, Patrick PC Lee, and John Lui.
-  // "Stochastic modeling of large-scale solid-state storage systems: analysis,
-  // design tradeoffs and optimization." ACM SIGMETRICS (2013)
-  temp.name = prefix + "page_mapping.wear_leveling";
-  temp.desc = "Wear-leveling factor";
-  list.push_back(temp);
-}
-
-void Firmware::getStatValues(Vector<double> &values) {
-  values.push_back(stat.gcCount);
-  values.push_back(stat.reclaimedBlocks);
-  values.push_back(stat.validSuperPageCopies);
-  values.push_back(stat.validPageCopies);
-  values.push_back(calculateWearLeveling());
-}
-
-void Firmware::resetStatValues() {
-  memset(&stat, 0, sizeof(stat));
 }

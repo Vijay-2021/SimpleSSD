@@ -20,10 +20,10 @@
 #ifndef __FTL_COMMON_BLOCK__
 #define __FTL_COMMON_BLOCK__
 
-#include <cinttypes>
-#include <vector>
+#include <stdint.h>
+#include "vector.hh"
 
-#include "util/bitset.hh"
+#include "bitset.hh"
 
 class Block {
  private:

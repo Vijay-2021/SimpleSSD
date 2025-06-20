@@ -18,9 +18,8 @@
  */
 
 #include "block.hh"
-
-#include <algorithm>
-#include <cstring>
+#include "string.h"
+#include "memory.h"
 
 Block::Block(uint32_t blockIdx, uint32_t count, uint32_t ioUnit)
     : idx(blockIdx),
@@ -257,8 +256,7 @@ bool Block::getPageInfo(uint32_t pageIndex, Vector<uint64_t> &lpn,
   }
   else if (map.size() == ioUnitInPage) {
     map = validBits.at(pageIndex);
-    lpn = Vector<uint64_t>(ppLPNs[pageIndex],
-                                ppLPNs[pageIndex] + ioUnitInPage);
+    lpn = Vector<uint64_t>(ppLPNs[pageIndex], ppLPNs[pageIndex] + ioUnitInPage);
   }
   else {
     panic("I/O map size mismatch");

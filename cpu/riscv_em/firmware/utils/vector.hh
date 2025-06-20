@@ -12,6 +12,13 @@ class Vector {
     size_t capacity_;
 
 public:
+
+    using iterator = T*;
+    iterator begin() { return data_; }
+    iterator end() { return data_ + size_; }
+    iterator cbegin() const { return data_; }
+    iterator cend() const { return data_ + size_; }
+
     Vector()
         : data_(nullptr), size_(0), capacity_(0) {}
 
@@ -27,7 +34,39 @@ public:
             }
         }
     }
+    Vector(size_t count, const T& value)
+        : data_(nullptr), size_(count), capacity_(count) {
+        if (count > 0) {
+            data_ = (T*)malloc(count * sizeof(T));
+            if (data_) {
+                for (size_t i = 0; i < count; ++i)
+                    data_[i] = value;
+            } else {
+                size_ = capacity_ = 0;
+            }
+        }
+    }
 
+    Vector(iterator begin, iterator end) {
+        if (end < begin) {
+            size_ = 0;
+            capacity_ = 0;
+            data_ = nullptr;
+            return;
+        } else {
+            size_ = end - begin;
+            capacity_ = size_;
+            data_ = (T*)malloc(capacity_ * sizeof(T));
+            if (data_) {
+                for (size_t i = 0; i < size_; ++i) {
+                    data_[i] = *(begin + i);
+                }
+            } else {
+                size_ = capacity_ = 0;
+            }
+        }
+
+    }
 
     Vector(const Vector<T>& rhs) {
         capacity_ = rhs.capacity_;
@@ -54,12 +93,14 @@ public:
     size_t size() const { return size_; }
     size_t capacity() const { return capacity_; }
     bool empty() const { return size_ == 0; }
-
+    T& at(size_t idx) {
+        return data_[idx];
+    }
     T& operator[](size_t idx) { return data_[idx]; }
     const T& operator[](size_t idx) const { return data_[idx]; }
     Vector<T>& operator=(const Vector<T>& rhs) {
         if (this != &rhs) {
-            reserve(rhs.capacity);
+            reserve(rhs.capacity_);
             clear();
             for (size_t i = 0; i < size_; i++) {
                 push_back(rhs[i]);
@@ -121,12 +162,6 @@ public:
         size_ = newSize;
         return 0;
     }
-
-    using iterator = T*;
-    iterator begin() { return data_; }
-    iterator end() { return data_ + size_; }
-    iterator cbegin() const { return data_; }
-    iterator cend() const { return data_ + size_; }
 };
 
 

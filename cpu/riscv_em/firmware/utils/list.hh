@@ -29,7 +29,28 @@ class List {
                 iterator& operator--() { cur = cur->prev; return *this; }
                 bool operator!=(const iterator& o) const { return cur != o.cur; }
                 bool operator==(const iterator& o) const { return cur == o.cur; }
+                T* operator->() const {
+                    return &(cur->data);
+                }
         };
+
+        class riterator {
+            friend class List;
+            Node* cur;
+            public:
+                riterator(Node* p) : cur(p) {}
+                T& operator*() const { return cur->data; }
+                riterator& operator++() { cur = cur->prev; return *this; }
+                riterator& operator--() { cur = cur->next; return *this; }
+                bool operator!=(const riterator& o) const { return cur != o.cur; }
+                bool operator==(const riterator& o) const { return cur == o.cur; }
+                T* operator->() const {
+                    return &(cur->data);
+                }
+        };
+
+        riterator rbegin() { return riterator(sentinel->prev); }
+        riterator rend() { return riterator(sentinel); }
 
         iterator begin() { return iterator(sentinel->next); }
         iterator end() { return iterator(sentinel); }

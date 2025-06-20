@@ -1,6 +1,13 @@
 #ifndef __FIRMWARE_DEFINITIONS__
 #define __FIRMWARE_DEFINITIONS__
 
+#include <stdint.h>
+#include <stdbool.h>
+#include "bitset.hh"
+#include <limits.h>
+#include "memory.h"
+
+
 typedef enum {
   /* Common FTL configuration */
   FTL_MAPPING_MODE          = 0,
@@ -47,6 +54,7 @@ typedef enum {
 typedef enum {
     FIRMWARE_PARAMS = 0, 
     FIRMWARE_QUEUE = 1,
+    FIRMWARE_TICK = 2,
 } DATA_REQ;
 
 typedef enum {
@@ -85,7 +93,9 @@ typedef struct _Request {
   uint64_t reqSubID;
   uint64_t lpn;
   Bitset ioFlag;
-  FIRMWARE_REQ_TYPE reqType;
+  FTL_REQ_TYPE reqType;
+  _Request(uint32_t);
+  _Request();
 } Request;
 
 }  // namespace FTL
@@ -104,5 +114,23 @@ typedef struct _Request {
 } Request;
 
 }  // namespace PAL
+
+template <typename T>
+uint8_t popcount(T v) {
+  v = v - ((v >> 1) & (T) ~(T)0 / 3);
+  v = (v & (T) ~(T)0 / 15 * 3) + ((v >> 2) & (T) ~(T)0 / 15 * 3);
+  v = (v + (v >> 4)) & (T) ~(T)0 / 255 * 15;
+  v = (T)(v * ((T) ~(T)0 / 255)) >> (sizeof(T) - 1) * CHAR_BIT;
+
+  return (uint8_t)v;
+}
+
+
+void* operator new(size_t size);
+void operator delete(void* p);
+void operator delete(void* ptr, size_t size);
+void* operator new[](size_t size);
+void operator delete[](void* ptr);
+void operator delete[](void* ptr, size_t size);
 
 #endif

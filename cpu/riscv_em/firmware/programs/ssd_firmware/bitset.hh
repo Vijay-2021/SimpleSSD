@@ -26,6 +26,7 @@
 
 #include "vector.hh"
 #include "utils.h"
+#include "move.hh"
 
 // TODO: use SIMD operation if possible
 class Bitset {

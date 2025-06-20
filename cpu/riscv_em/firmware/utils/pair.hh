@@ -3,6 +3,7 @@
 
 #include "memory.h"
 #include "utils.h"
+#include "move.hh"
 
 template<typename T1, typename T2>
 class Pair {
@@ -12,14 +13,11 @@ class Pair {
         
         Pair(T1 _first, T2 _second) : first(_first), second(_second) {};
         
-        Pair(const Pair<T1, T2>& rhs) {
-            first = rhs.first;
-            second = rhs.second;
+        Pair(const Pair<T1, T2>& rhs) : first(rhs.first), second(rhs.second) {
         }
         
-        Pair(Pair<T1, T2> && rhs) {
-            first = move(rhs.first);
-            second = move(rhs.second);
+        Pair(Pair<T1, T2> && rhs) : first(move(rhs.first)), second(move(rhs.second)) {
+            
         }
 
         bool operator==(const Pair<T1, T2>& rhs) const {
@@ -40,6 +38,7 @@ class Pair {
                 first = move(rhs.first);
                 second = move(rhs.second);
             }
+            return *this;
         } 
         
 }; 

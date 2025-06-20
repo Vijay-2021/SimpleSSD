@@ -1197,6 +1197,9 @@ uint64_t CPU::read_buffer(uint8_t* buffer, uint64_t req_type) {
     memcpy(buffer, &fw_params, sizeof(firmware_params_td));
   } else if (req_type == FIRMWARE_QUEUE) {
     memcpy(buffer, &req_buffer[0], sizeof(FTL::Request));
+  } else if (req_type == FIRMWARE_TICK) {
+    uint64_t tick = getTick();
+    memcpy(buffer, &tick, sizeof(uint64_t));
   }
   return getTick() + clockPeriod;
 }
