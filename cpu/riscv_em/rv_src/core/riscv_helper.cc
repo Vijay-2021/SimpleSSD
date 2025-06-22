@@ -10,7 +10,7 @@ namespace CPU {
 
 namespace RISCV {
 
-int sim_continue = 1;
+SOC_RUN_MODE soc_run_mode_ = PAUSED_MODE; // default mode is paused
 
 void die_msg(char* fmt, ...)
 {
@@ -19,15 +19,7 @@ void die_msg(char* fmt, ...)
     printf(fmt, args);
     va_end(args);
     printf("Fatal error, simulation will stop now!\n");
-    sim_continue = 0;
-}
-
-int getContinueSim() {
-    return sim_continue;
-}
-
-void setContinueSim(int sim_cont) {
-    sim_continue = sim_cont;
+    soc_run_mode_ = FAILED_MODE; // stop the simulation
 }
 
 } // namespace RISCV

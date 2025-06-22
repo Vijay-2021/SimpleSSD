@@ -4,6 +4,8 @@
 #include <stdint.h>
 #include <stddef.h> 
 #include "memory.h"
+#include "utils.h"
+#include "new.hh"
 
 template<typename T>
 class Vector {
@@ -28,7 +30,7 @@ public:
             data_ = (T*)malloc(count * sizeof(T));
             if (data_) {
                 for (size_t i = 0; i < count; ++i)
-                    data_[i] = T();
+                    new(&data_[i]) T();
             } else {
                 size_ = capacity_ = 0;
             }
@@ -39,8 +41,9 @@ public:
         if (count > 0) {
             data_ = (T*)malloc(count * sizeof(T));
             if (data_) {
-                for (size_t i = 0; i < count; ++i)
-                    data_[i] = value;
+                for (size_t i = 0; i < count; ++i) {
+                    new(&data_[i]) T(value);
+                }
             } else {
                 size_ = capacity_ = 0;
             }
@@ -59,7 +62,7 @@ public:
             data_ = (T*)malloc(capacity_ * sizeof(T));
             if (data_) {
                 for (size_t i = 0; i < size_; ++i) {
-                    data_[i] = *(begin + i);
+                    new (&data_[i]) T(*(begin + i));
                 }
             } else {
                 size_ = capacity_ = 0;
@@ -87,6 +90,9 @@ public:
     }
 
     ~Vector() {
+        for (size_t i = 0; i < size_; ++i) {
+            data_[i].~T();  // Call destructor explicitly
+        }
         free(data_);
     }
 
@@ -135,10 +141,16 @@ public:
     }
 
     void pop_back() {
-        if (size_) --size_;
+        if (size_) {
+            size_--;
+            data_[size_].~T();
+        }
     }
 
     void clear() {
+        for (size_t i = 0; i < size_; ++i) {
+            data_[i].~T();
+        }
         size_ = 0;
     }
 
@@ -157,7 +169,7 @@ public:
         }
         if (newSize > size_) {
             for (size_t i = size_; i < newSize; ++i)
-                data_[i] = T();
+                new (&data_[i]) T();
         }
         size_ = newSize;
         return 0;

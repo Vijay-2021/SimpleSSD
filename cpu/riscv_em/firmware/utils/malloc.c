@@ -4,7 +4,7 @@
 
 extern char _heap_start;
 
-uint64_t heap_end = 0x88000000;
+uint64_t heap_end = 0xFFFFFFFF; // This is the end of the heap, set to a large value initially
 uint64_t heap_begin = (uint64_t)&_heap_start;
 
 /*
@@ -257,11 +257,12 @@ mya_coalesce(mya_header_t *header)
 }
 
 static char* sbrk(size_t size) {
-	char *new_brk = (char *)heap_begin + size;
-	if (new_brk > (char *)heap_end) {
+	if (heap_begin + size > heap_end) {
+        printf("requesting too large of a data\n");
 		return (char *)-1; // Simulate failure
 	}
-	heap_begin = (uint64_t)new_brk;
+	char *new_brk = (char *)heap_begin;
+	heap_begin = (uint64_t)new_brk + size;
 	return new_brk;
 }
 

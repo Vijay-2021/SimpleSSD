@@ -2195,25 +2195,25 @@ static inline rv_word_t rv_core_decode(Core *rv_core)
     return 0;
 }
 
-static rv_word_t rv_core_execute(Core *rv_core)
+static uint64_t rv_core_execute(Core *rv_core)
 {
-    rv_core->execute_cb(rv_core);
+    uint64_t next_tick = rv_core->execute_cb(rv_core);
 
     /* clear x0 if any instruction has written into it */
     rv_core->reg_file[0] = 0;
 
-    return 0;
+    return next_tick;
 }
 
 /******************* Public functions *******************************/
-void Core::rv_core_run()
+uint64_t Core::rv_core_run()
 {
     next_pc = 0;
-
+    uint64_t next_tick = getTick() + pSOC->get_period();
     if(rv_core_fetch(this))
     {
         rv_core_decode(this);
-        rv_core_execute(this);
+        next_tick = rv_core_execute(this);
     }
 
     /* increase program counter here */
@@ -2234,6 +2234,7 @@ void Core::rv_core_run()
         csr_regs[CSR_ADDR_CYCLEH].value = curr_cycle >> 32;
         csr_regs[CSR_ADDR_TIMEH].value = curr_cycle >> 32;
     #endif
+    return next_tick;
 }
 
 void Core::rv_core_process_interrupts(uint8_t mei, uint8_t mti, uint8_t msi)

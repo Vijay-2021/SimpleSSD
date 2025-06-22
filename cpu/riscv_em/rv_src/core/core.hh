@@ -74,7 +74,7 @@ class Core {
         
         Core(SOC *soc, bus_access_func bus_acc);
         
-        void rv_core_run();
+        uint64_t rv_core_run();
         void rv_core_process_interrupts(uint8_t mei, uint8_t mti, uint8_t msi);
         void rv_core_reg_dump();
         void rv_core_reg_dump_more_regs();

@@ -27,26 +27,31 @@
 Firmware::Firmware(firmware_params &ssd_params) : params(ssd_params), lastFreeBlock(params.pageCountToMaxPerf),
       lastFreeBlockIOMap(params.ioUnitInPage), bReclaimMore(false), blocks(params.totalPhysicalBlocks), 
       table(params.totalLogicalBlocks * params.pagesInBlock) {
-
+  printf("Firmware constructor called\n");
+  List<int> test;
+  test.emplace_back(1);
+  printf("constructor called\n");
   for (uint32_t i = 0; i < params.totalPhysicalBlocks; i++) {
+    printf("making call to emplace back\n");
     freeBlocks.emplace_back(Block(i, params.pagesInBlock, params.ioUnitInPage));
   }
 
   nFreeBlocks = params.totalPhysicalBlocks;
-
+  printf("free blocks is fine\n");
   // status.totalLogicalPages = params.totalLogicalBlocks * params.pagesInBlock;
 
   // Allocate free blocks
   for (uint32_t i = 0; i < params.pageCountToMaxPerf; i++) {
     lastFreeBlock.at(i) = getFreeBlock(i);
   }
-
+  printf("Cmpleted at \n");
   lastFreeBlockIndex = 0;
 
   memset(&stat, 0, sizeof(stat));
 
   bRandomTweak = params.bRandomTweak;
   bitsetSize = bRandomTweak ? params.ioUnitInPage : 1;
+  printf("finished setup, starting initialization\n");
   initialize();
 }
 

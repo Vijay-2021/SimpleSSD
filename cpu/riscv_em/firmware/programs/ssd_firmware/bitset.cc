@@ -105,7 +105,6 @@ uint32_t Bitset::size() noexcept {
 
 void Bitset::set() noexcept {
   uint8_t mask = 0xFF >> (allocSize * 8 - dataSize);
-
   for (uint32_t i = 0; i < allocSize - 1; i++) {
     data[i] = 0xFF;
   }

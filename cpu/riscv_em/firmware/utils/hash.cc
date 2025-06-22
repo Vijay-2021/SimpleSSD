@@ -1,7 +1,8 @@
 #include "hash.hh"
+#include <stdint.h>
 
 template<>
-size_t hash(const uint32_t &key) const {
+size_t hash(const uint32_t &key) {
     uint64_t x = key; 
     x = ~x + (x << 15);
     x = x ^ (x >> 12);
@@ -13,7 +14,7 @@ size_t hash(const uint32_t &key) const {
 }
 
 template<>
-size_t hash(const uint64_t &key) const {
+size_t hash(const uint64_t &key) {
     uint64_t x = key;
     x ^= x >> 30;
     x *= 0xbf58476d1ce4e5b9ull;
@@ -24,6 +25,6 @@ size_t hash(const uint64_t &key) const {
 }
 
 template<> 
-size_t hash(const int &key) const {
+size_t hash(const int &key) {
     return hash(static_cast<uint32_t>(key));
 }

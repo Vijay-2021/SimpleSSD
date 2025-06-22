@@ -143,9 +143,31 @@ void CPU::Core::addStat(InstStat &inst) {
 }
 
 void CPU::csdCycle() {
-  if (csd_in_progress) {
-    csd->rv_soc_tick(0, 1);
-    schedule(csdCycleEvent, getTick() + clockPeriod);
+  uint64_t next_tick = 0;
+  uint32_t burst_cycles = conf.readUint(CONFIG_CPU, BURST_CYCLES);
+  switch(RISCV::soc_run_mode_) {
+    case RISCV::FAST_FORWARD_MODE:
+      csd->rv_soc_run(); // don't schedule the next cycle, just run until the next stop signal
+      break;
+    case RISCV::CYCLE_MODE:
+      csd->rv_soc_tick(1);
+      schedule(csdCycleEvent, getTick() + clockPeriod);
+      break;
+    case RISCV::PAUSED_MODE:
+      // Do nothing
+      break;
+    case RISCV::FAILED_MODE:
+      break;
+    case RISCV::TIMING_MODE:
+      next_tick = csd->rv_soc_tick(1);
+      schedule(csdCycleEvent, next_tick);
+      break;
+    case RISCV::BURST_MODE:
+      csd->rv_soc_tick(burst_cycles);
+      schedule(csdCycleEvent, getTick() + burst_cycles * clockPeriod);
+      break;
+    default:
+      panic("Invalid CSD mode");
   }
 }
 
@@ -343,7 +365,7 @@ CPU::~CPU() {
 }
 
 void CPU::startCSD() {
-  csd_in_progress = true;
+  RISCV::soc_run_mode_ = RISCV::SOC_RUN_MODE::TIMING_MODE;
   schedule(csdCycleEvent, getTick());
 }
 
@@ -353,7 +375,7 @@ void CPU::stopCSD() {
   if (csdCycleTick >= getTick()) {
     deschedule(csdCycleEvent);
   }
-  csd_in_progress = false;
+  RISCV::soc_run_mode_ = RISCV::SOC_RUN_MODE::PAUSED_MODE;
 }
 
 void CPU::calculatePower(Power &power) {

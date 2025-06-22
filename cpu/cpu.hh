@@ -44,6 +44,8 @@
 #include "rv_src/soc/riscv_example_soc.hh"
 #include "rv_src/core/riscv_helper.hh"
 #include "rv_src/peripherals/uart/simple_uart.hh"
+#include "rv_src/core/riscv_types.hh"
+
 #include "util/simplessd.hh"
 #include "util/disk.hh"
 #include "util/def.hh"
@@ -72,7 +74,6 @@ typedef enum {
     FIRMWARE_QUEUE = 1,
     FIRMWARE_TICK = 2,
 } DATA_REQ;
-
 
 typedef struct firmware_params {
 	uint64_t totalPhysicalBlocks;
@@ -124,68 +125,69 @@ typedef struct _JobEntry {
 } JobEntry;
 
 class CPU : public StatObject {
- private:
-  struct CoreStat {
-    InstStat instStat;
-    uint64_t busy;
+  private:
+    struct CoreStat {
+      InstStat instStat;
+      uint64_t busy;
 
-    CoreStat();
-  };
-  Event csdCycleEvent; // cycle for computational storage device
-  class Core {
-   private:
-    bool busy;
+      CoreStat();
+    };
+    Event csdCycleEvent; // cycle for computational storage device
+    class Core {
+    private:
+      bool busy;
 
-    Event jobEvent;
-    std::queue<JobEntry> jobs;
+      Event jobEvent;
+      std::queue<JobEntry> jobs;
 
-    CoreStat stat;
+      CoreStat stat;
 
-    void handleJob();
-    void jobDone();
+      void handleJob();
+      void jobDone();
 
-   public:
-    Core();
-    ~Core();
+    public:
+      Core();
+      ~Core();
 
-    void submitJob(JobEntry, uint64_t = 0);
+      void submitJob(JobEntry, uint64_t = 0);
 
-    void addStat(InstStat &);
+      void addStat(InstStat &);
 
-    bool isBusy();
-    uint64_t getJobListSize();
-    CoreStat &getStat();
-  };
-  
-  ConfigReader &conf;
-  
-  ICL::ICL *pICL;
-  FTL::FTL *pFTL;
-  PAL::PAL *pPAL;
-  DRAM::AbstractDRAM *pDRAM;
-  Disk *pDisk;
+      bool isBusy();
+      uint64_t getJobListSize();
+      CoreStat &getStat();
+    };
+    
+    ConfigReader &conf;
+    
+    ICL::ICL *pICL;
+    FTL::FTL *pFTL;
+    PAL::PAL *pPAL;
+    DRAM::AbstractDRAM *pDRAM;
+    Disk *pDisk;
 
-  uint64_t lastResetStat;
+    uint64_t lastResetStat;
 
-  uint64_t clockSpeed;
-  uint64_t clockPeriod;
+    uint64_t clockSpeed;
+    uint64_t clockPeriod;
 
-  // Cores
-  std::vector<Core> hilCore;
-  std::vector<Core> iclCore;
-  std::vector<Core> ftlCore;
-  RISCV::SOC *csd;
-  // CPIs
-  std::unordered_map<uint16_t, std::unordered_map<uint16_t, InstStat>> cpi;
+    // Cores
+    std::vector<Core> hilCore;
+    std::vector<Core> iclCore;
+    std::vector<Core> ftlCore;
+    RISCV::SOC *csd;
+    // CPIs
+    std::unordered_map<uint16_t, std::unordered_map<uint16_t, InstStat>> cpi;
 
-  uint32_t leastBusyCPU(std::vector<Core> &);
-  void calculatePower(Power &);
-  void csdCycle();
-  bool csd_in_progress;
-  uint32_t page_size = 16834; // Default page size for SimpleSSD
-  uint32_t lba_size = 512;
-  firmware_params_td fw_params;
-  std::vector<FTL::Request> req_buffer;
+    uint32_t leastBusyCPU(std::vector<Core> &);
+    void calculatePower(Power &);
+    void csdCycle();
+    bool csd_in_progress;
+    uint32_t page_size = 16834; // Default page size for SimpleSSD
+    uint32_t lba_size = 512;
+    firmware_params_td fw_params;
+    std::vector<FTL::Request> req_buffer;
+    
   public:
     CPU(ConfigReader &, ICL::ICL *, FTL::FTL *, PAL::PAL *pal, DRAM::AbstractDRAM *dram);
     ~CPU();
@@ -199,6 +201,7 @@ class CPU : public StatObject {
     uint64_t getClockPeriod();
     void resetStatValues() override;
     void startCSD();
+
     bool socIsPaused();
     void stopCSD();
     void initCSD();

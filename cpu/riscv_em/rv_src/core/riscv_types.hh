@@ -47,6 +47,28 @@ typedef enum
 
 typedef uint64_t (*bus_access_func)(void *priv, privilege_level priv_level, bus_access_type access_type, rv_word_t addr, void *value, uint8_t len);
 
+namespace SimpleSSD {
+
+namespace CPU {
+
+namespace RISCV {
+
+typedef enum {
+  FAST_FORWARD_MODE = 0, // soc runs until it sends a stop signal to cpu
+  TIMING_MODE = 1, // schedule soc at requested intervals
+  CYCLE_MODE = 2, // soc runs at every tick
+  BURST_MODE = 3, // run soc for a set burst of cycles
+  PAUSED_MODE = 4, // soc is paused, no execution
+  FAILED_MODE = 5, // soc has failed, no execution
+} SOC_RUN_MODE;
+
+
+}
+
+}
+
+} // namespace SimpleSSD::CPU::RISCV
+
 #define FLOAT_FMT 0x00
 #define DOUBLE_FMT 0x01
 

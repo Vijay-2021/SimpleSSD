@@ -31,6 +31,7 @@ Block::Block(uint32_t blockIdx, uint32_t count, uint32_t ioUnit)
       ppLPNs(nullptr),
       lastAccessed(0),
       eraseCount(0) {
+  printf("calling block constructor!\n");
   if (ioUnitInPage == 1) {
     pValidBits = new Bitset(pageCount);
     pErasedBits = new Bitset(pageCount);
@@ -39,12 +40,10 @@ Block::Block(uint32_t blockIdx, uint32_t count, uint32_t ioUnit)
   }
   else if (ioUnitInPage > 1) {
     Bitset copy(ioUnitInPage);
-
     validBits = Vector<Bitset>(pageCount, copy);
     erasedBits = Vector<Bitset>(pageCount, copy);
-
     ppLPNs = (uint64_t **)calloc(pageCount, sizeof(uint64_t *));
-
+    printf("called calloc\n");
     for (uint32_t i = 0; i < pageCount; i++) {
       ppLPNs[i] = (uint64_t *)calloc(ioUnitInPage, sizeof(uint64_t));
     }
@@ -55,7 +54,7 @@ Block::Block(uint32_t blockIdx, uint32_t count, uint32_t ioUnit)
 
   // C-style allocation
   pNextWritePageIndex = (uint32_t *)calloc(ioUnitInPage, sizeof(uint32_t));
-
+  printf("finished block constructor!\n");
   erase();
   eraseCount = 0;
 }
@@ -334,16 +333,20 @@ void Block::erase() {
     pErasedBits->set();
   }
   else {
+    int j = 0;
     for (auto &iter : validBits) {
       iter.reset();
     }
+    printf("the loc of mem ptr is: %p\n", erasedBits[257].data);
+    printf("the address of allocation 278 alloc size is: %p\n", &erasedBits[278]);
+    printf("the alloc size of erased bits is: %u\n", erasedBits[257].allocSize);
     for (auto &iter : erasedBits) {
       iter.set();
     }
   }
-
+  printf("finsihed reset valid and erased bits\n");
   memset(pNextWritePageIndex, 0, sizeof(uint32_t) * ioUnitInPage);
-
+  printf("finished memset\n");
   eraseCount++;
 }
 

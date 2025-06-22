@@ -6,7 +6,7 @@
 #include "bitset.hh"
 #include <limits.h>
 #include "memory.h"
-
+#include "new.hh"
 
 typedef enum {
   /* Common FTL configuration */
@@ -124,13 +124,5 @@ uint8_t popcount(T v) {
 
   return (uint8_t)v;
 }
-
-
-void* operator new(size_t size);
-void operator delete(void* p);
-void operator delete(void* ptr, size_t size);
-void* operator new[](size_t size);
-void operator delete[](void* ptr);
-void operator delete[](void* ptr, size_t size);
 
 #endif

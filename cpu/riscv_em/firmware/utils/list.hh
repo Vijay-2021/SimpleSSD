@@ -5,7 +5,7 @@
 #include <stddef.h>
 
 #include "memory.h"
-
+#include "utils.h"
 
 template<typename T>
 class List {
@@ -89,7 +89,7 @@ class List {
             Node* cur = sentinel->next;
             while (cur != sentinel) {
                 Node* nxt = cur->next;
-                free(cur);
+                delete cur;
                 cur = nxt;
             }
             sentinel->next = sentinel->prev = sentinel;
@@ -101,15 +101,15 @@ class List {
                 Node* cur = iter.cur;
                 cur->next->prev = cur->prev;
                 cur->prev->next = cur->next;
-                free(cur);
+                delete cur;
+                cur = nullptr;
                 length_--;
             } 
         }
 
         void emplace(iterator iter, const T& data) {
-            Node* n = (Node *) malloc(sizeof(Node));
             Node* cur = iter.cur;
-            n->data = data;
+            Node* n = new Node{cur, cur->prev, data};
             n->next = cur;
             n->prev = cur->prev;
             cur->prev->next = n;
@@ -118,6 +118,7 @@ class List {
         }
 
         void emplace_back(const T& data) {
+            printf("calling emplace back\n");
             emplace(end(), data);
         }
 

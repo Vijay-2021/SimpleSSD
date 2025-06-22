@@ -7,9 +7,11 @@
 int main(int argc, char** argv) {
     firmware_params params;
     read_buffer((uint64_t)&params, FIRMWARE_PARAMS);
+    printf("read params\n");
     Firmware firmware(params); // just initialize it for now
     FTL::Request req;
     uint64_t curr_tick = 0;
+    printf("all of this is fine!\n");
     stop_sim();
     while(1) {
         read_buffer((uint64_t)&req, FIRMWARE_QUEUE);

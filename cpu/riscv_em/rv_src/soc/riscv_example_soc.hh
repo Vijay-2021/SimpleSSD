@@ -25,8 +25,8 @@ class SOC {
         SOC(char *fw_file_name, char *dtb_file_name, char *initrd_file_name, CPU *cpu, uint32_t num_cores, DRAM::AbstractDRAM *dram);
         ~SOC();
         void rv_soc_dump_mem();
-        void rv_soc_run(rv_word_t success_pc, uint64_t num_cycles); // this depends on the stored number of cycles in the core
-        void rv_soc_tick(rv_word_t success_pc, uint64_t num_cycles); // this just runs for the given number of cycles
+        void rv_soc_run(); // run the SOC until either success is reached or a stop signal is sent
+        uint64_t rv_soc_tick(uint64_t num_cycles); // run the soc for a given number of cycles, returns the next tick time
         void rv_soc_init_mem_access_cbs();
         void rv_soc_fs_init(); 
         void rv_soc_add_task(char *input_cmd);
@@ -56,16 +56,19 @@ class SOC {
         uint64_t clock_period;
         rv_soc_mem_access_cb_td mem_access_cbs[6];
         DRAM::AbstractDRAM *pDRAM;
+        std::vector<Core> rv_cores;
+
     private: 
         CPU *pCPU; 
-        std::vector<Core> rv_cores;
+    
         uint8_t *mrom; /* Contains reset vector and device-tree? */
         uint8_t *ram;
         uint8_t *from; /* Contains filesystem */
-        //superblock_td *fs_superblock; /* Contains superblock of the filesystem */
+        
         clint_td clint;
         plic_td plic;
         simple_uart_td uart;
+
         void stop();
         void start();
         void init_mem_access_struct(int entry, bus_access_func bus_access, void* _priv, rv_word_t addr_start, rv_word_t mem_size);

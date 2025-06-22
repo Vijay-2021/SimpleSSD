@@ -23,31 +23,3 @@ Request::_Request(uint32_t iocount)
 Request::_Request() : reqID(0), reqSubID(0), lpn(0), ioFlag(0), reqType(FTL_REQ_EMPTY) {}
 
 }
-
-
-void* operator new(size_t size) {
-    void* p = malloc(size);
-    return p;
-}
-
-void operator delete(void* p) noexcept {
-    free(p);
-}
-
-void operator delete(void* ptr, size_t size) noexcept {
-    (void)size; 
-    free(ptr);
-}
-
-void* operator new[](size_t size) noexcept {
-    return malloc(size);
-}
-
-void operator delete[](void* ptr) noexcept {
-    free(ptr);
-}
-
-void operator delete[](void* ptr, size_t size) noexcept {
-    (void)size;
-    free(ptr);
-}

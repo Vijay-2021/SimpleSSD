@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stddef.h>
+#include <limits>
 
 #include "rv_src/core/riscv_helper.hh"
 #include "riscv_example_soc.hh"
@@ -74,7 +75,9 @@ static uint64_t rv_soc_bus_access(void *priv, privilege_level priv_level, bus_ac
             return ret_time;
         }
     }
-
+    printf("address is: %p\n", (void*)address);
+    printf("pc is: %p\n", (void*)rv_soc->rv_cores[0].pc);
+    printf("instruction is: %x\n", rv_soc->rv_cores[0].instruction);
     die_msg("Invalid Addresses, or no valid write pointer found, write not executed!");
     return ret_time + rv_soc->clock_period;
 }
@@ -175,79 +178,67 @@ void SOC::rv_soc_dump_mem()
     }
 }
 
-void SOC::rv_soc_run(rv_word_t success_pc, uint64_t num_cycles)
+void SOC::rv_soc_run()
 {
-    if (getContinueSim()) {
-        uint8_t mei = 0, msi = 0, mti = 0;
-        uint8_t uart_irq_pending = 0;
+    uint8_t mei = 0, msi = 0, mti = 0;
+    uint8_t uart_irq_pending = 0;
+    for (uint32_t core_id = 0; core_id < rv_cores.size(); core_id++) {
+        rv_cores[core_id].rv_core_reg_dump();
+    }
+    while(soc_run_mode_ != PAUSED_MODE && soc_run_mode_ != FAILED_MODE) 
+    {
         for (uint32_t core_id = 0; core_id < rv_cores.size(); core_id++) {
+            rv_cores[core_id].rv_core_run();
+        }
+        uart_irq_pending = simple_uart_update(&uart);
+
+        /* update interrupt controllers */
+        plic_update_pending(&plic, 10, uart_irq_pending);
+        mei = plic_update(&plic);
+
+        /* Feed clint and update internall states */    
+        clint_update(&clint, &msi, &mti);
+
+        for (uint32_t core_id = 0; core_id < rv_cores.size(); core_id++) {
+            /* update CSRs for actual interrupt processing */
+            rv_cores[core_id].rv_core_process_interrupts(mei, mti, msi);
+
             rv_cores[core_id].rv_core_reg_dump();
         }
-        while(1)
-        {
-            for (uint32_t core_id = 0; core_id < rv_cores.size(); core_id++) {
-                rv_cores[core_id].rv_core_run();
-            }
-
-            uart_irq_pending = simple_uart_update(&uart);
-
-            /* update interrupt controllers */
-            plic_update_pending(&plic, 10, uart_irq_pending);
-            mei = plic_update(&plic);
-
-            /* Feed clint and update internall states */    
-            clint_update(&clint, &msi, &mti);
-
-            for (uint32_t core_id = 0; core_id < rv_cores.size(); core_id++) {
-                /* update CSRs for actual interrupt processing */
-                rv_cores[core_id].rv_core_process_interrupts(mei, mti, msi);
-
-                rv_cores[core_id].rv_core_reg_dump();
-
-                if(rv_cores[core_id].pc == success_pc)
-                    break;
-
-                if((num_cycles != 0) && (rv_cores[core_id].curr_cycle >= num_cycles))
-                    break;
-            }
-        }
-    }   
+    }
+    
 }
 
 
-void SOC::rv_soc_tick(rv_word_t success_pc, uint64_t num_cycles)
+uint64_t SOC::rv_soc_tick(uint64_t num_cycles)
 {
-    if (getContinueSim()) {
-        uint8_t mei = 0, msi = 0, mti = 0;
-        uint8_t uart_irq_pending = 0;
-
-        // rv_core_reg_dump(&rv_core0);
-        for (uint64_t current_cycle = 0; current_cycle < num_cycles; current_cycle++) {
-            for (uint32_t core_id = 0; core_id < rv_cores.size(); core_id++) {
-                rv_cores[core_id].rv_core_run();
-            }
-
-            uart_irq_pending = simple_uart_update(&uart);
-
-            /* update interrupt controllers */
-            plic_update_pending(&plic, 10, uart_irq_pending);
-            mei = plic_update(&plic);
-
-            /* Feed clint and update internall states */    
-            clint_update(&clint, &msi, &mti);
-
-            /* update CSRs for actual interrupt processing */
-            for (uint32_t core_id = 0; core_id < rv_cores.size(); core_id++) {
-                rv_cores[core_id].rv_core_process_interrupts(mei, mti, msi);
-
-                // rv_core_reg_dump(&rv_core0);
-                
-                if(rv_cores[core_id].pc == success_pc)
-                    break;
-            }
-            
+    uint8_t mei = 0, msi = 0, mti = 0;
+    uint8_t uart_irq_pending = 0;
+    uint64_t next_tick = getTick() + clock_period;
+    // rv_core_reg_dump(&rv_core0);
+    for (uint64_t current_cycle = 0; current_cycle < num_cycles && soc_run_mode_ != PAUSED_MODE && soc_run_mode_ != FAILED_MODE; current_cycle++) {
+        next_tick = std::numeric_limits<uint64_t>::max(); // reset next tick to max value for each cycle
+        for (uint32_t core_id = 0; core_id < rv_cores.size(); core_id++) {
+            uint64_t requested_tick = rv_cores[core_id].rv_core_run();
+            next_tick = std::min(next_tick, requested_tick);
         }
+
+        uart_irq_pending = simple_uart_update(&uart);
+
+        /* update interrupt controllers */
+        plic_update_pending(&plic, 10, uart_irq_pending);
+        mei = plic_update(&plic);
+
+        /* Feed clint and update internall states */    
+        clint_update(&clint, &msi, &mti);
+
+        /* update CSRs for actual interrupt processing */
+        for (uint32_t core_id = 0; core_id < rv_cores.size(); core_id++) {
+            rv_cores[core_id].rv_core_process_interrupts(mei, mti, msi);
+        }
+        
     }
+    return next_tick;
 }
 
 void SOC::rv_soc_add_task(char *input_cmd)
@@ -259,13 +250,6 @@ void SOC::rv_soc_add_task(char *input_cmd)
     // You can implement the actual task addition logic here
 }
 
-void SOC::stop() {
-    setContinueSim(0);
-}
-
-void SOC::start() {
-    setContinueSim(1);
-}
 
 uint64_t SOC::lread(uint8_t* buffer, uint64_t offset , uint64_t len) {
     return pCPU->read_flash_icl(buffer, offset, len);
@@ -306,7 +290,6 @@ void SOC::start_simulation() {
 
 void SOC::stop_simulation() {
     pCPU->stopCSD();
-
 }
 
 void SOC::next_simulation_tick(uint64_t next_tick) {

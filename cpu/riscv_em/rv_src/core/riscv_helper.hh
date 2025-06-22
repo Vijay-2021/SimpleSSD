@@ -135,8 +135,7 @@ namespace RISCV {
 
 void die_msg(char* fmt, ...);
 
-int getContinueSim();
-void setContinueSim(int sim_cont);
+extern SOC_RUN_MODE soc_run_mode_;
 
 } // namespace RISCV
 

@@ -63,7 +63,7 @@ public:
                 return table_[idx].value;
             idx = (idx + 1) % capacity_;
         }
-        table_[idx].data = Pair<K, V>(key, V());
+        new (&table_[idx].data) Pair<K, V>();
         table_[idx].occupied = true;
         ++size_;
         return table_[idx].value;
@@ -89,25 +89,26 @@ public:
             }
             idx = (idx + 1) % capacity_;
         }
-        table_[idx].data = Pair<K, V>(key, value);
+        new (&table_[idx].data) Pair<K, V>();
         table_[idx].occupied = true;
         ++size_;
         return Pair<iterator, bool>(iterator(&table_[idx], table_ + capacity_), true);
     }
-    bool count(const K& key) const {
+    size_t count(const K& key) const {
         size_t idx = hash(key) % capacity_;
         while (table_[idx].occupied) {
             if (table_[idx].data.first == key)
-                return true;
+                return 1;
             idx = (idx + 1) % capacity_;
         }
-        return false;
+        return 0;
     }
     
     void erase(const K& key) {
         size_t idx = hash(key) % capacity_;
         while (table_[idx].occupied) {
             if (table_[idx].data.first == key) {
+                table_[idx].data.~Pair<K, V>();
                 table_[idx].occupied = false;
                 --size_;
                 return;
@@ -118,6 +119,7 @@ public:
 
     void erase(iterator iter) {
         if (iter != end()) {
+            iter.ptr->data.~Pair<K, V>();
             iter.ptr->occupied = false;
             --size_;
             ++iter; // Move iterator to next valid position
