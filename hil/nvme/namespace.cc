@@ -184,9 +184,9 @@ void Namespace::getLogPage(SQEntryWrapper &req, RequestFunction &func) {
   uint32_t req_size = (((uint32_t)numdu << 16 | numdl) + 1) * 4;
   uint64_t offset = ((uint64_t)lopu << 32) | lopl;
 
-  debugprint(LOG_HIL_NVME,
-             "ADMIN   | Get Log Page | Log %d | Size %d | NSID %d", lid,
-             req_size, nsid);
+  // debugprint(LOG_HIL_NVME,
+  //           "ADMIN   | Get Log Page | Log %d | Size %d | NSID %d", lid,
+  //           req_size, nsid);
 
   static DMAFunction dmaDone = [](uint64_t, void *context) {
     RequestContext *pContext = (RequestContext *)context;
@@ -255,13 +255,13 @@ void Namespace::flush(SQEntryWrapper &req, RequestFunction &func) {
       DMAFunction doFlush = [this](uint64_t now, void *context) {
         IOContext *pContext = (IOContext *)context;
 
-        debugprint(
-            LOG_HIL_NVME,
-            "NVM     | FLUSH | CQ %u | SQ %u:%u | CID %u | NSID %-5d | %" PRIu64
-            " - %" PRIu64 " (%" PRIu64 ")",
-            pContext->resp.cqID, pContext->resp.entry.dword2.sqID,
-            pContext->resp.sqUID, pContext->resp.entry.dword3.commandID, nsid,
-            pContext->beginAt, now, now - pContext->beginAt);
+        // debugprint(
+        //    LOG_HIL_NVME,
+        //    "NVM     | FLUSH | CQ %u | SQ %u:%u | CID %u | NSID %-5d | %" PRIu64
+        //    " - %" PRIu64 " (%" PRIu64 ")",
+        //    pContext->resp.cqID, pContext->resp.entry.dword2.sqID,
+        //    pContext->resp.sqUID, pContext->resp.entry.dword3.commandID, nsid,
+         //   pContext->beginAt, now, now - pContext->beginAt);
 
         pContext->function(pContext->resp);
 
@@ -271,8 +271,8 @@ void Namespace::flush(SQEntryWrapper &req, RequestFunction &func) {
       pParent->flush(this, doFlush, context);
     };
 
-    debugprint(LOG_HIL_NVME, "NVM     | FLUSH | SQ %u:%u | CID %u |  NSID %-5d",
-               req.sqID, req.sqUID, req.entry.dword0.commandID, nsid);
+    // debugprint(LOG_HIL_NVME, "NVM     | FLUSH | SQ %u:%u | CID %u |  NSID %-5d",
+    //           req.sqID, req.sqUID, req.entry.dword0.commandID, nsid);
 
     IOContext *pContext = new IOContext(func, resp);
 
@@ -299,10 +299,10 @@ void Namespace::write(SQEntryWrapper &req, RequestFunction &func) {
     warn("nvme_namespace: host tried to write 0 blocks");
   }
 
-  debugprint(LOG_HIL_NVME,
-             "NVM     | WRITE | SQ %u:%u | CID %u | NSID %-5d | %" PRIX64
-             " + %d",
-             req.sqID, req.sqUID, req.entry.dword0.commandID, nsid, slba, nlb);
+  // debugprint(LOG_HIL_NVME,
+  //           "NVM     | WRITE | SQ %u:%u | CID %u | NSID %-5d | %" PRIX64
+  //           " + %d",
+  //           req.sqID, req.sqUID, req.entry.dword0.commandID, nsid, slba, nlb);
 
   if (!err) {
     DMAFunction doRead = [this](uint64_t tick, void *context) {
@@ -312,14 +312,14 @@ void Namespace::write(SQEntryWrapper &req, RequestFunction &func) {
         pContext->beginAt++;
 
         if (pContext->beginAt == 2) {
-          debugprint(
-              LOG_HIL_NVME,
-              "NVM     | WRITE | CQ %u | SQ %u:%u | CID %u | NSID %-5d | "
-              "%" PRIX64 " + %d | %" PRIu64 " - %" PRIu64 " (%" PRIu64 ")",
-              pContext->resp.cqID, pContext->resp.entry.dword2.sqID,
-              pContext->resp.sqUID, pContext->resp.entry.dword3.commandID, nsid,
-              pContext->slba, pContext->nlb, pContext->tick, tick,
-              tick - pContext->tick);
+          // debugprint(
+          //    LOG_HIL_NVME,
+          //    "NVM     | WRITE | CQ %u | SQ %u:%u | CID %u | NSID %-5d | "
+          //    "%" PRIX64 " + %d | %" PRIu64 " - %" PRIu64 " (%" PRIu64 ")",
+          //    pContext->resp.cqID, pContext->resp.entry.dword2.sqID,
+          //    pContext->resp.sqUID, pContext->resp.entry.dword3.commandID, nsid,
+          //    pContext->slba, pContext->nlb, pContext->tick, tick,
+          //    tick - pContext->tick);
           pContext->function(pContext->resp);
 
           if (pContext->buffer) {
@@ -394,10 +394,10 @@ void Namespace::read(SQEntryWrapper &req, RequestFunction &func) {
     warn("nvme_namespace: host tried to read 0 blocks");
   }
 
-  debugprint(LOG_HIL_NVME,
-             "NVM     | READ  | SQ %u:%u | CID %u | NSID %-5d | %" PRIX64
-             " + %d",
-             req.sqID, req.sqUID, req.entry.dword0.commandID, nsid, slba, nlb);
+  // debugprint(LOG_HIL_NVME,
+  //           "NVM     | READ  | SQ %u:%u | CID %u | NSID %-5d | %" PRIX64
+  //           " + %d",
+  //           req.sqID, req.sqUID, req.entry.dword0.commandID, nsid, slba, nlb);
 
   if (!err) {
     DMAFunction doRead = [this](uint64_t tick, void *context) {
@@ -407,14 +407,14 @@ void Namespace::read(SQEntryWrapper &req, RequestFunction &func) {
         pContext->beginAt++;
 
         if (pContext->beginAt == 2) {
-          debugprint(
-              LOG_HIL_NVME,
-              "NVM     | READ  | CQ %u | SQ %u:%u | CID %u | NSID %-5d | "
-              "%" PRIX64 " + %d | %" PRIu64 " - %" PRIu64 " (%" PRIu64 ")",
-              pContext->resp.cqID, pContext->resp.entry.dword2.sqID,
-              pContext->resp.sqUID, pContext->resp.entry.dword3.commandID, nsid,
-              pContext->slba, pContext->nlb, pContext->tick, tick,
-              tick - pContext->tick);
+          // debugprint(
+          //    LOG_HIL_NVME,
+          //    "NVM     | READ  | CQ %u | SQ %u:%u | CID %u | NSID %-5d | "
+          //    "%" PRIX64 " + %d | %" PRIu64 " - %" PRIu64 " (%" PRIu64 ")",
+          //    pContext->resp.cqID, pContext->resp.entry.dword2.sqID,
+          //    pContext->resp.sqUID, pContext->resp.entry.dword3.commandID, nsid,
+          //    pContext->slba, pContext->nlb, pContext->tick, tick,
+           //   tick - pContext->tick);
 
           pContext->function(pContext->resp);
 
@@ -486,10 +486,10 @@ void Namespace::compare(SQEntryWrapper &req, RequestFunction &func) {
     warn("nvme_namespace: host tried to read 0 blocks");
   }
 
-  debugprint(LOG_HIL_NVME,
-             "NVM     | COMP  | SQ %u:%u | CID %u | NSID %-5d | %" PRIX64
-             " + %d",
-             req.sqID, req.sqUID, req.entry.dword0.commandID, nsid, slba, nlb);
+  // debugprint(LOG_HIL_NVME,
+  //           "NVM     | COMP  | SQ %u:%u | CID %u | NSID %-5d | %" PRIX64
+  //           " + %d",
+  //           req.sqID, req.sqUID, req.entry.dword0.commandID, nsid, slba, nlb);
 
   if (!err) {
     DMAFunction doRead = [this](uint64_t tick, void *context) {
@@ -508,14 +508,14 @@ void Namespace::compare(SQEntryWrapper &req, RequestFunction &func) {
                                       STATUS_COMPARE_FAILURE);
           }
 
-          debugprint(
-              LOG_HIL_NVME,
-              "NVM     | COMP  | CQ %u | SQ %u:%u | CID %u | NSID %-5d | "
-              "%" PRIX64 " + %d | %" PRIu64 " - %" PRIu64 " (%" PRIu64 ")",
-              pContext->resp.cqID, pContext->resp.entry.dword2.sqID,
-              pContext->resp.sqUID, pContext->resp.entry.dword3.commandID, nsid,
-              pContext->slba, pContext->nlb, pContext->tick, tick,
-              tick - pContext->tick);
+          // debugprint(
+          //    LOG_HIL_NVME,
+          //    "NVM     | COMP  | CQ %u | SQ %u:%u | CID %u | NSID %-5d | "
+          //    "%" PRIX64 " + %d | %" PRIu64 " - %" PRIu64 " (%" PRIu64 ")",
+          //    pContext->resp.cqID, pContext->resp.entry.dword2.sqID,
+          //    pContext->resp.sqUID, pContext->resp.entry.dword3.commandID, nsid,
+          //    pContext->slba, pContext->nlb, pContext->tick, tick,
+          //    tick - pContext->tick);
 
           pContext->function(pContext->resp);
 
@@ -590,11 +590,11 @@ void Namespace::datasetManagement(SQEntryWrapper &req, RequestFunction &func) {
     // Just ignore
   }
 
-  debugprint(
-      LOG_HIL_NVME,
-      "NVM     | TRIM  | SQ %u:%u | CID %u |  NSID %-5d| %d ranges | Attr %1X",
-      req.sqID, req.sqUID, req.entry.dword0.commandID, nsid, nr,
-      req.entry.dword11 & 0x0F);
+  // debugprint(
+  //    LOG_HIL_NVME,
+  //    "NVM     | TRIM  | SQ %u:%u | CID %u |  NSID %-5d| %d ranges | Attr %1X",
+  //    req.sqID, req.sqUID, req.entry.dword0.commandID, nsid, nr,
+  //    req.entry.dword11 & 0x0F);
 
   if (!err) {
     static DMAFunction eachTrimDone = [](uint64_t tick, void *context) {
@@ -613,13 +613,13 @@ void Namespace::datasetManagement(SQEntryWrapper &req, RequestFunction &func) {
         DMAFunction trimDone = [this](uint64_t tick, void *context) {
           IOContext *pContext = (IOContext *)context;
 
-          debugprint(LOG_HIL_NVME,
-                     "NVM     | TRIM  | CQ %u | SQ %u:%u | CID %u | NSID %-5d| "
-                     "%" PRIu64 " - %" PRIu64 " (%" PRIu64 ")",
-                     pContext->resp.cqID, pContext->resp.entry.dword2.sqID,
-                     pContext->resp.sqUID,
-                     pContext->resp.entry.dword3.commandID, nsid,
-                     pContext->beginAt, tick, tick - pContext->beginAt);
+          // debugprint(LOG_HIL_NVME,
+          //           "NVM     | TRIM  | CQ %u | SQ %u:%u | CID %u | NSID %-5d| "
+          //           "%" PRIu64 " - %" PRIu64 " (%" PRIu64 ")",
+          //           pContext->resp.cqID, pContext->resp.entry.dword2.sqID,
+          //           pContext->resp.sqUID,
+          //           pContext->resp.entry.dword3.commandID, nsid,
+          //           pContext->beginAt, tick, tick - pContext->beginAt);
 
           pContext->function(pContext->resp);
 

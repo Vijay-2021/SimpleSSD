@@ -44,11 +44,11 @@ void HIL::read(Request &req) {
 
     pReq->reqID = ++reqCount;
 
-    debugprint(LOG_HIL,
-               "READ  | REQ %7u | LCA %" PRIu64 " + %" PRIu64 " | BYTE %" PRIu64
-               " + %" PRIu64,
-               pReq->reqID, pReq->range.slpn, pReq->range.nlp, pReq->offset,
-               pReq->length);
+    //debugprint(LOG_HIL,
+    //           "READ  | REQ %7u | LCA %" PRIu64 " + %" PRIu64 " | BYTE %" PRIu64
+    //           " + %" PRIu64,
+     //          pReq->reqID, pReq->range.slpn, pReq->range.nlp, pReq->offset,
+     //          pReq->length);
 
     ICL::Request reqInternal(*pReq);
     pICL->read(reqInternal, tick);
@@ -76,11 +76,11 @@ void HIL::write(Request &req) {
 
     pReq->reqID = ++reqCount;
 
-    debugprint(LOG_HIL,
-               "WRITE | REQ %7u | LCA %" PRIu64 " + %" PRIu64 " | BYTE %" PRIu64
-               " + %" PRIu64,
-               pReq->reqID, pReq->range.slpn, pReq->range.nlp, pReq->offset,
-               pReq->length);
+    //debugprint(LOG_HIL,
+    //           "WRITE | REQ %7u | LCA %" PRIu64 " + %" PRIu64 " | BYTE %" PRIu64
+    //           " + %" PRIu64,
+    //           pReq->reqID, pReq->range.slpn, pReq->range.nlp, pReq->offset,
+    //           pReq->length);
 
     ICL::Request reqInternal(*pReq);
     pICL->write(reqInternal, tick);
@@ -107,8 +107,8 @@ void HIL::flush(Request &req) {
 
     pReq->reqID = ++reqCount;
 
-    debugprint(LOG_HIL, "FLUSH | REQ %7u | LCA %" PRIu64 " + %" PRIu64,
-               pReq->reqID, pReq->range.slpn, pReq->range.nlp);
+    //debugprint(LOG_HIL, "FLUSH | REQ %7u | LCA %" PRIu64 " + %" PRIu64,
+    //           pReq->reqID, pReq->range.slpn, pReq->range.nlp);
 
     pICL->flush(pReq->range, tick);
 
@@ -129,8 +129,8 @@ void HIL::trim(Request &req) {
 
     pReq->reqID = ++reqCount;
 
-    debugprint(LOG_HIL, "TRIM  | REQ %7u | LCA %" PRIu64 " + %" PRIu64,
-               pReq->reqID, pReq->range.slpn, pReq->range.nlp);
+    //debugprint(LOG_HIL, "TRIM  | REQ %7u | LCA %" PRIu64 " + %" PRIu64,
+    //           pReq->reqID, pReq->range.slpn, pReq->range.nlp);
 
     pICL->trim(pReq->range, tick);
 
@@ -149,8 +149,8 @@ void HIL::format(Request &req, bool erase) {
   DMAFunction doFlush = [this, erase](uint64_t tick, void *context) {
     auto pReq = (Request *)context;
 
-    debugprint(LOG_HIL, "FORMAT| LCA %" PRIu64 " + %" PRIu64, pReq->reqID,
-               pReq->range.slpn, pReq->range.nlp);
+    //debugprint(LOG_HIL, "FORMAT| LCA %" PRIu64 " + %" PRIu64, pReq->reqID,
+     //          pReq->range.slpn, pReq->range.nlp);
 
     if (erase) {
       pICL->format(pReq->range, tick);

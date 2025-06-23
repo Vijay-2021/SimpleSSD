@@ -38,7 +38,7 @@ class Block {
   uint64_t *pLPNs;
 
   // Following variables are used when ioUnitInPage > 1
-  Vector<Bitset> validBits;
+  
   Vector<Bitset> erasedBits;
   uint64_t **ppLPNs;
 
@@ -46,6 +46,8 @@ class Block {
   uint32_t eraseCount;
 
  public:
+  Vector<Bitset> validBits;
+  Block() = default;  // Default constructor
   Block(uint32_t, uint32_t, uint32_t);
   Block(const Block &);      // Copy constructor
   Block(Block &&) noexcept;  // Move constructor

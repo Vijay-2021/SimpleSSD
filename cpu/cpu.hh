@@ -69,12 +69,6 @@ namespace DRAM {
 
 namespace CPU {
 
-typedef enum {
-    FIRMWARE_PARAMS = 0, 
-    FIRMWARE_QUEUE = 1,
-    FIRMWARE_TICK = 2,
-} DATA_REQ;
-
 typedef struct firmware_params {
 	uint64_t totalPhysicalBlocks;
   uint64_t totalLogicalBlocks;

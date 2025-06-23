@@ -50,6 +50,20 @@ public:
         }
     }
 
+    Vector(size_t count, T&& value)
+        : data_(nullptr), size_(count), capacity_(count) {
+        if (count > 0) {
+            data_ = (T*)malloc(count * sizeof(T));
+            if (data_) {
+                for (size_t i = 0; i < count; ++i) {
+                    new(&data_[i]) T(static_cast<T&&>(value));  // move constructor
+                }
+            } else {
+                size_ = capacity_ = 0;
+            }
+        }
+    }
+
     Vector(iterator begin, iterator end) {
         if (end < begin) {
             size_ = 0;
@@ -108,7 +122,7 @@ public:
         if (this != &rhs) {
             reserve(rhs.capacity_);
             clear();
-            for (size_t i = 0; i < size_; i++) {
+            for (size_t i = 0; i < rhs.size_; i++) {
                 push_back(rhs[i]);
             }
         }

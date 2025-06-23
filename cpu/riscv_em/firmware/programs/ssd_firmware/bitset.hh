@@ -69,7 +69,7 @@ class Bitset {
     bool ret = true;
 
     if (lhs.dataSize != rhs.dataSize) {
-      panic("Size does not match");
+      panic("Size does not match with %u and %u", lhs.dataSize, rhs.dataSize);
     }
 
     for (uint32_t i = 0; i < lhs.allocSize; i++) {

@@ -75,7 +75,7 @@ void Subsystem::init() {
   pCPU = new CPU::CPU(conf, icl, ftl, pal, dram);
   setCPU(pCPU);
   ftl->setCPU(pCPU);
-  pCPU->startCSD();
+  pCPU->initCSD();
   uint16_t nNamespaces =
       (uint16_t)conf.readUint(CONFIG_NVME, NVME_ENABLE_DEFAULT_NAMESPACE);
 
@@ -239,9 +239,9 @@ bool Subsystem::createNamespace(uint32_t nsid, Namespace::Information *info) {
   pNS->setData(nsid, info);
 
   lNamespaces.push_back(pNS);
-  debugprint(LOG_HIL_NVME,
-             "NS %-5d| CREATE | LBA size %" PRIu32 " | Capacity %" PRIu64, nsid,
-             info->lbaSize, info->size);
+  // debugprint(LOG_HIL_NVME,
+  //           "NS %-5d| CREATE | LBA size %" PRIu32 " | Capacity %" PRIu64, nsid,
+  //           info->lbaSize, info->size);
 
   lNamespaces.sort([](Namespace *lhs, Namespace *rhs) -> bool {
     return lhs->getNSID() < rhs->getNSID();
@@ -258,7 +258,7 @@ bool Subsystem::destroyNamespace(uint32_t nsid) {
     if ((*iter)->getNSID() == nsid) {
       found = true;
 
-      debugprint(LOG_HIL_NVME, "NS %-5d| DELETE", nsid);
+      // debugprint(LOG_HIL_NVME, "NS %-5d| DELETE", nsid);
 
       info = (*iter)->getInfo();
       allocatedLogicalPages -= info->size * info->lbaSize / logicalPageSize;
@@ -526,7 +526,7 @@ bool Subsystem::deleteSQueue(SQEntryWrapper &req, RequestFunction &func) {
   CQEntryWrapper resp(req);
   uint16_t sqid = req.entry.dword10 & 0xFFFF;
 
-  debugprint(LOG_HIL_NVME, "ADMIN   | Delete I/O Submission Queue");
+  // debugprint(LOG_HIL_NVME, "ADMIN   | Delete I/O Submission Queue");
 
   int ret = pParent->deleteSQueue(sqid);
 
@@ -550,7 +550,7 @@ bool Subsystem::createSQueue(SQEntryWrapper &req, RequestFunction &func) {
   uint8_t priority = (req.entry.dword11 & 0x06) >> 1;
   bool pc = req.entry.dword11 & 0x01;
 
-  debugprint(LOG_HIL_NVME, "ADMIN   | Create I/O Submission Queue");
+  // debugprint(LOG_HIL_NVME, "ADMIN   | Create I/O Submission Queue");
 
   if (entrySize > cfgdata.maxQueueEntry) {
     err = true;
@@ -600,9 +600,9 @@ bool Subsystem::getLogPage(SQEntryWrapper &req, RequestFunction &func) {
   uint32_t req_size = (((uint32_t)numdu << 16 | numdl) + 1) * 4;
   uint64_t offset = ((uint64_t)lopu << 32) | lopl;
 
-  debugprint(LOG_HIL_NVME,
-             "ADMIN   | Get Log Page | Log %d | Size %d | NSID %d", lid,
-             req_size, req.entry.namespaceID);
+  // debugprint(LOG_HIL_NVME,
+  //           "ADMIN   | Get Log Page | Log %d | Size %d | NSID %d", lid,
+  //           req_size, req.entry.namespaceID);
 
   static DMAFunction dmaDone = [](uint64_t, void *context) {
     RequestContext *pContext = (RequestContext *)context;
@@ -662,7 +662,7 @@ bool Subsystem::deleteCQueue(SQEntryWrapper &req, RequestFunction &func) {
   CQEntryWrapper resp(req);
   uint16_t cqid = req.entry.dword10 & 0xFFFF;
 
-  debugprint(LOG_HIL_NVME, "ADMIN   | Delete I/O Completion Queue");
+  // debugprint(LOG_HIL_NVME, "ADMIN   | Delete I/O Completion Queue");
 
   int ret = pParent->deleteCQueue(cqid);
 
@@ -690,7 +690,7 @@ bool Subsystem::createCQueue(SQEntryWrapper &req, RequestFunction &func) {
   bool ien = req.entry.dword11 & 0x02;
   bool pc = req.entry.dword11 & 0x01;
 
-  debugprint(LOG_HIL_NVME, "ADMIN   | Create I/O Completion Queue");
+  // debugprint(LOG_HIL_NVME, "ADMIN   | Create I/O Completion Queue");
 
   if (entrySize > cfgdata.maxQueueEntry) {
     err = true;
@@ -735,8 +735,8 @@ bool Subsystem::identify(SQEntryWrapper &req, RequestFunction &func) {
   uint16_t idx = 0;
 
   pContext->buffer = (uint8_t *)calloc(0x1000, sizeof(uint8_t));
-  debugprint(LOG_HIL_NVME, "ADMIN   | Identify | CNS %d | CNTID %d | NSID %d",
-             cns, cntid, req.entry.namespaceID);
+  // debugprint(LOG_HIL_NVME, "ADMIN   | Identify | CNS %d | CNTID %d | NSID %d",
+  //           cns, cntid, req.entry.namespaceID);
 
   switch (cns) {
     case CNS_IDENTIFY_NAMESPACE:
@@ -849,7 +849,7 @@ bool Subsystem::abort(SQEntryWrapper &req, RequestFunction &func) {
   uint16_t sqid = req.entry.dword10 & 0xFFFF;
   uint16_t cid = (req.entry.dword10 & 0xFFFF0000) >> 16;
 
-  debugprint(LOG_HIL_NVME, "ADMIN   | Abort | SQID %d | CID %d", sqid, cid);
+  // debugprint(LOG_HIL_NVME, "ADMIN   | Abort | SQID %d | CID %d", sqid, cid);
 
   int ret = pParent->abort(sqid, cid);
 
@@ -876,8 +876,8 @@ bool Subsystem::setFeatures(SQEntryWrapper &req, RequestFunction &func) {
   uint16_t fid = req.entry.dword10 & 0x00FF;
   bool save = req.entry.dword10 & 0x80000000;
 
-  debugprint(LOG_HIL_NVME, "ADMIN   | Set Features | Feature %d | NSID %d", fid,
-             req.entry.namespaceID);
+  // debugprint(LOG_HIL_NVME, "ADMIN   | Set Features | Feature %d | NSID %d", fid,
+  //           req.entry.namespaceID);
 
   if (save) {
     err = true;
@@ -931,8 +931,8 @@ bool Subsystem::getFeatures(SQEntryWrapper &req, RequestFunction &func) {
   CQEntryWrapper resp(req);
   uint16_t fid = req.entry.dword10 & 0x00FF;
 
-  debugprint(LOG_HIL_NVME, "ADMIN   | Get Features | Feature %d | NSID %d", fid,
-             req.entry.namespaceID);
+  // debugprint(LOG_HIL_NVME, "ADMIN   | Get Features | Feature %d | NSID %d", fid,
+  //           req.entry.namespaceID);
 
   switch (fid) {
     case FEATURE_ARBITRATION:
@@ -991,8 +991,8 @@ bool Subsystem::namespaceManagement(SQEntryWrapper &req,
   CQEntryWrapper resp(req);
   uint8_t sel = req.entry.dword10 & 0x0F;
 
-  debugprint(LOG_HIL_NVME, "ADMIN   | Namespace Management | OP %d | NSID %d",
-             sel, req.entry.namespaceID);
+  // debugprint(LOG_HIL_NVME, "ADMIN   | Namespace Management | OP %d | NSID %d",
+  //           sel, req.entry.namespaceID);
 
   static DMAFunction dmaDone = [this](uint64_t, void *context) {
     Namespace::Information info;
@@ -1114,8 +1114,8 @@ bool Subsystem::namespaceAttachment(SQEntryWrapper &req,
   uint8_t sel = req.entry.dword10 & 0x0F;
   uint32_t nsid = req.entry.namespaceID;
 
-  debugprint(LOG_HIL_NVME, "ADMIN   | Namespace Attachment | OP %d | NSID %d",
-             req.entry.dword10 & 0x0F, req.entry.namespaceID);
+  // debugprint(LOG_HIL_NVME, "ADMIN   | Namespace Attachment | OP %d | NSID %d",
+  //           req.entry.dword10 & 0x0F, req.entry.namespaceID);
 
   static DMAFunction dmaDone = [this](uint64_t, void *context) {
     bool err = false;
@@ -1235,8 +1235,8 @@ bool Subsystem::formatNVM(SQEntryWrapper &req, RequestFunction &func) {
   uint8_t lbaf = req.entry.dword10 & 0x0F;
   bool submit = true;
 
-  debugprint(LOG_HIL_NVME, "ADMIN   | Format NVM | SES %d | NSID %d", ses,
-             req.entry.namespaceID);
+  // debugprint(LOG_HIL_NVME, "ADMIN   | Format NVM | SES %d | NSID %d", ses,
+  //           req.entry.namespaceID);
 
   static DMAFunction doFormat = [](uint64_t, void *context) {
     RequestContext *pContext = (RequestContext *)context;
@@ -1323,8 +1323,8 @@ bool Subsystem::formatNVM(SQEntryWrapper &req, RequestFunction &func) {
 
 bool Subsystem::csdSOCInit(SQEntryWrapper &req, RequestFunction &func) {
   CQEntryWrapper resp(req); // create the completion queue response
-  debugprint(LOG_HIL_NVME, "ADMIN   | CSD SOC Init | NSID %d",
-             req.entry.namespaceID);
+  // debugprint(LOG_HIL_NVME, "ADMIN   | CSD SOC Init | NSID %d",
+  //           req.entry.namespaceID);
   // start soc
   pCPU->startCSD();
   // init file system
@@ -1334,8 +1334,8 @@ bool Subsystem::csdSOCInit(SQEntryWrapper &req, RequestFunction &func) {
 
 bool Subsystem::csdSOCStop(SQEntryWrapper &req, RequestFunction &func) {
   CQEntryWrapper resp(req); // create the completion queue response
-  debugprint(LOG_HIL_NVME, "ADMIN   | CSD SOC Stop | NSID %d",
-             req.entry.namespaceID);
+  // debugprint(LOG_HIL_NVME, "ADMIN   | CSD SOC Stop | NSID %d",
+  //           req.entry.namespaceID);
   func(resp);
   return true; // Not implemented yet
 }
@@ -1343,8 +1343,8 @@ bool Subsystem::csdSOCStop(SQEntryWrapper &req, RequestFunction &func) {
 bool Subsystem::csdAddTask(SQEntryWrapper &req, RequestFunction &func) {
 
   CQEntryWrapper resp(req); // create the completion queue response
-  debugprint(LOG_HIL_NVME, "ADMIN   | CSD Add Task | NSID %d",
-             req.entry.namespaceID);  
+  // debugprint(LOG_HIL_NVME, "ADMIN   | CSD Add Task | NSID %d",
+  //           req.entry.namespaceID);  
   uint32_t req_size = req.entry.dword10;
   char* buffer = (char*)calloc(256, sizeof(char));
   static DMAFunction dmaDone = [this](uint64_t, void *context) {
@@ -1377,12 +1377,12 @@ bool Subsystem::csdAddTask(SQEntryWrapper &req, RequestFunction &func) {
 
 bool Subsystem::csdPoll(SQEntryWrapper &req, RequestFunction &func) {
   CQEntryWrapper resp(req); // create the completion queue response
-  debugprint(LOG_HIL_NVME, "ADMIN   | CSD Poll | NSID %d",
-                            req.entry.namespaceID);
+  // debugprint(LOG_HIL_NVME, "ADMIN   | CSD Poll | NSID %d",
+  //                          req.entry.namespaceID);
   uint32_t req_size = req.entry.dword10; 
   char* buffer = (char*)calloc(256, sizeof(char));
   strcpy(buffer, "CSD Poll Response");
-  debugprint(LOG_HIL_NVME, "CSD Polling with buffer: %s and ptr %p", buffer, buffer); 
+  // debugprint(LOG_HIL_NVME, "CSD Polling with buffer: %s and ptr %p", buffer, buffer); 
   static DMAFunction dmaDone = [](uint64_t, void *context) {
     RequestContext *pContext = (RequestContext *)context;
     pContext->function(pContext->resp);

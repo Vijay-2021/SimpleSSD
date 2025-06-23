@@ -23,7 +23,7 @@ public:
             while (ptr != end && !ptr->occupied) ++ptr;
         }
         iterator() : ptr(nullptr), end(nullptr) {}
-        Pair<K, V> operator*() const { return ptr->data; }
+        Pair<K, V>& operator*() const { return ptr->data; }
         iterator& operator++() { 
             do { ++ptr; } while (ptr != end && !ptr->occupied);
             return *this;
@@ -59,21 +59,23 @@ public:
         }
         size_t idx = hash(key) % capacity_;
         while (table_[idx].occupied) {
-            if (table_[idx].data.first == key)
-                return table_[idx].value;
+            if (table_[idx].data.first == key) {
+                return table_[idx].data.second;
+            }
             idx = (idx + 1) % capacity_;
         }
-        new (&table_[idx].data) Pair<K, V>();
+        new (&table_[idx].data) Pair<K, V>(key, V());
         table_[idx].occupied = true;
         ++size_;
-        return table_[idx].value;
+        return table_[idx].data.second;
     }
 
     iterator find(const K& key) {
         size_t idx = hash(key) % capacity_;
         while (table_[idx].occupied) {
-            if (table_[idx].data.first == key)
+            if (table_[idx].data.first == key) {
                 return iterator(&table_[idx], table_ + capacity_);
+            }
             idx = (idx + 1) % capacity_;
         }
         return end();
@@ -89,7 +91,25 @@ public:
             }
             idx = (idx + 1) % capacity_;
         }
-        new (&table_[idx].data) Pair<K, V>();
+
+        new (&table_[idx].data) Pair<K, V>(key, value);
+        table_[idx].occupied = true;
+        ++size_;
+        return Pair<iterator, bool>(iterator(&table_[idx], table_ + capacity_), true);
+    }
+
+    Pair<iterator, bool> emplace(K&& key, V&& value) {
+        if (size_ >= capacity_) {
+            panic("HashMap is full, cannot insert new element\n");
+        }
+        size_t idx = hash(key) % capacity_;
+        while (table_[idx].occupied) {
+            if (table_[idx].data.first == key) {
+                return Pair<iterator, bool>(iterator(&table_[idx], table_ + capacity_), false);
+            }
+            idx = (idx + 1) % capacity_;
+        }
+        new (&table_[idx].data) Pair<K, V>(static_cast<K&&>(key), static_cast<V&&>(value));
         table_[idx].occupied = true;
         ++size_;
         return Pair<iterator, bool>(iterator(&table_[idx], table_ + capacity_), true);

@@ -145,6 +145,20 @@ void next_tick(uint64_t rs1) {
   EMIT_CUSTOM_INSTR(CUSTOM_OPCODE, FUNC3_SOC_INTERFACE, FUNC7_NEXTSIMTICK, 5, 6, 7);
   COMPILER_BARRIER();
 }
+
+void putc(uint64_t rs1) {
+  COMPILER_BARRIER();
+  __asm__ volatile (
+      "mv t0, %0\n\t"
+      "mv t1, %1\n\t"
+      "mv t2, %2\n\t"
+      :
+      : "r"(0), "r"(rs1), "r"(0)
+      : "t0", "t1", "t2"
+  ); 
+  EMIT_CUSTOM_INSTR(CUSTOM_OPCODE, FUNC3_SOC_INTERFACE, FUNC7_PUTC, 5, 6, 7);
+  COMPILER_BARRIER();
+}
 // we want to write programs that do this kind of thing
 
 // should add some support for open/close/read/write

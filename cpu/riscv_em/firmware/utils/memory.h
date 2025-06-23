@@ -25,9 +25,10 @@ extern void* calloc(size_t num, size_t size);
 extern void* realloc(void *ptr, size_t size);
 extern void free(void *mem);
 
-extern void* memcpy(const void* dest, const void* src, size_t num );
+extern void* memcpy(void* dest, const void* src, size_t num );
 extern void* memset (void * ptr, int value, size_t num );
-extern void* memset16 (void *ptr, uint16_t value, size_t num);
+
+extern void print_heap_top();
 
 #ifdef __cplusplus
 }

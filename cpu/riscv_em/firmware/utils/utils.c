@@ -3,10 +3,11 @@
 #include "utils.h"
 #include "string.h"
 #include "memory.h"
+#include "cs_instructions.h"
 
 void putchar(char c)
 {
-    reg_uart_data = c;
+    putc((uint64_t)c);
 }
 
 void print(const char *p)
@@ -127,8 +128,6 @@ void panic(char *format, ...) {
     va_start(args, format);
     _printf(format, (char**)args);
     va_end(args);
-    while (1) {
-        // infinite loop to stop execution, will replace with something better later
-    }
+    stop_sim();
 }
   

@@ -364,6 +364,11 @@ CPU::~CPU() {
   delete csd;
 }
 
+void CPU::initCSD() {
+  RISCV::soc_run_mode_ = RISCV::SOC_RUN_MODE::FAST_FORWARD_MODE;
+  schedule(csdCycleEvent, getTick());  
+}
+
 void CPU::startCSD() {
   RISCV::soc_run_mode_ = RISCV::SOC_RUN_MODE::TIMING_MODE;
   schedule(csdCycleEvent, getTick());
@@ -1215,11 +1220,11 @@ void CPU::addCSDTask(char* input_command) {
 }
 
 uint64_t CPU::read_buffer(uint8_t* buffer, uint64_t req_type) {
-  if (req_type == FIRMWARE_PARAMS) {
+  if (req_type == RISCV::FIRMWARE_PARAMS) {
     memcpy(buffer, &fw_params, sizeof(firmware_params_td));
-  } else if (req_type == FIRMWARE_QUEUE) {
+  } else if (req_type == RISCV::FIRMWARE_QUEUE) {
     memcpy(buffer, &req_buffer[0], sizeof(FTL::Request));
-  } else if (req_type == FIRMWARE_TICK) {
+  } else if (req_type == RISCV::FIRMWARE_TICK) {
     uint64_t tick = getTick();
     memcpy(buffer, &tick, sizeof(uint64_t));
   }

@@ -30,6 +30,7 @@ extern "C" {
         #define FUNC7_STARTSIM 0x01 // stop continuos execution
         #define FUNC7_STOPSIM 0x02 // execute once every cycle
         #define FUNC7_NEXTSIMTICK 0x03 // sets the next tick
+        #define FUNC7_PUTC 0x04
 
 void pread(uint64_t rd, uint64_t rs1, uint64_t rs2);
 void pwrite(uint64_t rd, uint64_t rs1, uint64_t rs2);
@@ -43,6 +44,7 @@ void read_buffer(uint64_t rd, uint64_t rs1);
 void start_sim();
 void stop_sim();
 void next_tick(uint64_t rs1);
+void putc(uint64_t rs1);
 
 #ifdef __cplusplus
 }

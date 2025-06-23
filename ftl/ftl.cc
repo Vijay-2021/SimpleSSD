@@ -53,9 +53,9 @@ FTL::FTL(ConfigReader &c, DRAM::AbstractDRAM *d) : conf(c), pDRAM(d) {
   }
 
   // Print mapping Information
-  debugprint(LOG_FTL, "Total physical blocks %u", param.totalPhysicalBlocks);
-  debugprint(LOG_FTL, "Total logical blocks %u", param.totalLogicalBlocks);
-  debugprint(LOG_FTL, "Logical page size %u", param.pageSize);
+  // debugprint(LOG_FTL, "Total physical blocks %u", param.totalPhysicalBlocks);
+  // debugprint(LOG_FTL, "Total logical blocks %u", param.totalLogicalBlocks);
+  // debugprint(LOG_FTL, "Logical page size %u", param.pageSize);
 
   // Initialize pFTL
   pFTL->initialize();
@@ -67,7 +67,7 @@ FTL::~FTL() {
 }
 
 void FTL::read(Request &req, uint64_t &tick) {
-  debugprint(LOG_FTL, "READ  | LPN %" PRIu64, req.lpn);
+  // debugprint(LOG_FTL, "READ  | LPN %" PRIu64, req.lpn);
   if (pCPU->socIsPaused()) {
     pCPU->startCSD();
   }
@@ -75,7 +75,7 @@ void FTL::read(Request &req, uint64_t &tick) {
 }
 
 void FTL::write(Request &req, uint64_t &tick) {
-  debugprint(LOG_FTL, "WRITE | LPN %" PRIu64, req.lpn);
+  // debugprint(LOG_FTL, "WRITE | LPN %" PRIu64, req.lpn);
   if (pCPU->socIsPaused()) {
     pCPU->startCSD();
   }
@@ -83,7 +83,7 @@ void FTL::write(Request &req, uint64_t &tick) {
 }
 
 void FTL::trim(Request &req, uint64_t &tick) {
-  debugprint(LOG_FTL, "TRIM  | LPN %" PRIu64, req.lpn);
+  // debugprint(LOG_FTL, "TRIM  | LPN %" PRIu64, req.lpn);
   if (pCPU->socIsPaused()) {
     pCPU->startCSD();
   }
@@ -91,7 +91,7 @@ void FTL::trim(Request &req, uint64_t &tick) {
 }
 
 void FTL::format(LPNRange &range, uint64_t &tick) {
-  // debugprint(LOG_FTL, "FORMAT  | LPN %" PRIu64, req.lpn);
+  // // debugprint(LOG_FTL, "FORMAT  | LPN %" PRIu64, req.lpn);
   if (pCPU->socIsPaused()) {
     pCPU->startCSD();
   }

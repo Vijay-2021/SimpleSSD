@@ -4,7 +4,7 @@ start:
 
 # zero-initialize register file
 addi x1, zero, 0
-li sp, 0x88000000
+li sp, 0xFFFFFFFF
 # x2 (sp) is initialized by reset
 addi x3, zero, 0
 addi x4, zero, 0

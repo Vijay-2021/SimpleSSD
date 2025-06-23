@@ -85,11 +85,11 @@ void ICL::read(Request &req, uint64_t &tick) {
     finishedAt = MAX(finishedAt, beginAt);
   }
 
-  debugprint(LOG_ICL,
-             "READ  | LCA %" PRIu64 " + %" PRIu64 " | %" PRIu64 " - %" PRIu64
-             " (%" PRIu64 ")",
-             req.range.slpn, req.range.nlp, tick, finishedAt,
-             finishedAt - tick);
+  // debugprint(LOG_ICL,
+  //           "READ  | LCA %" PRIu64 " + %" PRIu64 " | %" PRIu64 " - %" PRIu64
+  //           " (%" PRIu64 ")",
+  //           req.range.slpn, req.range.nlp, tick, finishedAt,
+  //           finishedAt - tick);
 
   tick = finishedAt;
   tick += applyLatency(CPU::ICL, CPU::READ);
@@ -117,11 +117,11 @@ void ICL::write(Request &req, uint64_t &tick) {
     finishedAt = MAX(finishedAt, beginAt);
   }
 
-  debugprint(LOG_ICL,
-             "WRITE | LCA %" PRIu64 " + %" PRIu64 " | %" PRIu64 " - %" PRIu64
-             " (%" PRIu64 ")",
-             req.range.slpn, req.range.nlp, tick, finishedAt,
-             finishedAt - tick);
+  // debugprint(LOG_ICL,
+  //           "WRITE | LCA %" PRIu64 " + %" PRIu64 " | %" PRIu64 " - %" PRIu64
+  //           " (%" PRIu64 ")",
+  //           req.range.slpn, req.range.nlp, tick, finishedAt,
+  //           finishedAt - tick);
 
   tick = finishedAt;
   tick += applyLatency(CPU::ICL, CPU::WRITE);
@@ -132,10 +132,10 @@ void ICL::flush(LPNRange &range, uint64_t &tick) {
 
   pCache->flush(range, tick);
 
-  debugprint(LOG_ICL,
-             "FLUSH | LCA %" PRIu64 " + %" PRIu64 " | %" PRIu64 " - %" PRIu64
-             " (%" PRIu64 ")",
-             range.slpn, range.nlp, beginAt, tick, tick - beginAt);
+  // debugprint(LOG_ICL,
+  //           "FLUSH | LCA %" PRIu64 " + %" PRIu64 " | %" PRIu64 " - %" PRIu64
+ //            " (%" PRIu64 ")",
+  //           range.slpn, range.nlp, beginAt, tick, tick - beginAt);
 
   tick += applyLatency(CPU::ICL, CPU::FLUSH);
 }
@@ -145,10 +145,10 @@ void ICL::trim(LPNRange &range, uint64_t &tick) {
 
   pCache->trim(range, tick);
 
-  debugprint(LOG_ICL,
-             "TRIM  | LCA %" PRIu64 " + %" PRIu64 " | %" PRIu64 " - %" PRIu64
-             " (%" PRIu64 ")",
-             range.slpn, range.nlp, beginAt, tick, tick - beginAt);
+  // debugprint(LOG_ICL,
+  //           "TRIM  | LCA %" PRIu64 " + %" PRIu64 " | %" PRIu64 " - %" PRIu64
+  //           " (%" PRIu64 ")",
+  //           range.slpn, range.nlp, beginAt, tick, tick - beginAt);
 
   tick += applyLatency(CPU::ICL, CPU::TRIM);
 }
@@ -158,10 +158,10 @@ void ICL::format(LPNRange &range, uint64_t &tick) {
 
   pCache->format(range, tick);
 
-  debugprint(LOG_ICL,
-             "FORMAT| LCA %" PRIu64 " + %" PRIu64 " | %" PRIu64 " - %" PRIu64
-             " (%" PRIu64 ")",
-             range.slpn, range.nlp, beginAt, tick, tick - beginAt);
+  // debugprint(LOG_ICL,
+  //           "FORMAT| LCA %" PRIu64 " + %" PRIu64 " | %" PRIu64 " - %" PRIu64
+  //           " (%" PRIu64 ")",
+  //           range.slpn, range.nlp, beginAt, tick, tick - beginAt);
 
   tick += applyLatency(CPU::ICL, CPU::FORMAT);
 }

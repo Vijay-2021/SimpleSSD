@@ -1,41 +1,46 @@
-/** @author Levente Kurusa <levex@linux.com> **/
 #include "memory.h"
 #include <stdint.h>
 #include <stddef.h>
 
 
-void* memcpy(const void* dest, const void* src, size_t count )
-{
-	char* dst8 = (char*)dest;
-	char* src8 = (char*)src;
+void *memset(void *s, int c, size_t n) {
+  uint64_t *long_s = (uint64_t *)s;
+  size_t blocks = n >> 3;
+  // construct mask
+  uint64_t c_mask = ((uint64_t)c << 56) | ((uint64_t)c << 48) | ((uint64_t)c << 40) 
+                  | ((uint64_t)c << 32) | ((uint64_t)c << 24) | ((uint64_t)c << 16) 
+                  | ((uint64_t)c << 8)  | (uint64_t)c;
+  for (size_t i = 0; i < blocks; ++i) {
+    long_s[i] = c_mask;
+  }
+  // n is multiple of 8
+  size_t n_complete = blocks << 3;
+  if (n_complete == n) return s;
 
-	if (count & 1) {
-		dst8[0] = src8[0];
-		dst8 += 1;
-		src8 += 1;
-	}
-
-	count /= 2;
-	while (count--) {
-		dst8[0] = src8[0];
-		dst8[1] = src8[1];
-
-		dst8 += 2;
-		src8 += 2;
-	}
-	return (void*)dest;
+  // set remainder byte-wise
+  uint8_t *byte_s = (uint8_t *)s;
+  for (size_t i = n_complete; i < n; ++i) {
+    byte_s[i] = (uint8_t)c;
+  }
+  return s;
 }
-void* memset16 (void *ptr, uint16_t value, size_t num)
-{
-	uint16_t* p = (uint16_t*)ptr;
-	while(num--)
-		*p++ = value;
-	return ptr;
-}
-void* memset (void * ptr, int value, size_t num )
-{
-	unsigned char* p=(unsigned char*)ptr;
-	while(num--)
-		*p++ = (unsigned char)value;
-	return ptr;
+
+void *memcpy(void *dest, const void *src, size_t n) {
+  uint64_t *long_src = (uint64_t *)src;
+  uint64_t *long_dest = (uint64_t *)dest;
+  size_t blocks = n >> 3;
+  for (size_t i = 0; i < blocks; ++i) {
+    long_dest[i] = long_src[i];
+  }
+  // n is multiple of 8
+  size_t n_complete = blocks << 3;
+  if (n_complete == n) return dest;
+
+  // set remainder byte-wise
+  uint8_t *byte_src = (uint8_t *)src;
+  uint8_t *byte_dest = (uint8_t *)dest;
+  for (size_t i = n_complete; i < n; ++i) {
+    byte_dest[i] = byte_src[i];
+  }
+  return dest;
 }

@@ -34,9 +34,16 @@ Bitset::Bitset(uint32_t size) : Bitset() {
   }
 }
 
-Bitset::Bitset(const Bitset &rhs) : Bitset(rhs.dataSize) {
-  if (rhs.data) {
-    memcpy(data, rhs.data, allocSize);
+Bitset::Bitset(const Bitset &rhs) {
+  if (rhs.dataSize > 0) {
+    dataSize = rhs.dataSize;
+    allocSize = DIVCEIL(dataSize, 8);
+    if (rhs.data) {
+      data = (uint8_t *)malloc(allocSize);
+      memcpy(data, rhs.data, allocSize);
+    } else {
+      data = (uint8_t *) calloc(allocSize, 1);
+    }
   }
 }
 
@@ -151,7 +158,7 @@ bool Bitset::operator[](uint32_t idx) noexcept {
 
 Bitset &Bitset::operator&=(const Bitset &rhs) {
   if (dataSize != rhs.dataSize) {
-    panic("Size does not match");
+    panic("Size does not match with %u and %u", dataSize, rhs.dataSize);
   }
 
   for (uint32_t i = 0; i < allocSize; i++) {
@@ -163,7 +170,7 @@ Bitset &Bitset::operator&=(const Bitset &rhs) {
 
 Bitset &Bitset::operator|=(const Bitset &rhs) {
   if (dataSize != rhs.dataSize) {
-    panic("Size does not match");
+    panic("Size does not match with %u and %u", dataSize, rhs.dataSize);
   }
 
   for (uint32_t i = 0; i < allocSize; i++) {
@@ -175,7 +182,7 @@ Bitset &Bitset::operator|=(const Bitset &rhs) {
 
 Bitset &Bitset::operator^=(const Bitset &rhs) {
   if (dataSize != rhs.dataSize) {
-    panic("Size does not match");
+    panic("Size does not match with %u and %u", dataSize, rhs.dataSize);
   }
 
   for (uint32_t i = 0; i < allocSize; i++) {

@@ -103,9 +103,6 @@ uint64_t mmu_checked_bus_access(void *priv, privilege_level priv_level, bus_acce
         #ifdef PMP_SUPPORT 
             return rv_core->mmu.bus_access(rv_core->mmu.priv, internal_priv_level, access_type, phys_addr, value, len);
         #else
-            if (rv_core->curr_cycle < 10) {
-                printf("this is getting called for addr: %lu\n", addr);
-            }
             return rv_core->bus_access((void *)rv_core->pSOC, priv_level, access_type, addr, value, len);
         #endif
     #endif
@@ -1422,7 +1419,11 @@ static uint64_t instr_PERASE(Core * rv_core) {
 }
 
 static uint64_t instr_READBUFF(Core *rv_core) {
-    return rv_core->pSOC->read_buffer(rv_core->pSOC->get_ram() + ((rv_core->reg_file[rv_core->rd] - RAM_BASE_ADDR)), rv_core->reg_file[rv_core->rs1]);
+    if (rv_core->reg_file[rv_core->rs1] == FIRMWARE_CYCLE) {
+        memcpy(rv_core->pSOC->get_ram() + ((rv_core->reg_file[rv_core->rd] - RAM_BASE_ADDR)), &rv_core->curr_cycle, sizeof(rv_core->curr_cycle));
+    } else {
+        rv_core->pSOC->read_buffer(rv_core->pSOC->get_ram() + ((rv_core->reg_file[rv_core->rd] - RAM_BASE_ADDR)), rv_core->reg_file[rv_core->rs1]);
+    }
     return getTick() + rv_core->pSOC->get_period();
 }
 
@@ -1438,6 +1439,15 @@ static uint64_t instr_STOPSIM(Core *rv_core) {
 
 static uint64_t instr_NEXTSIMTICK(Core *rv_core) {
     rv_core->pSOC->next_simulation_tick(rv_core->reg_file[rv_core->rs1]);
+    return getTick() + rv_core->pSOC->get_period();
+}
+
+static uint64_t instr_PUTC(Core *rv_core) {
+    if(rv_core->reg_file[rv_core->rs1] == 0) {
+        printf("\n");
+    } else {
+        printf("%c", (char)rv_core->reg_file[rv_core->rs1]);
+    }
     return getTick() + rv_core->pSOC->get_period();
 }
 
@@ -1537,24 +1547,33 @@ static uint64_t instr_FSW(Core *rv_core) {
 }
 
 static uint64_t instr_FTOSINT(Core *rv_core) {
-    rv_core->reg_file[rv_core->rd] = (rv_sword_t)rv_core->float_reg_file[rv_core->rs1];
-    printf("executing float to signed int on %f and %f for result %f\n",  rv_core->float_reg_file[rv_core->rs1], rv_core->float_reg_file[rv_core->rs2], rv_core->float_reg_file[rv_core->rd]);
+    rv_core->reg_file[rv_core->rd] = static_cast<int>(rv_core->float_reg_file[rv_core->rs1]);
+    return getTick() + rv_core->pSOC->get_period();
+}
+
+static uint64_t instr_FTOLONG(Core *rv_core) {
+    rv_core->reg_file[rv_core->rd] = static_cast<long long>(rv_core->float_reg_file[rv_core->rs1]);
     return getTick() + rv_core->pSOC->get_period();
 }
 
 static uint64_t instr_FTOUINT(Core *rv_core) {
-    rv_core->reg_file[rv_core->rd] = (rv_word_t)rv_core->float_reg_file[rv_core->rs1];
-    printf("executing float unsigned int on %f and %f for result %f\n",  rv_core->float_reg_file[rv_core->rs1], rv_core->float_reg_file[rv_core->rs2], rv_core->float_reg_file[rv_core->rd]);
+    rv_core->reg_file[rv_core->rd] = static_cast<uint32_t>(rv_core->float_reg_file[rv_core->rs1]);
+    return getTick() + rv_core->pSOC->get_period();
+}
+
+static uint64_t instr_FTOULONG(Core *rv_core) {
+    rv_core->reg_file[rv_core->rd] = static_cast<uint64_t>(rv_core->float_reg_file[rv_core->rs1]);
     return getTick() + rv_core->pSOC->get_period();
 }
 
 static uint64_t instr_FFROMSINT(Core *rv_core) {
-    rv_core->float_reg_file[rv_core->rd] = (float)rv_core->reg_file[rv_core->rs1];
+
+    rv_core->float_reg_file[rv_core->rd] = static_cast<float>(static_cast<rv_sword_t>(rv_core->reg_file[rv_core->rs1]));
     return getTick() + rv_core->pSOC->get_period();
 }
 
 static uint64_t instr_FFROMUINT(Core *rv_core) {
-    rv_core->float_reg_file[rv_core->rd] = (float)rv_core->float_reg_file[rv_core->rs1];
+    rv_core->float_reg_file[rv_core->rd] = static_cast<float>(rv_core->reg_file[rv_core->rs1]);
     return getTick() + rv_core->pSOC->get_period();
 }
 
@@ -1752,11 +1771,15 @@ static void R_float_type_preparation(Core *rv_core, int32_t *next_subcode) {
                 rv_core->execute_cb = instr_FTOSINT;
             } else if (rv_core->rs2 == FLT_CVT_TO_UINT) {
                 rv_core->execute_cb = instr_FTOUINT;
+            } else if (rv_core->rs2 == FLT_CVT_TO_LONG) {
+                rv_core->execute_cb = instr_FTOLONG;
+            } else if (rv_core->rs2 == FLT_CVT_TO_ULONG) {
+                rv_core->execute_cb = instr_FTOULONG;
             }
         } else if (rv_core->func7 == FLT_CVT_FROM_INT) {
-            if (rv_core->rs2 == FLT_CVT_FROM_SINT) {
+            if (rv_core->rs2 == FLT_CVT_FROM_SINT || rv_core->rs2 == FLT_CVT_FROM_LONG) {
                 rv_core->execute_cb = instr_FFROMSINT;
-            } else if (rv_core->rs2 == FLT_CVT_FROM_UINT) {
+            } else if (rv_core->rs2 == FLT_CVT_FROM_UINT || rv_core->rs2 == FLT_CVT_FROM_ULONG) {
                 rv_core->execute_cb = instr_FFROMUINT; 
             }
         } else if (rv_core->func3 == FLT_MV_FUNC3) {
@@ -2034,6 +2057,7 @@ static void init_instruction_hooks() {
     CUSTOM_soc_interface_func7_subcode_list[FUNC7_STARTSIM] = {NULL, instr_STARTSIM, NULL};
     CUSTOM_soc_interface_func7_subcode_list[FUNC7_STOPSIM] = {NULL, instr_STOPSIM, NULL};
     CUSTOM_soc_interface_func7_subcode_list[FUNC7_NEXTSIMTICK] = {NULL, instr_NEXTSIMTICK, NULL};
+    CUSTOM_soc_interface_func7_subcode_list[FUNC7_PUTC] = {NULL, instr_PUTC, NULL};
     INIT_INSTRUCTION_LIST_DESC(CUSTOM_soc_interface_func7_subcode_list);
 
     static instruction_hook_td CUSTOM_func3_subcode_list[MAX_FUNC3_VALUE] = {};
@@ -2083,11 +2107,14 @@ static void rv_call_from_opcode_list(Core *rv_core, instruction_desc_td *opcode_
 
     if( (opcode_list[opcode].preparation_cb == NULL) &&
         (opcode_list[opcode].execution_cb == NULL) &&
-        (opcode_list[opcode].next == NULL) )
-        die_msg("Unknown instruction: %08x PC: "PRINTF_FMT" Cycle: %016ld\n", rv_core->instruction, rv_core->pc, rv_core->curr_cycle);
-
-    if(opcode >= list_size)
-        die_msg("Unknown instruction: %08x PC: "PRINTF_FMT" Cycle: %016ld\n", rv_core->instruction, rv_core->pc, rv_core->curr_cycle);
+        (opcode_list[opcode].next == NULL) ) 
+        {
+            printf("No preparation or execution callback for opcode %d\n", opcode);
+            die_msg("Unknown instruction: %lu PC: %lu Cycle: %lu\n", rv_core->instruction, rv_core->pc, rv_core->curr_cycle);
+    } 
+    if(opcode >= list_size) {
+        die_msg("Unknown instruction: %lu PC: %lu Cycle: %lu\n", rv_core->instruction, rv_core->pc, rv_core->curr_cycle);
+    }
 
     if(opcode_list[opcode].preparation_cb != NULL)
         opcode_list[opcode].preparation_cb(rv_core, &next_subcode);
@@ -2189,9 +2216,7 @@ static inline rv_word_t rv_core_decode(Core *rv_core)
     rv_core->func7 = 0;
     rv_core->immediate = 0;
     rv_core->jump_offset = 0;
-
     rv_call_from_opcode_list(rv_core, &RV_opcode_list_desc, rv_core->opcode);
-
     return 0;
 }
 
@@ -2218,11 +2243,8 @@ uint64_t Core::rv_core_run()
 
     /* increase program counter here */
     pc = next_pc ? next_pc : pc + 4;
-
     curr_cycle++;
-    if (curr_cycle < 10) {
-        printf("current cycle: %lu at pc %lu and instruction %x \n", curr_cycle, pc, instruction);
-    }
+    /**
     csr_regs[CSR_ADDR_MCYCLE].value = curr_cycle;
     csr_regs[CSR_ADDR_MINSTRET].value = curr_cycle;
     csr_regs[CSR_ADDR_CYCLE].value = curr_cycle;
@@ -2233,7 +2255,7 @@ uint64_t Core::rv_core_run()
         csr_regs[CSR_ADDR_MINSTRETH].value = curr_cycle >> 32;
         csr_regs[CSR_ADDR_CYCLEH].value = curr_cycle >> 32;
         csr_regs[CSR_ADDR_TIMEH].value = curr_cycle >> 32;
-    #endif
+    #endif*/
     return next_tick;
 }
 

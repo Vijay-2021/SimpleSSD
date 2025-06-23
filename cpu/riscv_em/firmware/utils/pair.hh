@@ -11,14 +11,13 @@ class Pair {
         T1 first;
         T2 second;
         Pair() : first(), second() {};
-        Pair(const T1& __first, const T2& _second) : first(__first), second(_second) {};
-        Pair(T1 _first, T2 _second) : first(_first), second(_second) {};
+        Pair(T1 _first, T2 _second) : first(_first), second(_second) {
+        };
         
         Pair(const Pair<T1, T2>& rhs) : first(rhs.first), second(rhs.second) {
         }
         
         Pair(Pair<T1, T2> && rhs) : first(move(rhs.first)), second(move(rhs.second)) {
-            
         }
         ~Pair() {
             first.~T1();
@@ -31,7 +30,6 @@ class Pair {
 
         Pair<T1, T2>& operator=(const Pair<T1, T2>& rhs) {
             if (&rhs != this) {
-                printf("move constructor called\n");
                 first = rhs.first;
                 second = rhs.second;
             }

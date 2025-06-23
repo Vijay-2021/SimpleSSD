@@ -20,6 +20,8 @@
 #include "block.hh"
 #include "string.h"
 #include "memory.h"
+#include "cs_instructions.h"
+#include "def.hh"
 
 Block::Block(uint32_t blockIdx, uint32_t count, uint32_t ioUnit)
     : idx(blockIdx),
@@ -31,11 +33,9 @@ Block::Block(uint32_t blockIdx, uint32_t count, uint32_t ioUnit)
       ppLPNs(nullptr),
       lastAccessed(0),
       eraseCount(0) {
-  printf("calling block constructor!\n");
   if (ioUnitInPage == 1) {
     pValidBits = new Bitset(pageCount);
     pErasedBits = new Bitset(pageCount);
-
     pLPNs = (uint64_t *)calloc(pageCount, sizeof(uint64_t));
   }
   else if (ioUnitInPage > 1) {
@@ -43,9 +43,9 @@ Block::Block(uint32_t blockIdx, uint32_t count, uint32_t ioUnit)
     validBits = Vector<Bitset>(pageCount, copy);
     erasedBits = Vector<Bitset>(pageCount, copy);
     ppLPNs = (uint64_t **)calloc(pageCount, sizeof(uint64_t *));
-    printf("called calloc\n");
+    pLPNs = (uint64_t *)calloc(pageCount * ioUnitInPage, sizeof(uint64_t));
     for (uint32_t i = 0; i < pageCount; i++) {
-      ppLPNs[i] = (uint64_t *)calloc(ioUnitInPage, sizeof(uint64_t));
+      ppLPNs[i] = pLPNs + i * ioUnitInPage;
     }
   }
   else {
@@ -54,8 +54,14 @@ Block::Block(uint32_t blockIdx, uint32_t count, uint32_t ioUnit)
 
   // C-style allocation
   pNextWritePageIndex = (uint32_t *)calloc(ioUnitInPage, sizeof(uint32_t));
-  printf("finished block constructor!\n");
-  erase();
+  if (ioUnitInPage == 1) {
+    pErasedBits->set();
+  }
+  else {
+    for (auto &iter : erasedBits) {
+      iter.set();
+    }
+  }
   eraseCount = 0;
 }
 
@@ -70,10 +76,7 @@ Block::Block(const Block &old)
   else {
     validBits = old.validBits;
     erasedBits = old.erasedBits;
-
-    for (uint32_t i = 0; i < pageCount; i++) {
-      memcpy(ppLPNs[i], old.ppLPNs[i], ioUnitInPage * sizeof(uint64_t));
-    }
+    memcpy(pLPNs, old.pLPNs, pageCount * ioUnitInPage * sizeof(uint64_t));
   }
 
   memcpy(pNextWritePageIndex, old.pNextWritePageIndex,
@@ -116,9 +119,9 @@ Block::~Block() {
   delete pErasedBits;
 
   if (ppLPNs) {
-    for (uint32_t i = 0; i < pageCount; i++) {
-      free(ppLPNs[i]);
-    }
+    //for (uint32_t i = 0; i < pageCount; i++) {
+    //  free(ppLPNs[i]);
+    //}
 
     free(ppLPNs);
   }
@@ -333,20 +336,14 @@ void Block::erase() {
     pErasedBits->set();
   }
   else {
-    int j = 0;
     for (auto &iter : validBits) {
       iter.reset();
     }
-    printf("the loc of mem ptr is: %p\n", erasedBits[257].data);
-    printf("the address of allocation 278 alloc size is: %p\n", &erasedBits[278]);
-    printf("the alloc size of erased bits is: %u\n", erasedBits[257].allocSize);
     for (auto &iter : erasedBits) {
       iter.set();
     }
   }
-  printf("finsihed reset valid and erased bits\n");
   memset(pNextWritePageIndex, 0, sizeof(uint32_t) * ioUnitInPage);
-  printf("finished memset\n");
   eraseCount++;
 }
 

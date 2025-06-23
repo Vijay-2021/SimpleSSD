@@ -5,7 +5,6 @@
 #include <stddef.h>
 
 #include "memory.h"
-#include "utils.h"
 
 template<typename T>
 class List {
@@ -118,8 +117,21 @@ class List {
         }
 
         void emplace_back(const T& data) {
-            printf("calling emplace back\n");
             emplace(end(), data);
+        }
+
+        void emplace(iterator iter, T&& data) {
+            Node* cur = iter.cur;
+            Node* n = new Node{cur, cur->prev, static_cast<T&&>(data)};  // move
+            n->next = cur;
+            n->prev = cur->prev;
+            cur->prev->next = n;
+            cur->prev = n;
+            length_++;
+        }
+
+        void emplace_back(T&& data) {
+            emplace(end(), static_cast<T&&>(data));  // move
         }
 
         bool empty() const { return sentinel->next == sentinel; }

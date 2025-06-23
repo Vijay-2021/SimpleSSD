@@ -1,5 +1,6 @@
 #include "hash.hh"
 #include <stdint.h>
+#include "utils.h"
 
 template<>
 size_t hash(const uint32_t &key) {

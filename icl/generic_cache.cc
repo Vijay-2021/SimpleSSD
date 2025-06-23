@@ -70,13 +70,13 @@ GenericCache::GenericCache(ConfigReader &c, FTL::FTL *f, DRAM::AbstractDRAM *d)
     setSize = MAX(cacheSize / lineSize / waySize, 1);
   }
 
-  debugprint(
-      LOG_ICL_GENERIC_CACHE,
-      "CREATE  | Set size %u | Way size %u | Line size %u | Capacity %" PRIu64,
-      setSize, waySize, lineSize, (uint64_t)setSize * waySize * lineSize);
-  debugprint(LOG_ICL_GENERIC_CACHE,
-             "CREATE  | line count in super page %u | line count in max I/O %u",
-             lineCountInSuperPage, lineCountInMaxIO);
+  // debugprint(
+  //    LOG_ICL_GENERIC_CACHE,
+  //    "CREATE  | Set size %u | Way size %u | Line size %u | Capacity %" PRIu64,
+  //    setSize, waySize, lineSize, (uint64_t)setSize * waySize * lineSize);
+  // debugprint(LOG_ICL_GENERIC_CACHE,
+  //           "CREATE  | line count in super page %u | line count in max I/O %u",
+  //           lineCountInSuperPage, lineCountInMaxIO);
 
   cacheData.resize(setSize);
 
@@ -307,7 +307,7 @@ void GenericCache::evictCache(uint64_t tick, bool flush) {
   uint64_t beginAt;
   uint64_t finishedAt = tick;
 
-  debugprint(LOG_ICL_GENERIC_CACHE, "----- | Begin eviction");
+  // debugprint(LOG_ICL_GENERIC_CACHE, "----- | Begin eviction");
 
   for (uint32_t row = 0; row < lineCountInSuperPage; row++) {
     for (uint32_t col = 0; col < parallelIO; col++) {
@@ -339,18 +339,18 @@ void GenericCache::evictCache(uint64_t tick, bool flush) {
     }
   }
 
-  debugprint(LOG_ICL_GENERIC_CACHE,
-             "----- | End eviction | %" PRIu64 " - %" PRIu64 " (%" PRIu64 ")",
-             tick, finishedAt, finishedAt - tick);
+  // debugprint(LOG_ICL_GENERIC_CACHE,
+  //           "----- | End eviction | %" PRIu64 " - %" PRIu64 " (%" PRIu64 ")",
+ //            tick, finishedAt, finishedAt - tick);
 }
 
 // True when hit
 bool GenericCache::read(Request &req, uint64_t &tick) {
   bool ret = false;
 
-  debugprint(LOG_ICL_GENERIC_CACHE,
-             "READ  | REQ %7u-%-4u | LCA %" PRIu64 " | SIZE %" PRIu64,
-             req.reqID, req.reqSubID, req.range.slpn, req.length);
+  // debugprint(LOG_ICL_GENERIC_CACHE,
+  //           "READ  | REQ %7u-%-4u | LCA %" PRIu64 " | SIZE %" PRIu64,
+  //           req.reqID, req.reqSubID, req.range.slpn, req.length);
 
   if (useReadCaching) {
     uint32_t setIdx = calcSetIndex(req.range.slpn);
@@ -378,16 +378,16 @@ bool GenericCache::read(Request &req, uint64_t &tick) {
       // DRAM access
       pDRAM->read(&cacheData[setIdx][wayIdx], req.length, tick);
 
-      debugprint(LOG_ICL_GENERIC_CACHE,
-                 "READ  | Cache hit at (%u, %u) | %" PRIu64 " - %" PRIu64
-                 " (%" PRIu64 ")",
-                 setIdx, wayIdx, arrived, tick, tick - arrived);
+      // debugprint(LOG_ICL_GENERIC_CACHE,
+      //           "READ  | Cache hit at (%u, %u) | %" PRIu64 " - %" PRIu64
+      //           " (%" PRIu64 ")",
+      //           setIdx, wayIdx, arrived, tick, tick - arrived);
 
       ret = true;
 
       // Do we need to prefetch data?
       if (useReadPrefetch && req.range.slpn == prefetchTrigger) {
-        debugprint(LOG_ICL_GENERIC_CACHE, "READ  | Prefetch triggered");
+        // debugprint(LOG_ICL_GENERIC_CACHE, "READ  | Prefetch triggered");
 
         req.range.slpn = lastPrefetched;
 
@@ -413,7 +413,7 @@ bool GenericCache::read(Request &req, uint64_t &tick) {
         pDRAM->setScheduling(false);
 
         if (!ret) {
-          debugprint(LOG_ICL_GENERIC_CACHE, "READ  | Read ahead triggered");
+          // debugprint(LOG_ICL_GENERIC_CACHE, "READ  | Read ahead triggered");
         }
 
         beginLCA = req.range.slpn;
@@ -499,11 +499,11 @@ bool GenericCache::read(Request &req, uint64_t &tick) {
           finishedAt = beginAt;
         }
 
-        debugprint(LOG_ICL_GENERIC_CACHE,
-                   "READ  | Cache miss at (%u, %u) | %" PRIu64 " - %" PRIu64
-                   " (%" PRIu64 ")",
-                   iter.second >> 32, iter.second & 0xFFFFFFFF, tick, beginAt,
-                   beginAt - tick);
+        // debugprint(LOG_ICL_GENERIC_CACHE,
+        //           "READ  | Cache miss at (%u, %u) | %" PRIu64 " - %" PRIu64
+        //           " (%" PRIu64 ")",
+        //           iter.second >> 32, iter.second & 0xFFFFFFFF, tick, beginAt,
+        //           beginAt - tick);
       }
 
       tick = finishedAt;
@@ -511,13 +511,13 @@ bool GenericCache::read(Request &req, uint64_t &tick) {
       if (readDetect.enabled) {
         if (ret) {
           // This request was prefetch
-          debugprint(LOG_ICL_GENERIC_CACHE, "READ  | Prefetch done");
+          // debugprint(LOG_ICL_GENERIC_CACHE, "READ  | Prefetch done");
 
           // Restore tick
           tick = arrived;
         }
         else {
-          debugprint(LOG_ICL_GENERIC_CACHE, "READ  | Read ahead done");
+          // debugprint(LOG_ICL_GENERIC_CACHE, "READ  | Read ahead done");
         }
 
         // TEMP: Restore
@@ -550,9 +550,9 @@ bool GenericCache::write(Request &req, uint64_t &tick) {
   uint64_t flash = tick;
   bool dirty = false;
 
-  debugprint(LOG_ICL_GENERIC_CACHE,
-             "WRITE | REQ %7u-%-4u | LCA %" PRIu64 " | SIZE %" PRIu64,
-             req.reqID, req.reqSubID, req.range.slpn, req.length);
+  // debugprint(LOG_ICL_GENERIC_CACHE,
+  //           "WRITE | REQ %7u-%-4u | LCA %" PRIu64 " | SIZE %" PRIu64,
+  //           req.reqID, req.reqSubID, req.range.slpn, req.length);
 
   FTL::Request reqInternal(lineCountInSuperPage, req);
 
@@ -596,10 +596,10 @@ bool GenericCache::write(Request &req, uint64_t &tick) {
       // DRAM access
       pDRAM->write(&cacheData[setIdx][wayIdx], req.length, tick);
 
-      debugprint(LOG_ICL_GENERIC_CACHE,
-                 "WRITE | Cache hit at (%u, %u) | %" PRIu64 " - %" PRIu64
-                 " (%" PRIu64 ")",
-                 setIdx, wayIdx, arrived, tick, tick - arrived);
+      // debugprint(LOG_ICL_GENERIC_CACHE,
+      //           "WRITE | Cache hit at (%u, %u) | %" PRIu64 " - %" PRIu64
+      //           " (%" PRIu64 ")",
+      //           setIdx, wayIdx, arrived, tick, tick - arrived);
 
       ret = true;
     }
@@ -718,10 +718,10 @@ bool GenericCache::write(Request &req, uint64_t &tick) {
         cacheData[setIdx][wayIdx].tag = req.range.slpn;
       }
 
-      debugprint(LOG_ICL_GENERIC_CACHE,
-                 "WRITE | Cache miss at (%u, %u) | %" PRIu64 " - %" PRIu64
-                 " (%" PRIu64 ")",
-                 setIdx, wayIdx, arrived, tick, tick - arrived);
+      // debugprint(LOG_ICL_GENERIC_CACHE,
+      //           "WRITE | Cache miss at (%u, %u) | %" PRIu64 " - %" PRIu64
+      //           " (%" PRIu64 ")",
+      //           setIdx, wayIdx, arrived, tick, tick - arrived);
     }
 
     tick += applyLatency(CPU::ICL__GENERIC_CACHE, CPU::WRITE);

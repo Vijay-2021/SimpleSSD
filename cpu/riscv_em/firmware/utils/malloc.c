@@ -4,7 +4,7 @@
 
 extern char _heap_start;
 
-uint64_t heap_end = 0xFFFFFFFF; // This is the end of the heap, set to a large value initially
+uint64_t heap_end = 0x100100000; // This is the end of the heap
 uint64_t heap_begin = (uint64_t)&_heap_start;
 
 /*
@@ -257,8 +257,9 @@ mya_coalesce(mya_header_t *header)
 }
 
 static char* sbrk(size_t size) {
+    asm volatile("mv %0, sp" : "=r"(heap_end));
 	if (heap_begin + size > heap_end) {
-        printf("requesting too large of a data\n");
+        printf("request would cause a stack overflow for size %u and heap_begin %u and heap end %u\n", size, heap_begin, heap_end);
 		return (char *)-1; // Simulate failure
 	}
 	char *new_brk = (char *)heap_begin;
@@ -630,3 +631,6 @@ realloc(void *ptr, size_t size)
     return new_ptr;
 }
 
+void print_heap_top() {
+    printf("heap_top: %u and addr heap_begin %p\n", heap_begin, &heap_begin);
+}

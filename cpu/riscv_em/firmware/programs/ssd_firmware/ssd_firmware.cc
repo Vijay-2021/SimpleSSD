@@ -23,17 +23,15 @@
 #include "move.hh"
 #include "random.h"
 #include "sort.hh"
+#include "memory.h"
 
-Firmware::Firmware(firmware_params &ssd_params) : params(ssd_params), lastFreeBlock(params.pageCountToMaxPerf),
-      lastFreeBlockIOMap(params.ioUnitInPage), bReclaimMore(false), blocks(params.totalPhysicalBlocks), 
+Firmware::Firmware(firmware_params &ssd_params) : params(ssd_params), lastFreeBlock(ssd_params.pageCountToMaxPerf),
+      lastFreeBlockIOMap(ssd_params.ioUnitInPage), bReclaimMore(false), blocks(ssd_params.totalPhysicalBlocks), 
       table(params.totalLogicalBlocks * params.pagesInBlock) {
-  printf("Firmware constructor called\n");
-  List<int> test;
-  test.emplace_back(1);
-  printf("constructor called\n");
-  for (uint32_t i = 0; i < params.totalPhysicalBlocks; i++) {
-    printf("making call to emplace back\n");
-    freeBlocks.emplace_back(Block(i, params.pagesInBlock, params.ioUnitInPage));
+  printf("constructor called with total physical blocks: %u\n", params.totalPhysicalBlocks);
+  printf("total page count to max perf: %u\n", params.pageCountToMaxPerf);
+  for (uint32_t i = 0; i < 16; i++) {
+    freeBlocks.emplace_back(move(Block(i, params.pagesInBlock, params.ioUnitInPage)));
   }
 
   nFreeBlocks = params.totalPhysicalBlocks;
@@ -44,7 +42,7 @@ Firmware::Firmware(firmware_params &ssd_params) : params(ssd_params), lastFreeBl
   for (uint32_t i = 0; i < params.pageCountToMaxPerf; i++) {
     lastFreeBlock.at(i) = getFreeBlock(i);
   }
-  printf("Cmpleted at \n");
+  printf("Completed map allocate\n");
   lastFreeBlockIndex = 0;
 
   memset(&stat, 0, sizeof(stat));
@@ -82,25 +80,25 @@ bool Firmware::initialize() {
       (params.totalPhysicalBlocks *
            (1 - params.ftl_gc_threshold_ratio) -
        params.pageCountToMaxPerf);  // # free blocks to maintain
-
   if (nPagesToWarmup + nPagesToInvalidate > maxPagesBeforeGC) {
-    print("ftl: Too high filling ratio. Adjusting invalidPageRatio.\n");
     nPagesToInvalidate = maxPagesBeforeGC - nPagesToWarmup;
   }
-
   req.ioFlag.set();
-
   // Step 1. Filling
   if (mode == FILLING_MODE_0 || mode == FILLING_MODE_1) {
     // Sequential
+    printf("using sequential fillings mode\n");
     for (uint64_t i = 0; i < nPagesToWarmup; i++) {
+      printf("Filling page %lu\n", i);
       req.lpn = i;
+      printf("set lpn issue?");
       writeInternal(req, tick, false);
     }
+    printf("down here\n");
   }
   else {
     // Random
-
+    printf("using random filling mode\n");
     for (uint64_t i = 0; i < nPagesToWarmup; i++) {
       tick = 0;
       req.lpn = rand64_range(0, nTotalLogicalPages - 1);
@@ -111,14 +109,16 @@ bool Firmware::initialize() {
   // Step 2. Invalidating
   if (mode == FILLING_MODE_0) {
     // Sequential
+    printf("using sequential invalidation mode\n");
     for (uint64_t i = 0; i < nPagesToInvalidate; i++) {
       tick = 0;
+      printf("okay...\n");
       req.lpn = i;
       writeInternal(req, tick, false);
     }
   }
   else if (mode == FILLING_MODE_1) {
-
+    printf("using sequential invalidation mode with warmup\n");
     for (uint64_t i = 0; i < nPagesToInvalidate; i++) {
       tick = 0;
       req.lpn = rand64_range(0, nPagesToWarmup - 1);
@@ -127,14 +127,14 @@ bool Firmware::initialize() {
   }
   else {
     // Random
-
+    printf("using random invalidation mode\n");
     for (uint64_t i = 0; i < nPagesToInvalidate; i++) {
       tick = 0;
       req.lpn = rand64_range(0, nTotalLogicalPages - 1);
       writeInternal(req, tick, false);
     }
   }
-
+  printf("finished this too?\n");
   // Report
   calculateTotalPages(valid, invalid);
   printf("Filling finished.\n");
@@ -256,14 +256,11 @@ uint32_t Firmware::getFreeBlock(uint32_t idx) {
       iter = freeBlocks.begin();
       blockIndex = iter->getBlockIndex();
     }
-
     // Insert found block to block list
     if (blocks.find(blockIndex) != blocks.end()) {
       panic("Corrupted");
     }
-
     blocks.emplace(blockIndex, move(*iter));
-
     // Remove found block from free block list
     freeBlocks.erase(iter);
     nFreeBlocks--;
@@ -586,6 +583,7 @@ void Firmware::readInternal(FTL::Request &req, uint64_t &tick) {
 }
 
 void Firmware::writeInternal(FTL::Request &req, uint64_t &tick, bool sendToPAL) {
+  printf("calling write interal!\n");
   PAL::Request palRequest(req);
   HashMap<uint32_t, Block>::iterator block;
   auto mappingList = table.find(req.lpn);
@@ -818,8 +816,8 @@ float Firmware::calculateWearLeveling() {
 void Firmware::calculateTotalPages(uint64_t &valid, uint64_t &invalid) {
   valid = 0;
   invalid = 0;
-
-  for (auto iter : blocks) {
+  int i = 0;
+  for (auto &iter : blocks) {
     valid += iter.second.getValidPageCount();
     invalid += iter.second.getDirtyPageCount();
   }

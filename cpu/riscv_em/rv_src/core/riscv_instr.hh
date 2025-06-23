@@ -171,9 +171,13 @@
     #define FLT_CVT_TO_INT 0x60
         #define FLT_CVT_TO_SINT 0x00
         #define FLT_CVT_TO_UINT 0x01
+        #define FLT_CVT_TO_LONG 0x02
+        #define FLT_CVT_TO_ULONG 0x03
     #define FLT_CVT_FROM_INT 0x68
         #define FLT_CVT_FROM_SINT 0x00
         #define FLT_CVT_FROM_UINT 0x01
+        #define FLT_CVT_FROM_LONG 0x02
+        #define FLT_CVT_FROM_ULONG 0x03
     #define FLT_MV_FUNC3 0x00
         #define FLT_MV_TO_INT 0x70
         #define FLT_MV_FROM_INT 0x78
@@ -202,4 +206,5 @@
         #define FUNC7_STARTSIM 0x01 // stop continuos execution
         #define FUNC7_STOPSIM 0x02 // execute once every cycle
         #define FUNC7_NEXTSIMTICK 0x03 // sets the next tick
+        #define FUNC7_PUTC 0x04
 #endif /* RISCV_INSTR_H */

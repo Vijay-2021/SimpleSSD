@@ -56,13 +56,13 @@ static uint64_t rv_soc_bus_access(void *priv, privilege_level priv_level, bus_ac
     SOC *rv_soc = (SOC *)priv;
     rv_word_t tmp_addr = 0;
     size_t i = 0;
-    uint64_t ret_time = getTick();
+    uint64_t ret_time = getTick() + rv_soc->clock_period;
     for(i=0;i<(sizeof(rv_soc->mem_access_cbs)/sizeof(rv_soc->mem_access_cbs[0]));i++)
     {
         if(ADDR_WITHIN_LEN(address, len, rv_soc->mem_access_cbs[i].addr_start, rv_soc->mem_access_cbs[i].mem_size))
         {
             tmp_addr = address - rv_soc->mem_access_cbs[i].addr_start;
-            if (rv_soc->mem_access_cbs[i].addr_start == RAM_BASE_ADDR) {
+            /**if (rv_soc->mem_access_cbs[i].addr_start == RAM_BASE_ADDR) {
                 if (access_type == bus_write_access) {
                     rv_soc->pDRAM->write((void*)tmp_addr, len, ret_time);
                 } else {
@@ -70,7 +70,7 @@ static uint64_t rv_soc_bus_access(void *priv, privilege_level priv_level, bus_ac
                 }
             } else {
                 ret_time += rv_soc->clock_period; // assume 1 cycle access time, for now
-            }
+            }*/
             rv_soc->mem_access_cbs[i].bus_access(rv_soc->mem_access_cbs[i].priv, priv_level, access_type, tmp_addr, value, len);
             return ret_time;
         }
@@ -120,9 +120,6 @@ SOC::SOC(char *fw_file_name, char *dtb_file_name, char *initrd_file_name, CPU *c
 
     write_mem_from_file(fw_file_name, ram, RAM_SIZE_BYTES);
     uint32_t* ram_instrs = (uint32_t*) ram;
-    for (int i = 2300; i < 2350; i++) {
-        printf("0x%08x\n", ram_instrs[i]);
-    }
     if (initrd_file_name != NULL) {
         write_mem_from_file(initrd_file_name, from, FROM_SIZE_BYTES);
     }
@@ -185,26 +182,30 @@ void SOC::rv_soc_run()
     for (uint32_t core_id = 0; core_id < rv_cores.size(); core_id++) {
         rv_cores[core_id].rv_core_reg_dump();
     }
+    uint64_t cycle = 0;
     while(soc_run_mode_ != PAUSED_MODE && soc_run_mode_ != FAILED_MODE) 
     {
+        if (cycle < 1000000 && cycle % 10000 == 0) {
+            printf("Running cycle: %lu\n", cycle);
+        }
+        if (cycle % 10000000 == 0) {
+            printf("Running cycle: %lu\n", cycle);
+        }
         for (uint32_t core_id = 0; core_id < rv_cores.size(); core_id++) {
             rv_cores[core_id].rv_core_run();
         }
+        /**
         uart_irq_pending = simple_uart_update(&uart);
-
-        /* update interrupt controllers */
         plic_update_pending(&plic, 10, uart_irq_pending);
         mei = plic_update(&plic);
-
-        /* Feed clint and update internall states */    
         clint_update(&clint, &msi, &mti);
 
         for (uint32_t core_id = 0; core_id < rv_cores.size(); core_id++) {
-            /* update CSRs for actual interrupt processing */
             rv_cores[core_id].rv_core_process_interrupts(mei, mti, msi);
 
             rv_cores[core_id].rv_core_reg_dump();
-        }
+        }*/
+        cycle++;
     }
     
 }
@@ -214,7 +215,7 @@ uint64_t SOC::rv_soc_tick(uint64_t num_cycles)
 {
     uint8_t mei = 0, msi = 0, mti = 0;
     uint8_t uart_irq_pending = 0;
-    uint64_t next_tick = getTick() + clock_period;
+    uint64_t next_tick = getTick() + clock_period; // default next tick is the next cycle
     // rv_core_reg_dump(&rv_core0);
     for (uint64_t current_cycle = 0; current_cycle < num_cycles && soc_run_mode_ != PAUSED_MODE && soc_run_mode_ != FAILED_MODE; current_cycle++) {
         next_tick = std::numeric_limits<uint64_t>::max(); // reset next tick to max value for each cycle
