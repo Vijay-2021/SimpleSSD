@@ -27,7 +27,7 @@
 
 Firmware::Firmware(firmware_params &ssd_params) : params(ssd_params), lastFreeBlock(ssd_params.pageCountToMaxPerf),
       lastFreeBlockIOMap(ssd_params.ioUnitInPage), bReclaimMore(false), blocks(ssd_params.totalPhysicalBlocks), 
-      table(params.totalLogicalBlocks * params.pagesInBlock) {
+      table(ssd_params.totalLogicalBlocks * ssd_params.pagesInBlock) {
   printf("constructor called with total physical blocks: %u\n", params.totalPhysicalBlocks);
   printf("total page count to max perf: %u\n", params.pageCountToMaxPerf);
   for (uint32_t i = 0; i < 16; i++) {
@@ -134,18 +134,17 @@ bool Firmware::initialize() {
       writeInternal(req, tick, false);
     }
   }
-  printf("finished this too?\n");
-  // Report
+  
   calculateTotalPages(valid, invalid);
-  printf("Filling finished.\n");
 
   return true;
 }
 
 void Firmware::read(FTL::Request &req, uint64_t &tick) {
   uint64_t begin = tick;
-
+  printf("FTL read called\n");
   if (req.ioFlag.count() > 0) {
+    printf("calling readInternal\n");
     readInternal(req, tick);
 
     printf("FTL READ | LPN %u | %u - %u (%u)\n", req.lpn, begin, tick, tick - begin);
@@ -539,9 +538,9 @@ void Firmware::readInternal(FTL::Request &req, uint64_t &tick) {
   PAL::Request palRequest(req);
   uint64_t beginAt;
   uint64_t finishedAt = tick;
-
+  printf("this is fine read internal\n");
   auto mappingList = table.find(req.lpn);
-
+  printf("find is not working?\n");
   if (mappingList != table.end()) {
 
     for (uint32_t idx = 0; idx < bitsetSize; idx++) {

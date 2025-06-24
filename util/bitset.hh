@@ -31,12 +31,10 @@ namespace SimpleSSD {
 
 // TODO: use SIMD operation if possible
 class Bitset {
- private:
+ public:
   uint8_t *data;
   uint32_t dataSize;
   uint32_t allocSize;
-
- public:
   Bitset();
   Bitset(uint32_t);
   Bitset(const Bitset &);

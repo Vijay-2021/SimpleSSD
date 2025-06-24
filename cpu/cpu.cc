@@ -157,6 +157,7 @@ void CPU::csdCycle() {
       // Do nothing
       break;
     case RISCV::FAILED_MODE:
+      debugprint(LOG_CPU, "CSD core is in FAILED mode, stopping further execution");
       break;
     case RISCV::TIMING_MODE:
       next_tick = csd->rv_soc_tick(1);
@@ -370,11 +371,13 @@ void CPU::initCSD() {
 }
 
 void CPU::startCSD() {
+  debugprint(LOG_CPU, "start csd called\n");
   RISCV::soc_run_mode_ = RISCV::SOC_RUN_MODE::TIMING_MODE;
   schedule(csdCycleEvent, getTick());
 }
 
 void CPU::stopCSD() {
+  debugprint(LOG_CPU, "stop csd called\n");
   uint64_t csdCycleTick = 0;
   scheduled(csdCycleEvent, &csdCycleTick);
   if (csdCycleTick >= getTick()) {
@@ -1222,8 +1225,13 @@ void CPU::addCSDTask(char* input_command) {
 uint64_t CPU::read_buffer(uint8_t* buffer, uint64_t req_type) {
   if (req_type == RISCV::FIRMWARE_PARAMS) {
     memcpy(buffer, &fw_params, sizeof(firmware_params_td));
-  } else if (req_type == RISCV::FIRMWARE_QUEUE) {
-    memcpy(buffer, &req_buffer[0], sizeof(FTL::Request));
+  } else if (req_type == RISCV::FIRMWARE_QUEUE_TOP) {
+    debugprint(LOG_CPU, "Reading firmware queue with %zu requests",
+             req_queue.size());
+    memcpy(buffer, &req_queue.front(), sizeof(FTL::Request));
+  } else if (req_type == RISCV::FIRMWARE_BITSET_BUFFER) {
+    memcpy(buffer, &req_queue.front().ioFlag.data, sizeof(req_queue.front().ioFlag.data));
+    req_queue.pop();
   } else if (req_type == RISCV::FIRMWARE_TICK) {
     uint64_t tick = getTick();
     memcpy(buffer, &tick, sizeof(uint64_t));
@@ -1239,30 +1247,30 @@ bool CPU::socIsPaused() {
 }
 
 uint64_t CPU::submitReadRequest(FTL::Request &req) {
+  //debugprint(LOG_CPU, "Submitting read request with ID %u", req.reqID);
   req.reqType = FTL_REQ_READ;
-  req_buffer.clear(); // TO-DO: implement a queue properly
-  req_buffer.push_back(req);
+  req_queue.push(req);
   return getTick() + clockPeriod;
 }
 
 uint64_t CPU::submitWriteRequest(FTL::Request &req) {
+  //debugprint(LOG_CPU, "Submitting write request with ID %u", req.reqID);
   req.reqType = FTL_REQ_WRITE;
-  req_buffer.clear(); // TO-DO: implement a queue properly
-  req_buffer.push_back(req);
+  req_queue.push(req);
   return getTick() + clockPeriod;
 }
 
 uint64_t CPU::submitTrimRequest(FTL::Request &req) {
+  //debugprint(LOG_CPU, "Submitting trim request with ID %u", req.reqID);
   req.reqType = FTL_REQ_TRIM;
-  req_buffer.clear(); // TO-DO: implement a queue properly
-  req_buffer.push_back(req);
+  req_queue.push(req);
   return getTick() + clockPeriod;
 }  
 
 uint64_t CPU::submitFormatRequest(FTL::Request &req) {
+  //debugprint(LOG_CPU, "Submitting format request with ID %u", req.reqID);
   req.reqType = FTL_REQ_FORMAT;
-  req_buffer.clear(); // TO-DO: implement a queue properly
-  req_buffer.push_back(req);
+  req_queue.push(req);
   return getTick() + clockPeriod;
 
 }

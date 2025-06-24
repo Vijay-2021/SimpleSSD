@@ -180,7 +180,7 @@ class CPU : public StatObject {
     uint32_t page_size = 16834; // Default page size for SimpleSSD
     uint32_t lba_size = 512;
     firmware_params_td fw_params;
-    std::vector<FTL::Request> req_buffer;
+    std::queue<FTL::Request> req_queue;
     
   public:
     CPU(ConfigReader &, ICL::ICL *, FTL::FTL *, PAL::PAL *pal, DRAM::AbstractDRAM *dram);

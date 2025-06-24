@@ -64,9 +64,10 @@ typedef enum {
 
 typedef enum {
     FIRMWARE_PARAMS = 0, 
-    FIRMWARE_QUEUE = 1,
-    FIRMWARE_TICK = 2,
-    FIRMWARE_CYCLE = 3,
+    FIRMWARE_QUEUE_TOP = 1,
+    FIRMWARE_BITSET_BUFFER = 2,
+    FIRMWARE_TICK = 3,
+    FIRMWARE_CYCLE = 4,
 } DATA_REQ;
 
 

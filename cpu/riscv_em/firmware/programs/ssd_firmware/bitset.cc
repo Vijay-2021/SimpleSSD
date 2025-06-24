@@ -100,6 +100,7 @@ uint32_t Bitset::count() noexcept {
   uint32_t count = 0;
 
   for (uint32_t i = 0; i < allocSize; i++) {
+    printf("data[%u] = %u\n", i, data[i]);
     count += popcount(data[i]);
   }
 
