@@ -46,6 +46,7 @@ ICL::ICL(icl_params& cparams, FTL::FTL *ftl) :
       useReadCaching(cparams.useReadCaching),
       useWriteCaching(cparams.useWriteCaching),
       useReadPrefetch(cparams.useReadPrefetch)  {
+  printf("calling icl initializer!\n");
   uint64_t cacheSize = params.cacheSize;
 
   lineSize = superPageSize / lineCountInSuperPage;
@@ -61,6 +62,9 @@ ICL::ICL(icl_params& cparams, FTL::FTL *ftl) :
   }
 
   if (!useReadCaching && !useWriteCaching) {
+    printf("Read and write caching are disabled, not creating cache.\n");
+    printf("useReadCaching: %u useWriteCaching: %u useReadPrefetch: %u\n",
+         (uint32_t)useReadCaching, (uint32_t)useWriteCaching, (uint32_t)useReadPrefetch);
     return;
   }
 
@@ -82,7 +86,6 @@ ICL::ICL(icl_params& cparams, FTL::FTL *ftl) :
   //           lineCountInSuperPage, lineCountInMaxIO);
 
   cacheData.resize(setSize);
-
   for (uint32_t i = 0; i < setSize; i++) {
     cacheData[i] = new Line[waySize]();
   }
@@ -150,12 +153,10 @@ uint32_t ICL::getEmptyWay(uint32_t setIdx) {
 uint32_t ICL::getValidWay(uint64_t lca) {
   uint32_t setIdx = calcSetIndex(lca);
   uint32_t wayIdx;
-
   for (wayIdx = 0; wayIdx < waySize; wayIdx++) {
     Line &line = cacheData[setIdx][wayIdx];
     // pDRAM->read(MAKE_META_ADDR(setIdx, wayIdx, offsetof(Line, tag)), 8,
     // tick);
-
     if (line.valid && line.tag == lca) {
       break;
     }
@@ -242,13 +243,10 @@ bool ICL::read(Request &req) {
     uint32_t setIdx = calcSetIndex(req.range.slpn);
     uint32_t wayIdx;
     // uint64_t arrived = getTick();
-
     if (useReadPrefetch) {
       checkSequential(req, readDetect);
     }
-
     wayIdx = getValidWay(req.range.slpn);
-
     // Do we have valid data?
     if (wayIdx != waySize) {
 
@@ -273,7 +271,6 @@ bool ICL::read(Request &req) {
       // Do we need to prefetch data?
       if (useReadPrefetch && req.range.slpn == prefetchTrigger) {
         // debugprint(LOG_ICL_GENERIC_CACHE, "READ  | Prefetch triggered");
-
         req.range.slpn = lastPrefetched;
 
         goto ICL_GENERIC_CACHE_READ;
@@ -424,6 +421,7 @@ bool ICL::read(Request &req) {
 
 // True when cold-miss/hit
 bool ICL::write(Request &req) {
+  printf("icl write called!\n");
   bool ret = false;
   uint64_t tick = getTick();
   uint64_t flash = tick;
@@ -439,6 +437,7 @@ bool ICL::write(Request &req) {
     dirty = true;
   }
   else {
+    printf("immediately calling ftl for write\n");
     flash = pFTL->write(reqInternal);
     process_request(flash);
   }
@@ -482,6 +481,9 @@ bool ICL::write(Request &req) {
       //           setIdx, wayIdx, arrived, tick, tick - arrived);
 
       ret = true;
+      if (dirty) {
+        process_request(getTick());
+      }
     }
     else {
       uint64_t arrived = tick;
@@ -514,7 +516,9 @@ bool ICL::write(Request &req) {
 
         // DRAM access
         //pDRAM->write(&cacheData[setIdx][wayIdx], req.length, tick);
-
+        if (dirty) {
+          process_request(getTick());
+        }
         ret = true;
       }
       // We have to flush
@@ -595,6 +599,9 @@ bool ICL::write(Request &req) {
         cacheData[setIdx][wayIdx].valid = true;
         cacheData[setIdx][wayIdx].dirty = true;
         cacheData[setIdx][wayIdx].tag = req.range.slpn;
+        if (dirty) {
+          process_request(getTick());
+        }
       }
 
       // debugprint(LOG_ICL_GENERIC_CACHE,

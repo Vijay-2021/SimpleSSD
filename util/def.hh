@@ -42,7 +42,8 @@ typedef enum {
   ICL_REQ_WRITE = 1,
   ICL_REQ_TRIM = 2,
   ICL_REQ_FORMAT = 3,
-  ICL_REQ_EMPTY = 4,
+  ICL_REQ_FLUSH = 4,
+  ICL_REQ_EMPTY = 5,
 } ICL_REQ_TYPE;
 
 namespace HIL {

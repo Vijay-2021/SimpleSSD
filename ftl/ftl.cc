@@ -71,7 +71,7 @@ void FTL::read(Request &req, uint64_t &tick) {
   if (pCPU->socIsPaused()) {
     pCPU->startCSD();
   }
-  tick = pCPU->submitReadRequest(req);
+ // tick = pCPU->submitReadRequest(req);
 }
 
 void FTL::write(Request &req, uint64_t &tick) {
@@ -79,7 +79,7 @@ void FTL::write(Request &req, uint64_t &tick) {
   if (pCPU->socIsPaused()) {
     pCPU->startCSD();
   }
-  tick = pCPU->submitWriteRequest(req);
+  //tick = pCPU->submitWriteRequest(req);
 }
 
 void FTL::trim(Request &req, uint64_t &tick) {
@@ -87,7 +87,7 @@ void FTL::trim(Request &req, uint64_t &tick) {
   if (pCPU->socIsPaused()) {
     pCPU->startCSD();
   }
-  tick = pCPU->submitTrimRequest(req);
+  //tick = pCPU->submitTrim(req);
 }
 
 void FTL::format(LPNRange &range, uint64_t &tick) {

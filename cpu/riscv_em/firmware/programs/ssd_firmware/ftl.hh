@@ -31,14 +31,14 @@
 
 namespace FTL {
 
-struct ftl_params {
+struct __attribute__((packed, aligned(4))) ftl_params {
   uint64_t totalPhysicalBlocks;
   uint64_t totalLogicalBlocks;
   uint64_t pagesInBlock;
   uint32_t pageSize;
   uint32_t ioUnitInPage;
   uint32_t pageCountToMaxPerf;  
-  bool bRandomTweak;
+  uint32_t bRandomTweak;
   float ftl_fill_ratio;
   float ftl_invalid_page_ratio;
   FILLING_MODE ftl_filling_mode; // or FILLING_MODE

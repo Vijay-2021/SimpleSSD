@@ -63,10 +63,10 @@ typedef enum {
     FIRMWARE_FTL_PARAMS = 0, 
     FIRMWARE_ICL_PARAMS = 1,
     FIRMWARE_QUEUE_TOP = 2,
-    FIRMWARE_BITSET_BUFFER = 3,
-    FIRMWARE_TICK = 4,
-    FIRMWARE_CYCLE = 5,
-    FIRMWARE_CORE_ID = 6,
+    FIRMWARE_TICK = 3,
+    FIRMWARE_CYCLE = 4,
+    FIRMWARE_CORE_ID = 5,
+    FIRMWARE_QUEUE_SIZE = 6,
 } DATA_REQ;
 
 typedef enum {
@@ -79,7 +79,8 @@ typedef enum {
   ICL_REQ_WRITE = 1,
   ICL_REQ_TRIM = 2,
   ICL_REQ_FORMAT = 3,
-  ICL_REQ_EMPTY = 4,
+  ICL_REQ_FLUSH = 4,
+  ICL_REQ_EMPTY = 5,
 } ICL_REQ_TYPE;
 
 namespace ICL {
@@ -139,5 +140,5 @@ void process_request(uint64_t req_time);
 void process_request_failed();
 uint64_t getTick();
 uint64_t getCoreId();
-
+uint64_t getReqQueueSize();
 #endif

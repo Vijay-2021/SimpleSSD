@@ -16,7 +16,7 @@ void print(const char *p)
         putchar(*(p++));
 }
 
-void _itoa(int num, char *buffer, unsigned int base, char is_signed) {
+void _itoa(int64_t num, char *buffer, unsigned int base, char is_signed) {
     // base cases :)
     if (base == 0) {
       buffer[0] = '0';
@@ -57,11 +57,11 @@ void _itoa(int num, char *buffer, unsigned int base, char is_signed) {
     }
 }
 
-void itoa(int num, char *buffer, int base) {
+void itoa(int64_t num, char *buffer, int base) {
     _itoa(num, buffer, base, 1);
 }
 
-void uitoa(unsigned int num, char *buffer, int base) {
+void uitoa(uint64_t num, char *buffer, int base) {
     _itoa(num, buffer, base, 0);
 } 
 

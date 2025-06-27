@@ -71,21 +71,21 @@ namespace DRAM {
 namespace CPU {
 
 typedef struct _RISCVJob {
-  ICL::Request *request;
+  ICL::Request request;
   DMAFunction func;
   void *context;
-  _RISCVJob(ICL::Request *req, DMAFunction &f, void *c) 
+  _RISCVJob(ICL::Request &req, DMAFunction &f, void *c) 
     : request(req), func(f), context(c) {}
 } RISCVJob;
 
-struct ftl_params {
+struct __attribute__((packed, aligned(4))) ftl_params {
   uint64_t totalPhysicalBlocks;
   uint64_t totalLogicalBlocks;
   uint64_t pagesInBlock;
   uint32_t pageSize;
   uint32_t ioUnitInPage;
   uint32_t pageCountToMaxPerf;  
-  bool bRandomTweak;
+  uint32_t bRandomTweak;
   float ftl_fill_ratio;
   float ftl_invalid_page_ratio;
   FTL::FILLING_MODE ftl_filling_mode; // or FILLING_MODE
@@ -98,17 +98,17 @@ struct ftl_params {
   uint64_t bad_block_threshold;
 };
 
-struct icl_params {
+struct __attribute__((packed, aligned(4))) icl_params {
     uint32_t pageSize;
     uint32_t pageCountToMaxPerf;
     uint32_t ioUnitInPage;
     uint32_t waySize;
     uint32_t prefetchCount;
     float prefetchRatio;
-    bool useReadCaching;
-    bool useWriteCaching;
-    bool useReadPrefetch;
-    bool useRandomIOTweak;
+    uint32_t useReadCaching;
+    uint32_t useWriteCaching;
+    uint32_t useReadPrefetch;
+    uint32_t useRandomIOTweak;
     uint64_t cacheSize;
     ICL::EVICT_MODE iclEvictGranularity;
     ICL::PREFETCH_MODE iclPrefetchGranularity;
@@ -230,17 +230,20 @@ class CPU : public StatObject {
     uint64_t read_flash_icl(uint8_t* buffer, uint64_t offset , uint64_t len); // for the flash functions
     uint64_t write_flash_icl(uint8_t* buffer, uint64_t offset , uint64_t len);
     uint64_t trim_flash_icl(uint8_t* buffer, uint64_t offset , uint64_t len);
-    void read_flash_pal(void* request, uint64_t* tick);
-    void write_flash_pal(void* request, uint64_t* tick);
-    void erase_flash_pal(void* request, uint64_t* tick);
-    uint64_t read_buffer(uint8_t *buffer, uint64_t req_type);
+    void read_flash_pal(uint8_t* request, uint64_t* tick);
+    void write_flash_pal(uint8_t* request, uint64_t* tick);
+    void erase_flash_pal(uint8_t* request, uint64_t* tick);
+    void read_buffer(uint8_t *buffer, uint64_t req_info, uint64_t req_type);
+    void write_buffer(uint8_t *buffer, uint64_t req_info, uint64_t req_type);
+    void runDMA(uint64_t finished_at, uint64_t core_id);
     void setDisk(Disk *disk);
     void closeDisk();
     void addCSDTask(char* input_cmd);
-    uint64_t submitReadRequest(ICL::Request &req, DMAFunction &func);
-    uint64_t submitWriteRequest(ICL::Request &req, DMAFunction &func);
-    uint64_t submitTrimRequest(ICL::Request &req, DMAFunction &func);
-    uint64_t submitFormatRequest(ICL::Request &range, DMAFunction &func);
+    uint64_t submitRead(HIL::Request *req, DMAFunction &func);
+    uint64_t submitWrite(HIL::Request *req, DMAFunction &func);
+    uint64_t submitTrim(HIL::Request *req, DMAFunction &func);
+    uint64_t submitFormat(HIL::Request *req, DMAFunction &func);
+    uint64_t submitFlush(HIL::Request *req, DMAFunction &func);
 };
 
 }  // namespace CPU

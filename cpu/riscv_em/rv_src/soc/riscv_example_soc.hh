@@ -35,13 +35,14 @@ class SOC {
         void rv_soc_schedule_next();
         uint64_t get_period(); 
         uint8_t* get_ram();
-        uint64_t pread(void* request, uint64_t* tick);
-        uint64_t pwrite(void* request, uint64_t* tick);
-        uint64_t perase(void* request, uint64_t* tick);
+        void pread(uint8_t *request, uint64_t* tick);
+        void pwrite(uint8_t *request, uint64_t* tick);
+        void perase(uint8_t *request, uint64_t* tick);
         uint64_t lread(uint8_t *buffer, uint64_t offset, uint64_t len);
         uint64_t lwrite(uint8_t *buffer, uint64_t offset, uint64_t len);
         uint64_t ltrim(uint8_t *buffer, uint64_t offset, uint64_t len);
-        uint64_t read_buffer(uint8_t *buffer, uint64_t req_type);
+        void read_buffer(uint8_t *buffer, uint64_t req_info, uint64_t req_type);
+        void write_buffer(uint8_t *buffer, uint64_t req_info, uint64_t req_type);
         void start_simulation();
         void stop_simulation();
         void next_simulation_tick(uint64_t next_tick);

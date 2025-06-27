@@ -1407,27 +1407,27 @@ static uint64_t instr_LTRIM(Core * rv_core) {
 }
 
 static uint64_t instr_PREAD(Core * rv_core) {
-    rv_core->pSOC->pread(rv_core->pSOC->get_ram() + ((rv_core->reg_file[rv_core->rd] - RAM_BASE_ADDR)), rv_core->reg_file[rv_core->rs1], rv_core->reg_file[rv_core->rs2]);
+    rv_core->pSOC->pread(rv_core->pSOC->get_ram() + ((rv_core->reg_file[rv_core->rd] - RAM_BASE_ADDR)), (uint64_t*) (rv_core->pSOC->get_ram() + ((rv_core->reg_file[rv_core->rs1] - RAM_BASE_ADDR))));
     return getTick() + rv_core->pSOC->get_period();
 }
 
 static uint64_t instr_PWRITE(Core * rv_core) {
-    rv_core->pSOC->pwrite(rv_core->pSOC->get_ram() + ((rv_core->reg_file[rv_core->rd] - RAM_BASE_ADDR)), rv_core->reg_file[rv_core->rs1], rv_core->reg_file[rv_core->rs2]);
+    rv_core->pSOC->pwrite(rv_core->pSOC->get_ram() + ((rv_core->reg_file[rv_core->rd] - RAM_BASE_ADDR)), (uint64_t*) (rv_core->pSOC->get_ram() + ((rv_core->reg_file[rv_core->rs1] - RAM_BASE_ADDR))));
     return getTick() + rv_core->pSOC->get_period();
 }
 
 static uint64_t instr_PERASE(Core * rv_core) {
-    rv_core->pSOC->perase(rv_core->pSOC->get_ram() + ((rv_core->reg_file[rv_core->rd] - RAM_BASE_ADDR)), rv_core->reg_file[rv_core->rs1], rv_core->reg_file[rv_core->rs2]);
+    rv_core->pSOC->perase(rv_core->pSOC->get_ram() + ((rv_core->reg_file[rv_core->rd] - RAM_BASE_ADDR)), (uint64_t*) (rv_core->pSOC->get_ram() + ((rv_core->reg_file[rv_core->rs1] - RAM_BASE_ADDR))));
     return getTick() + rv_core->pSOC->get_period();
 }
 
 static uint64_t instr_READBUFF(Core *rv_core) {
-    if (rv_core->reg_file[rv_core->rs1] == FIRMWARE_CYCLE) {
+    if (rv_core->reg_file[rv_core->rs2] == FIRMWARE_CYCLE) {
         memcpy(rv_core->pSOC->get_ram() + ((rv_core->reg_file[rv_core->rd] - RAM_BASE_ADDR)), &rv_core->curr_cycle, sizeof(rv_core->curr_cycle));
-    } else if (rv_core->reg_file[rv_core->rs1] == FIRMWARE_CORE_ID) {
+    } else if (rv_core->reg_file[rv_core->rs2] == FIRMWARE_CORE_ID) {
         memcpy(rv_core->pSOC->get_ram() + ((rv_core->reg_file[rv_core->rd] - RAM_BASE_ADDR)), &rv_core->core_id, sizeof(rv_core->core_id));
     } else {
-        rv_core->pSOC->read_buffer(rv_core->pSOC->get_ram() + ((rv_core->reg_file[rv_core->rd] - RAM_BASE_ADDR)), rv_core->reg_file[rv_core->rs1]);
+        rv_core->pSOC->read_buffer(rv_core->pSOC->get_ram() + ((rv_core->reg_file[rv_core->rd] - RAM_BASE_ADDR)), rv_core->reg_file[rv_core->rs1], rv_core->reg_file[rv_core->rs2]);
     }
     return getTick() + rv_core->pSOC->get_period();
 }
@@ -2068,6 +2068,7 @@ static void init_instruction_hooks() {
     CUSTOM_soc_interface_func7_subcode_list[FUNC7_STOPSIM] = {NULL, instr_STOPSIM, NULL};
     CUSTOM_soc_interface_func7_subcode_list[FUNC7_NEXTSIMTICK] = {NULL, instr_NEXTSIMTICK, NULL};
     CUSTOM_soc_interface_func7_subcode_list[FUNC7_PUTC] = {NULL, instr_PUTC, NULL};
+    CUSTOM_soc_interface_func7_subcode_list[FUNC7_WRITEBUFF] = {NULL, instr_WRITEBUFF, NULL};
     INIT_INSTRUCTION_LIST_DESC(CUSTOM_soc_interface_func7_subcode_list);
 
     static instruction_hook_td CUSTOM_func3_subcode_list[MAX_FUNC3_VALUE] = {};

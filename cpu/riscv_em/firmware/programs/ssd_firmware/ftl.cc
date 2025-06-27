@@ -493,7 +493,7 @@ uint64_t FTL::doGarbageCollection(Vector<uint32_t> &blocksToReclaim) {
 
   for (auto &iter : readRequests) {
     beginAt = getTick();
-    pread((uint64_t) &iter, (uint64_t)&beginAt, 0);
+    pread((uint64_t) &iter, (uint64_t)&beginAt);
     //pPAL->read(iter, beginAt);
 
     readFinishedAt = MAX(readFinishedAt, beginAt);
@@ -501,7 +501,7 @@ uint64_t FTL::doGarbageCollection(Vector<uint32_t> &blocksToReclaim) {
 
   for (auto &iter : writeRequests) {
     beginAt = readFinishedAt;
-    pwrite((uint64_t) &iter, (uint64_t)&beginAt, 0); // will implement it in the backend so that ticks are handled
+    pwrite((uint64_t) &iter, (uint64_t)&beginAt); // will implement it in the backend so that ticks are handled
     // pPAL->write(iter, beginAt);
 
     writeFinishedAt = MAX(writeFinishedAt, beginAt);
@@ -552,7 +552,7 @@ uint64_t FTL::readInternal(Request &req) {
           beginAt = getTick();
 
           block->second.read(palRequest.pageIndex, idx);
-          pread((uint64_t) &palRequest, (uint64_t)&beginAt, 0);
+          pread((uint64_t) &palRequest, (uint64_t)&beginAt);
           // pPAL->read(palRequest, beginAt);
 
           finishedAt = MAX(finishedAt, beginAt);
@@ -635,7 +635,7 @@ uint64_t FTL::writeInternal(Request &req, bool sendToPAL) {
         palRequest.ioFlag = req.ioFlag;
         palRequest.ioFlag.flip();
         beginAt = getTick();
-        pread((uint64_t) &palRequest, (uint64_t)&beginAt, 0);
+        pread((uint64_t) &palRequest, (uint64_t)&beginAt);
         //pPAL->read(palRequest, beginAt);
       }
 
@@ -654,7 +654,7 @@ uint64_t FTL::writeInternal(Request &req, bool sendToPAL) {
         else {
           palRequest.ioFlag.set();
         }
-        pwrite((uint64_t) &palRequest, (uint64_t)&beginAt, 0);
+        pwrite((uint64_t) &palRequest, (uint64_t)&beginAt);
         //pPAL->write(palRequest, beginAt);
       }
 
@@ -733,7 +733,7 @@ void FTL::eraseInternal(PAL::Request &req, uint64_t &tick) {
 
   // Erase block
   block->second.erase();
-  perase((uint64_t) &req, (uint64_t)&tick, 0);
+  perase((uint64_t) &req, (uint64_t)&tick);
   // pPAL->erase(req, tick);
 
   // Check erase count

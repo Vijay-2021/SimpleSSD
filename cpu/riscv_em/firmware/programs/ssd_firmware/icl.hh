@@ -49,22 +49,23 @@ typedef enum {
 
 typedef PREFETCH_MODE EVICT_MODE;
 
-struct icl_params {
+struct __attribute__((packed, aligned(4))) icl_params {
     uint32_t pageSize;
     uint32_t pageCountToMaxPerf;
     uint32_t ioUnitInPage;
-    uint32_t lineSize;
     uint32_t waySize;
     uint32_t prefetchCount;
     float prefetchRatio;
-    bool useReadCaching;
-    bool useWriteCaching;
-    bool useReadPrefetch;
-    bool useRandomIOTweak;
+    uint32_t useReadCaching;
+    uint32_t useWriteCaching;
+    uint32_t useReadPrefetch;
+    uint32_t useRandomIOTweak;
     uint64_t cacheSize;
     EVICT_MODE iclEvictGranularity;
     PREFETCH_MODE iclPrefetchGranularity;
 };
+
+
 
 class ICL {
  private:

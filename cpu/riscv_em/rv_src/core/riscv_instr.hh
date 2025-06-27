@@ -192,21 +192,21 @@
 
 // custom instructions for interfacing with the ssd simulator
 
-#define CUSTOM_OPCODE 0x0B
+#define INSTR_CSD 0x0B
     #define FUNC3_LOGADDR 0x0
-        #define FUNC7_INSTR_LREAD 0x00
-        #define FUNC7_INSTR_LWRITE 0x01
-        #define FUNC7_INSTR_LTRIM 0x02
+        #define FUNC7_LREAD 0x00
+        #define FUNC7_LWRITE 0x01
+        #define FUNC7_LTRIM 0x02
     #define FUNC3_PHYSADDR 0x1
-        #define FUNC7_INSTR_PREAD 0x00
-        #define FUNC7_INSTR_PWRITE 0x01
-        #define FUNC7_INSTR_PERASE 0x02
+        #define FUNC7_PREAD 0x00
+        #define FUNC7_PWRITE 0x01
+        #define FUNC7_PERASE 0x02
     #define FUNC3_SOC_INTERFACE 0x2
         #define FUNC7_READBUFF 0x00
         #define FUNC7_STARTSIM 0x01 // stop continuos execution
         #define FUNC7_STOPSIM 0x02 // execute once every cycle
         #define FUNC7_NEXTSIMTICK 0x03 // sets the next tick
         #define FUNC7_PUTC 0x04
-        #define FUNC7_WRITEBUFF 0x05 // write to the buffer
+        #define FUNC7_WRITEBUFF 0x05
         
 #endif /* RISCV_INSTR_H */

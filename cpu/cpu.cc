@@ -208,17 +208,20 @@ CPU::CPU(ConfigReader &c, ICL::ICL *icl, FTL::FTL *ftl, PAL::PAL *pal, DRAM::Abs
   iparams.pageSize = fparams.pageSize;
   iparams.pageCountToMaxPerf = fparams.pageCountToMaxPerf;
   iparams.ioUnitInPage = fparams.ioUnitInPage;
-  iparams.waySize = conf.readUint(CONFIG_ICL, ICL_WAY_SIZE);
-  iparams.prefetchCount = conf.readUint(CONFIG_ICL, ICL_PREFETCH_COUNT);
-  iparams.prefetchRatio = conf.readFloat(CONFIG_ICL, ICL_PREFETCH_RATIO);
-  iparams.useReadCaching = conf.readBoolean(CONFIG_ICL, ICL_USE_READ_CACHE);
-  iparams.useWriteCaching = conf.readBoolean(CONFIG_ICL, ICL_USE_WRITE_CACHE);
-  iparams.useReadPrefetch = conf.readBoolean(CONFIG_ICL, ICL_USE_READ_PREFETCH);
+  iparams.waySize = conf.readUint(CONFIG_ICL, ICL::ICL_WAY_SIZE);
+  iparams.prefetchCount = conf.readUint(CONFIG_ICL, ICL::ICL_PREFETCH_COUNT);
+  iparams.prefetchRatio = conf.readFloat(CONFIG_ICL, ICL::ICL_PREFETCH_RATIO);
+  iparams.useReadCaching = conf.readBoolean(CONFIG_ICL, ICL::ICL_USE_READ_CACHE);
+  iparams.useWriteCaching = conf.readBoolean(CONFIG_ICL, ICL::ICL_USE_WRITE_CACHE);
+  iparams.useReadPrefetch = conf.readBoolean(CONFIG_ICL, ICL::ICL_USE_READ_PREFETCH);
   iparams.useRandomIOTweak = fparams.bRandomTweak;
-  iparams.cacheSize = conf.readUint(CONFIG_ICL, ICL_CACHE_SIZE);
-  iparams.iclEvictGranularity = (ICL::EVICT_MODE)conf.readInt(CONFIG_ICL, ICL_EVICT_GRANULARITY) == 0 ? ICL::PREFETCH_MODE::MODE_SUPERPAGE : ICL::PREFETCH_MODE::MODE_ALL;
-  iparams.iclPrefetchGranularity = (ICL::PREFETCH_MODE)conf.readInt(CONFIG_ICL, ICL_PREFETCH_GRANULARITY) == 0 ? ICL::PREFETCH_MODE::
-  
+  iparams.cacheSize = conf.readUint(CONFIG_ICL, ICL::ICL_CACHE_SIZE);
+  iparams.iclEvictGranularity = (ICL::EVICT_MODE)conf.readInt(CONFIG_ICL, ICL::ICL_EVICT_GRANULARITY);
+  iparams.iclPrefetchGranularity = (ICL::PREFETCH_MODE)conf.readInt(CONFIG_ICL, ICL::ICL_PREFETCH_GRANULARITY);
+  debugprint(LOG_CPU, "page size is %u, page count to max perf is %u, io unit in page is %u and waySize is %u and prefetch count is %u and prefetch ratio is %f and useReadCaching is %u, useWriteCaching is %u, useReadPrefetch is %u, useRandomIOTweak is %u, cache size is %" PRIu64 " and iclEvictGranularity is %d and iclPrefetchGranularity is %d",
+             iparams.pageSize, iparams.pageCountToMaxPerf, iparams.ioUnitInPage, iparams.waySize, iparams.prefetchCount, iparams.prefetchRatio,
+             (uint32_t)iparams.useReadCaching, (uint32_t)iparams.useWriteCaching, (uint32_t)iparams.useReadPrefetch, (uint32_t)iparams.useRandomIOTweak,
+             iparams.cacheSize, (int)iparams.iclEvictGranularity, (int)iparams.iclPrefetchGranularity);
   // unsigned char buffer[256];
   // read_flash(buffer, 4096, 4096);
   // schedule(csdCycleEvent, getTick()); // start the csd core(s) as soon as possible
@@ -1164,32 +1167,26 @@ uint64_t CPU::trim_flash_icl(uint8_t* buffer, uint64_t offset , uint64_t len) {
 
 // TO-DO: implement!
 void CPU::read_flash_pal(uint8_t* request, uint64_t* tick) {
-  debugprint(LOG_CPU, "Read flash PAL from CSD at offset %u, length %u",
-             offset, len);
+  debugprint(LOG_CPU, "Read flash PAL from CSD at tick %llu", *tick);
   PAL::Request* req = (PAL::Request*)request;
   uint64_t reqTick = *tick;
-  debugprint(LOG_CPU, "Request ID %u at tick %llu", req.reqID, reqTick);
   pPAL->read(*req, reqTick);
   *tick = reqTick;
 }
 
 void CPU::write_flash_pal(uint8_t* request, uint64_t* tick) {
-  debugprint(LOG_CPU, "Write flash PAL from CSD at offset %u, length %u",
-             offset, len);
+  debugprint(LOG_CPU, "Write flash PAL from CSD at tick %llu", *tick);
   PAL::Request* req = (PAL::Request*)request;
   uint64_t reqTick = *tick;
-  debugprint(LOG_CPU, "Request ID %u at tick %llu", req.reqID, reqTick);
   pPAL->write(*req, reqTick);
   *tick = reqTick;
 }
 
 // TO-DO: implement!
 void CPU::erase_flash_pal(uint8_t* request, uint64_t* tick) {
-  debugprint(LOG_CPU, "Erase flash PAL from CSD at offset %u, length %u",
-             offset, len);
+  debugprint(LOG_CPU, "Erase flash PAL from CSD at tick %llu", *tick);
   PAL::Request* req = (PAL::Request*)request;
   uint64_t reqTick = *tick;
-  debugprint(LOG_CPU, "Request ID %u at tick %llu", req.reqID, reqTick);
   pPAL->erase(*req, reqTick);
   *tick = reqTick;
 }
@@ -1210,38 +1207,54 @@ void CPU::addCSDTask(char* input_command) {
   csd->rv_soc_add_task(input_command);
 }
 
-uint64_t CPU::read_buffer(uint8_t* buffer, uint64_t req_type) {
-  if (req_type == RISCV::FIRMWARE_PARAMS) {
-    memcpy(buffer, &fparams, sizeof(firmware_params_td));
+void CPU::read_buffer(uint8_t* buffer, uint64_t req_info, uint64_t req_type) {
+  if (req_type == RISCV::FIRMWARE_FTL_PARAMS) {
+    memcpy(buffer, &fparams, sizeof(ftl_params));
+  } else if (req_type == RISCV::FIRMWARE_ICL_PARAMS) {
+    memcpy(buffer, &iparams, sizeof(icl_params));
   } else if (req_type == RISCV::FIRMWARE_QUEUE_TOP) {
     debugprint(LOG_CPU, "Reading firmware queue with %zu requests",
              req_queue.size());
-    memcpy(buffer, &req_queue.front(), sizeof(FTL::Request));
-  } else if (req_type == RISCV::FIRMWARE_BITSET_BUFFER) {
-    memcpy(buffer, &req_queue.front().ioFlag.data, sizeof(req_queue.front().ioFlag.data));
+    RISCVJob req_job = req_queue.front();
+    debugprint(LOG_CPU, "Address of request job request: %p", &req_job.request);
+    memcpy(buffer, &req_job.request, sizeof(ICL::Request));
+    uint64_t core_id = req_info;
+    if (core_id < callbacks.size()) {
+      callbacks[core_id].first = req_job.func;
+      callbacks[core_id].second = req_job.context;
+    } else {
+      debugprint(LOG_CPU, "Core ID %llu is out of range for callbacks",
+                 core_id);
+    }
     req_queue.pop();
   } else if (req_type == RISCV::FIRMWARE_TICK) {
     uint64_t tick = getTick();
     memcpy(buffer, &tick, sizeof(uint64_t));
+  } else if (req_type == RISCV::FIRMWARE_QUEUE_SIZE) {
+    uint64_t size = req_queue.size();
+    memcpy(buffer, &size, sizeof(uint64_t));
+  } else {
+    debugprint(LOG_CPU, "Unknown request type %llu", req_type);
   }
-  return getTick() + clockPeriod;
 }
 
-void CPU::write_buffer(uint8_t* buffer, uint64_t req_data, uint64_t req_type) {
-  if (req_type == RISCV::REQ_DONE) {
+void CPU::write_buffer(uint8_t* buffer, uint64_t req_info, uint64_t req_type) {
+  if (req_type == RISCV::FIRMWARE_REQ_DONE) {
     uint64_t finished_at;
-    memcpy(finished_at, &req_data, sizeof(uint64_t));
-    runDMA(finished_at, req_data);
-  } else if (req_type == RISCV::REQ_FAILED) {
+    memcpy(&finished_at, buffer, sizeof(uint64_t));
+    runDMA(finished_at, req_info);
+  } else if (req_type == RISCV::FIRMWARE_REQ_FAILED) {
     debugprint(LOG_CPU, "Request failed!!\n");
-    runDMA(req_data);
+    // runDMA(req_info);
   }
 }
 
-void runDMA(uint64_t finished_at, uint64_t core_id) {
+void CPU::runDMA(uint64_t finished_at, uint64_t core_id) {
   // for now there isn't a core id
   DMAFunction func = callbacks[core_id].first;
   void* context = callbacks[core_id].second;
+  debugprint(LOG_CPU, "Running DMA function at tick %lu for core ID %lu",
+             finished_at, core_id);
   func(finished_at, context);
 }
 
@@ -1250,37 +1263,61 @@ uint64_t CPU::getClockPeriod() {
 }
 
 bool CPU::socIsPaused() {
-  return csd_in_progress;
+  return (RISCV::soc_run_mode_ == RISCV::PAUSED_MODE);
 }
 
 uint64_t CPU::submitRead(HIL::Request *req, DMAFunction &callback) {
-  //debugprint(LOG_CPU, "Submitting read request with ID %u", req.reqID);
+  debugprint(LOG_CPU, "Submitting read request with ID %u", req->reqID);
   ICL::Request request(*req);
   request.reqType = ICL_REQ_READ;
-  req.reqType = ICL_REQ_READ;
-  req_queue.push({request, callback, req});
-  req_queue.push(req);
+  req_queue.push({request, callback, (void*)req});
+  if (socIsPaused()) {
+    startCSD();
+  }
   return getTick() + clockPeriod;
 }
 
-uint64_t CPU::submitWriteRequest(FTL::Request &req) {
-  //debugprint(LOG_CPU, "Submitting write request with ID %u", req.reqID);
-  req.reqType = FTL_REQ_WRITE;
-  req_queue.push(req);
+uint64_t CPU::submitWrite(HIL::Request *req, DMAFunction &callback) {
+  debugprint(LOG_CPU, "Submitting write request with ID %u", req->reqID);
+  ICL::Request request(*req);
+  request.reqType = ICL_REQ_WRITE;
+  req_queue.push({request, callback, (void*)req});
+  if (socIsPaused()) {
+    startCSD();
+  }
   return getTick() + clockPeriod;
 }
 
-uint64_t CPU::submitTrimRequest(FTL::Request &req) {
-  //debugprint(LOG_CPU, "Submitting trim request with ID %u", req.reqID);
-  req.reqType = FTL_REQ_TRIM;
-  req_queue.push(req);
+uint64_t CPU::submitTrim(HIL::Request *req, DMAFunction &callback) {
+  debugprint(LOG_CPU, "Submitting trim request with ID %u", req->reqID);
+  ICL::Request request(*req);
+  request.reqType = ICL_REQ_TRIM;
+  req_queue.push({request, callback, (void*)req});
+  if (socIsPaused()) {
+    startCSD();
+  }
   return getTick() + clockPeriod;
 }  
 
-uint64_t CPU::submitFormatRequest(FTL::Request &req) {
-  //debugprint(LOG_CPU, "Submitting format request with ID %u", req.reqID);
-  req.reqType = FTL_REQ_FORMAT;
-  req_queue.push(req);
+uint64_t CPU::submitFormat(HIL::Request *req, DMAFunction &callback) {
+  debugprint(LOG_CPU, "Submitting format request with ID %u", req->reqID);
+  ICL::Request request(*req);
+  request.reqType = ICL_REQ_FORMAT;
+  req_queue.push({request, callback, (void*)req});
+  if (socIsPaused()) {
+    startCSD();
+  }
+  return getTick() + clockPeriod;
+}
+
+uint64_t CPU::submitFlush(HIL::Request *req, DMAFunction &callback) {
+  debugprint(LOG_CPU, "Submitting flush request with ID %u", req->reqID);
+  ICL::Request request(*req);
+  request.reqType = ICL_REQ_FLUSH;
+  req_queue.push({request, callback, (void*)req});
+  if (socIsPaused()) {
+    startCSD();
+  }
   return getTick() + clockPeriod;
 
 }

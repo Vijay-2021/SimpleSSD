@@ -82,7 +82,7 @@ static uint64_t rv_soc_bus_access(void *priv, privilege_level priv_level, bus_ac
     return ret_time + rv_soc->clock_period;
 }
 
-SOC::SOC(char *fw_file_name, char *dtb_file_name, char *initrd_file_name, CPU *cpu, uint32_t num_cores, DRAM::AbstractDRAM *dram) : pCPU(cpu), pDRAM(dram)
+SOC::SOC(char *fw_file_name, char *dtb_file_name, char *initrd_file_name, CPU *cpu, uint32_t num_cores, DRAM::AbstractDRAM *dram) : pDRAM(dram), pCPU(cpu)
 {
     #define RESET_VEC_SIZE 10
     #define MiB 0x100000
@@ -263,22 +263,22 @@ uint64_t SOC::ltrim(uint8_t *buffer, uint64_t offset, uint64_t len) {
     return pCPU->trim_flash_icl(buffer, offset, len);
 }
 
-void SOC::pread(void* request, uint64_t* tick) {
+void SOC::pread(uint8_t* request, uint64_t* tick) {
     pCPU->read_flash_pal(request, tick);
 }
-void SOC::pwrite(void* request, uint64_t* tick) {
+void SOC::pwrite(uint8_t* request, uint64_t* tick) {
     pCPU->write_flash_pal(request, tick);
 }
-void SOC::perase(void* request, uint64_t* tick) {
+void SOC::perase(uint8_t* request, uint64_t* tick) {
     pCPU->erase_flash_pal(request, tick);
 }
 
-uint64_t SOC::read_buffer(uint8_t *buffer, uint64_t req_type) {
-    return pCPU->read_buffer(buffer, req_type);
+void SOC::read_buffer(uint8_t *buffer, uint64_t req_info, uint64_t req_type) {
+    pCPU->read_buffer(buffer, req_info, req_type);
 }
 
-uint64_t SOC::write_buffer(uint8_t* buffer, uint64_t req_data, uint64_t req_type) {
-    return pCPU->write_buffer(buffer, req_data, req_type);
+void SOC::write_buffer(uint8_t* buffer, uint64_t req_info, uint64_t req_type) {
+    pCPU->write_buffer(buffer, req_info, req_type);
 }
 uint64_t SOC::get_period() {
     return clock_period;

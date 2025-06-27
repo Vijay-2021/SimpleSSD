@@ -20,6 +20,7 @@
 #include "hil/hil.hh"
 
 #include "util/algorithm.hh"
+#include "cpu/cpu.hh"
 
 namespace SimpleSSD {
 
@@ -41,7 +42,7 @@ void HIL::read(Request &req) {
   DMAFunction doRead = [this](uint64_t tick, void *context) {
     auto pReq = (Request *)context;
 
-
+    printf("calling dma for read at tick %lu with reqId %lu\n", tick, pReq->reqID);
     //debugprint(LOG_HIL,
     //           "READ  | REQ %7u | LCA %" PRIu64 " + %" PRIu64 " | BYTE %" PRIu64
     //           " + %" PRIu64,
@@ -63,7 +64,7 @@ void HIL::read(Request &req) {
 void HIL::write(Request &req) {
   DMAFunction doWrite = [this](uint64_t tick, void *context) {
     auto pReq = (Request *)context;
-
+    printf("calling dma for write at tick %lu with reqId %lu\n", tick, pReq->reqID);
     //debugprint(LOG_HIL,
     //           "WRITE | REQ %7u | LCA %" PRIu64 " + %" PRIu64 " | BYTE %" PRIu64
     //           " + %" PRIu64,
@@ -86,7 +87,7 @@ void HIL::write(Request &req) {
 void HIL::flush(Request &req) {
   DMAFunction doFlush = [this](uint64_t tick, void *context) {
     auto pReq = (Request *)context;
-
+    printf("calling dma for flush at tick %lu with reqId %lu\n", tick, pReq->reqID);
     pReq->finishedAt = tick;
     completionQueue.push(*pReq);
 
@@ -102,7 +103,7 @@ void HIL::flush(Request &req) {
 void HIL::trim(Request &req) {
   DMAFunction doFlush = [this](uint64_t tick, void *context) {
     auto pReq = (Request *)context;
-
+    printf("calling dma for trim at tick %lu with reqId %lu\n", tick, pReq->reqID);
     //debugprint(LOG_HIL, "TRIM  | REQ %7u | LCA %" PRIu64 " + %" PRIu64,
     //           pReq->reqID, pReq->range.slpn, pReq->range.nlp);
 
@@ -121,7 +122,7 @@ void HIL::trim(Request &req) {
 void HIL::format(Request &req, bool erase) {
   DMAFunction doFlush = [this, erase](uint64_t tick, void *context) {
     auto pReq = (Request *)context;
-
+    printf("calling dma for format at tick %lu with reqId %lu\n", tick, pReq->reqID);
     pReq->finishedAt = tick;
     completionQueue.push(*pReq);
 
@@ -165,7 +166,7 @@ void HIL::updateCompletion() {
   if (completionQueue.size() > 0) {
     if (lastScheduled != completionQueue.top().finishedAt) {
       lastScheduled = completionQueue.top().finishedAt;
-      schedule(completionEvent, lastScheduled);
+      schedule(completionEvent, MAX(lastScheduled, getTick()));
     }
   }
 }
@@ -249,6 +250,14 @@ void HIL::resetStatValues() {
   memset(&stat, 0, sizeof(stat));
 
   pICL->resetStatValues();
+}
+
+void HIL::setCPU(CPU::CPU *cpu) {
+  pCPU = cpu;
+}
+
+ICL::ICL *HIL::getICL() {
+  return pICL;
 }
 
 }  // namespace HIL

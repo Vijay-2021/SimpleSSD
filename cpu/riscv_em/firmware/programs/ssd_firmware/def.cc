@@ -46,8 +46,8 @@ Request::_Request(FTL::Request &r)
 
 void process_request(uint64_t req_time) {
     uint64_t core_id = getCoreId();
-    printf("Processing request with ID: %lu at time: %lu\n", core_id, req_time);
-    write_buffer(req_time, core_id, FIRMWARE_REQ_DONE);
+    printf("Processing request with ID: %u at time: %u\n", core_id, req_time);
+    write_buffer((uint64_t)&req_time, core_id, FIRMWARE_REQ_DONE);
 }
 
 void process_request_failed() {
@@ -57,13 +57,19 @@ void process_request_failed() {
 }
 
 uint64_t getTick() {
-    uint64_t tick;
-    read_buffer((uint64_t)&tick, FIRMWARE_TICK);
+    uint64_t tick = 0;
+    read_buffer((uint64_t)&tick, 0, FIRMWARE_TICK);
     return tick;
 }
 
 uint64_t getCoreId() {
     uint64_t core_id;
-    read_buffer((uint64_t)&core_id, FIRMWARE_CORE_ID);
+    read_buffer((uint64_t)&core_id, 0, FIRMWARE_CORE_ID);
     return core_id;
+}
+
+uint64_t getReqQueueSize() {
+    uint64_t size;
+    read_buffer((uint64_t)&size, 0, FIRMWARE_QUEUE_SIZE);
+    return size;
 }

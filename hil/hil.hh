@@ -28,6 +28,10 @@
 
 namespace SimpleSSD {
 
+namespace CPU {
+  class CPU;
+}
+
 namespace HIL {
 
 class HIL : public StatObject {
@@ -52,6 +56,8 @@ class HIL : public StatObject {
   void updateCompletion();
   void completion();
 
+  CPU::CPU *pCPU;
+
  public:
   HIL(ConfigReader &);
   ~HIL();
@@ -70,10 +76,8 @@ class HIL : public StatObject {
   void getStatValues(std::vector<double> &) override;
   void resetStatValues() override;
 
-  ICL::ICL *getICL() {
-    return pICL;
-  }
-  
+  ICL::ICL *getICL();
+  void setCPU(CPU::CPU *cpu);
 };
 
 }  // namespace HIL
