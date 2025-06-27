@@ -178,31 +178,47 @@ CPU::CPU(ConfigReader &c, ICL::ICL *icl, FTL::FTL *ftl, PAL::PAL *pal, DRAM::Abs
   hilCore.resize(conf.readUint(CONFIG_CPU, CPU_CORE_HIL));
   iclCore.resize(conf.readUint(CONFIG_CPU, CPU_CORE_ICL));
   ftlCore.resize(conf.readUint(CONFIG_CPU, CPU_CORE_FTL));
-
-  csd = new RISCV::SOC(const_cast<char*>(conf.readString(CONFIG_CPU, CPU_FW_PATH).c_str()), nullptr, nullptr, this, conf.readUint(CONFIG_CPU, CPU_CORE_CSD), pDRAM); // TO-DO: make this less hacky
+  uint64_t csd_cores = conf.readUint(CONFIG_CPU, CPU_CORE_CSD);
+  csd = new RISCV::SOC(const_cast<char*>(conf.readString(CONFIG_CPU, CPU_FW_PATH).c_str()), nullptr, nullptr, this, csd_cores, pDRAM); // TO-DO: make this less hacky
   csdCycleEvent = allocate([this](uint64_t) {
     csdCycle();
   });
+  callbacks.resize(csd_cores);
   page_size = pPAL->getInfo()->pageSize;
   pDisk = new Disk();
   
-  fw_params.totalPhysicalBlocks = pFTL->getInfo()->totalPhysicalBlocks;
-  fw_params.totalLogicalBlocks = pFTL->getInfo()->totalLogicalBlocks;
-  fw_params.pagesInBlock = pFTL->getInfo()->pagesInBlock;
-  fw_params.pageSize = pFTL->getInfo()->pageSize;
-  fw_params.ioUnitInPage = pFTL->getInfo()->ioUnitInPage;
-  fw_params.pageCountToMaxPerf = pFTL->getInfo()->pageCountToMaxPerf;
-  fw_params.bRandomTweak = conf.readBoolean(CONFIG_FTL, SimpleSSD::FTL::FTL_USE_RANDOM_IO_TWEAK);
-  fw_params.ftl_fill_ratio = conf.readFloat(CONFIG_FTL, SimpleSSD::FTL::FTL_FILL_RATIO);
-  fw_params.ftl_invalid_page_ratio = conf.readFloat(CONFIG_FTL, SimpleSSD::FTL::FTL_INVALID_PAGE_RATIO);
-  fw_params.ftl_filling_mode = (FTL::FILLING_MODE)conf.readInt(CONFIG_FTL, SimpleSSD::FTL::FTL_FILLING_MODE);
-  fw_params.ftl_gc_threshold_ratio = conf.readFloat(CONFIG_FTL, SimpleSSD::FTL::FTL_GC_THRESHOLD_RATIO);
-  fw_params.ftl_gc_mode = (FTL::GC_MODE)conf.readInt(CONFIG_FTL, SimpleSSD::FTL::FTL_GC_MODE);
-  fw_params.ftl_evict_policy = (FTL::EVICT_POLICY)conf.readInt(CONFIG_FTL, SimpleSSD::FTL::FTL_GC_EVICT_POLICY);
-  fw_params.choiceParam = conf.readInt(CONFIG_FTL, SimpleSSD::FTL::FTL_GC_D_CHOICE_PARAM);
-  fw_params.ftl_gc_reclaim_block = conf.readInt(CONFIG_FTL, SimpleSSD::FTL::FTL_GC_RECLAIM_BLOCK);
-  fw_params.ftl_gc_reclaim_threshold = conf.readFloat(CONFIG_FTL, SimpleSSD::FTL::FTL_GC_RECLAIM_BLOCK);
-  fw_params.bad_block_threshold = conf.readInt(CONFIG_FTL, SimpleSSD::FTL::FTL_BAD_BLOCK_THRESHOLD);
+  fparams.totalPhysicalBlocks = pFTL->getInfo()->totalPhysicalBlocks;
+  fparams.totalLogicalBlocks = pFTL->getInfo()->totalLogicalBlocks;
+  fparams.pagesInBlock = pFTL->getInfo()->pagesInBlock;
+  fparams.pageSize = pFTL->getInfo()->pageSize;
+  fparams.ioUnitInPage = pFTL->getInfo()->ioUnitInPage;
+  fparams.pageCountToMaxPerf = pFTL->getInfo()->pageCountToMaxPerf;
+  fparams.bRandomTweak = conf.readBoolean(CONFIG_FTL, SimpleSSD::FTL::FTL_USE_RANDOM_IO_TWEAK);
+  fparams.ftl_fill_ratio = conf.readFloat(CONFIG_FTL, SimpleSSD::FTL::FTL_FILL_RATIO);
+  fparams.ftl_invalid_page_ratio = conf.readFloat(CONFIG_FTL, SimpleSSD::FTL::FTL_INVALID_PAGE_RATIO);
+  fparams.ftl_filling_mode = (FTL::FILLING_MODE)conf.readInt(CONFIG_FTL, SimpleSSD::FTL::FTL_FILLING_MODE);
+  fparams.ftl_gc_threshold_ratio = conf.readFloat(CONFIG_FTL, SimpleSSD::FTL::FTL_GC_THRESHOLD_RATIO);
+  fparams.ftl_gc_mode = (FTL::GC_MODE)conf.readInt(CONFIG_FTL, SimpleSSD::FTL::FTL_GC_MODE);
+  fparams.ftl_evict_policy = (FTL::EVICT_POLICY)conf.readInt(CONFIG_FTL, SimpleSSD::FTL::FTL_GC_EVICT_POLICY);
+  fparams.choiceParam = conf.readInt(CONFIG_FTL, SimpleSSD::FTL::FTL_GC_D_CHOICE_PARAM);
+  fparams.ftl_gc_reclaim_block = conf.readInt(CONFIG_FTL, SimpleSSD::FTL::FTL_GC_RECLAIM_BLOCK);
+  fparams.ftl_gc_reclaim_threshold = conf.readFloat(CONFIG_FTL, SimpleSSD::FTL::FTL_GC_RECLAIM_BLOCK);
+  fparams.bad_block_threshold = conf.readInt(CONFIG_FTL, SimpleSSD::FTL::FTL_BAD_BLOCK_THRESHOLD);
+  
+  iparams.pageSize = fparams.pageSize;
+  iparams.pageCountToMaxPerf = fparams.pageCountToMaxPerf;
+  iparams.ioUnitInPage = fparams.ioUnitInPage;
+  iparams.waySize = conf.readUint(CONFIG_ICL, ICL_WAY_SIZE);
+  iparams.prefetchCount = conf.readUint(CONFIG_ICL, ICL_PREFETCH_COUNT);
+  iparams.prefetchRatio = conf.readFloat(CONFIG_ICL, ICL_PREFETCH_RATIO);
+  iparams.useReadCaching = conf.readBoolean(CONFIG_ICL, ICL_USE_READ_CACHE);
+  iparams.useWriteCaching = conf.readBoolean(CONFIG_ICL, ICL_USE_WRITE_CACHE);
+  iparams.useReadPrefetch = conf.readBoolean(CONFIG_ICL, ICL_USE_READ_PREFETCH);
+  iparams.useRandomIOTweak = fparams.bRandomTweak;
+  iparams.cacheSize = conf.readUint(CONFIG_ICL, ICL_CACHE_SIZE);
+  iparams.iclEvictGranularity = (ICL::EVICT_MODE)conf.readInt(CONFIG_ICL, ICL_EVICT_GRANULARITY) == 0 ? ICL::PREFETCH_MODE::MODE_SUPERPAGE : ICL::PREFETCH_MODE::MODE_ALL;
+  iparams.iclPrefetchGranularity = (ICL::PREFETCH_MODE)conf.readInt(CONFIG_ICL, ICL_PREFETCH_GRANULARITY) == 0 ? ICL::PREFETCH_MODE::
+  
   // unsigned char buffer[256];
   // read_flash(buffer, 4096, 4096);
   // schedule(csdCycleEvent, getTick()); // start the csd core(s) as soon as possible
@@ -1147,63 +1163,35 @@ uint64_t CPU::trim_flash_icl(uint8_t* buffer, uint64_t offset , uint64_t len) {
 }
 
 // TO-DO: implement!
-uint64_t CPU::read_flash_pal(uint8_t* buffer, uint64_t offset , uint64_t len) {
+void CPU::read_flash_pal(uint8_t* request, uint64_t* tick) {
   debugprint(LOG_CPU, "Read flash PAL from CSD at offset %u, length %u",
              offset, len);
-  ICL::Request req;
-  LPNRange lpnRange;
-  lpnRange.slpn = offset / (page_size / lba_size);
-  lpnRange.nlp = (len / (page_size / lba_size)) + 1;
-  req.range = lpnRange;
-  req.offset = 0;
-  req.length = len;
-  req.reqID = global_req_id++;
-  req.reqSubID = 0;
-  uint64_t reqTick = getTick();
+  PAL::Request* req = (PAL::Request*)request;
+  uint64_t reqTick = *tick;
   debugprint(LOG_CPU, "Request ID %u at tick %llu", req.reqID, reqTick);
-  pICL->read(req, reqTick);
-  uint64_t slba = offset;
-  uint32_t nlblk = len;
-  pDisk->read(slba, nlblk, buffer);
-  return reqTick;
+  pPAL->read(*req, reqTick);
+  *tick = reqTick;
+}
+
+void CPU::write_flash_pal(uint8_t* request, uint64_t* tick) {
+  debugprint(LOG_CPU, "Write flash PAL from CSD at offset %u, length %u",
+             offset, len);
+  PAL::Request* req = (PAL::Request*)request;
+  uint64_t reqTick = *tick;
+  debugprint(LOG_CPU, "Request ID %u at tick %llu", req.reqID, reqTick);
+  pPAL->write(*req, reqTick);
+  *tick = reqTick;
 }
 
 // TO-DO: implement!
-uint64_t CPU::write_flash_pal(uint8_t* buffer, uint64_t offset , uint64_t len) {
-  debugprint(SimpleSSD::LOG_CPU, "Write flash PAL from CSD at offset %u, length %u",
-      offset, len);
-  ICL::Request req;
-  LPNRange lpnRange;
-  uint32_t page_per_lba = page_size / lba_size;
-  lpnRange.slpn = offset / page_per_lba;
-  lpnRange.nlp = (len + page_per_lba - 1) / page_per_lba;
-  req.range = lpnRange;
-  req.offset = 0;
-  req.length = len;
-  req.reqID = global_req_id++;
-  req.reqSubID = 0;
-  uint64_t reqTick = getTick();
+void CPU::erase_flash_pal(uint8_t* request, uint64_t* tick) {
+  debugprint(LOG_CPU, "Erase flash PAL from CSD at offset %u, length %u",
+             offset, len);
+  PAL::Request* req = (PAL::Request*)request;
+  uint64_t reqTick = *tick;
   debugprint(LOG_CPU, "Request ID %u at tick %llu", req.reqID, reqTick);
-  pICL->write(req, reqTick);
-  debugprint(LOG_CPU, "Request ID %u completed at tick %llu",
-              req.reqID, reqTick);
-  uint64_t slba = offset;
-  uint32_t nlblk = len;
-  pDisk->write(slba, nlblk, buffer);
-  return reqTick;
-}
-
-// TO-DO: implement!
-uint64_t CPU::erase_flash_pal(uint8_t* buffer, uint64_t offset , uint64_t len) {
-  debugprint(SimpleSSD::LOG_CPU, "Erase flash PAL from CSD at offset %u, length %u",
-      offset, len);
-  LPNRange lpnRange;
-  uint32_t page_per_lba = page_size / lba_size;
-  lpnRange.slpn = offset / page_per_lba;
-  lpnRange.nlp = (len + page_per_lba - 1) / page_per_lba;
-  uint64_t reqTick = getTick();
-  pICL->trim(lpnRange, reqTick);
-  return reqTick;
+  pPAL->erase(*req, reqTick);
+  *tick = reqTick;
 }
 
 
@@ -1224,7 +1212,7 @@ void CPU::addCSDTask(char* input_command) {
 
 uint64_t CPU::read_buffer(uint8_t* buffer, uint64_t req_type) {
   if (req_type == RISCV::FIRMWARE_PARAMS) {
-    memcpy(buffer, &fw_params, sizeof(firmware_params_td));
+    memcpy(buffer, &fparams, sizeof(firmware_params_td));
   } else if (req_type == RISCV::FIRMWARE_QUEUE_TOP) {
     debugprint(LOG_CPU, "Reading firmware queue with %zu requests",
              req_queue.size());
@@ -1238,6 +1226,25 @@ uint64_t CPU::read_buffer(uint8_t* buffer, uint64_t req_type) {
   }
   return getTick() + clockPeriod;
 }
+
+void CPU::write_buffer(uint8_t* buffer, uint64_t req_data, uint64_t req_type) {
+  if (req_type == RISCV::REQ_DONE) {
+    uint64_t finished_at;
+    memcpy(finished_at, &req_data, sizeof(uint64_t));
+    runDMA(finished_at, req_data);
+  } else if (req_type == RISCV::REQ_FAILED) {
+    debugprint(LOG_CPU, "Request failed!!\n");
+    runDMA(req_data);
+  }
+}
+
+void runDMA(uint64_t finished_at, uint64_t core_id) {
+  // for now there isn't a core id
+  DMAFunction func = callbacks[core_id].first;
+  void* context = callbacks[core_id].second;
+  func(finished_at, context);
+}
+
 uint64_t CPU::getClockPeriod() {
   return clockPeriod;
 }
@@ -1246,9 +1253,12 @@ bool CPU::socIsPaused() {
   return csd_in_progress;
 }
 
-uint64_t CPU::submitReadRequest(FTL::Request &req) {
+uint64_t CPU::submitRead(HIL::Request *req, DMAFunction &callback) {
   //debugprint(LOG_CPU, "Submitting read request with ID %u", req.reqID);
-  req.reqType = FTL_REQ_READ;
+  ICL::Request request(*req);
+  request.reqType = ICL_REQ_READ;
+  req.reqType = ICL_REQ_READ;
+  req_queue.push({request, callback, req});
   req_queue.push(req);
   return getTick() + clockPeriod;
 }

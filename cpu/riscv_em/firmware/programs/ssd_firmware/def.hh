@@ -8,6 +8,14 @@
 #include "memory.h"
 #include "new.hh"
 
+typedef struct _LPNRange {
+  uint64_t slpn;
+  uint64_t nlp;
+
+  _LPNRange();
+  _LPNRange(uint64_t, uint64_t);
+} LPNRange;
+
 typedef enum {
   /* Common FTL configuration */
   FTL_MAPPING_MODE          = 0,
@@ -52,41 +60,41 @@ typedef enum {
 } EVICT_POLICY;
 
 typedef enum {
-    FIRMWARE_PARAMS = 0, 
-    FIRMWARE_QUEUE_TOP = 1,
-    FIRMWARE_BITSET_BUFFER = 2,
-    FIRMWARE_TICK = 3,
-    FIRMWARE_CYCLE = 4,
+    FIRMWARE_FTL_PARAMS = 0, 
+    FIRMWARE_ICL_PARAMS = 1,
+    FIRMWARE_QUEUE_TOP = 2,
+    FIRMWARE_BITSET_BUFFER = 3,
+    FIRMWARE_TICK = 4,
+    FIRMWARE_CYCLE = 5,
+    FIRMWARE_CORE_ID = 6,
 } DATA_REQ;
 
 typedef enum {
-  FTL_REQ_READ = 0,
-  FTL_REQ_WRITE = 1,
-  FTL_REQ_TRIM = 2,
-  FTL_REQ_FORMAT = 3,
-  FTL_REQ_EMPTY = 4,
-} FTL_REQ_TYPE;
+  FIRMWARE_REQ_DONE = 0,
+  FIRMWARE_REQ_FAILED = 1,
+} DATA_RESP; 
 
+typedef enum {
+  ICL_REQ_READ = 0,
+  ICL_REQ_WRITE = 1,
+  ICL_REQ_TRIM = 2,
+  ICL_REQ_FORMAT = 3,
+  ICL_REQ_EMPTY = 4,
+} ICL_REQ_TYPE;
 
-struct firmware_params {
-  uint64_t totalPhysicalBlocks;
-  uint64_t totalLogicalBlocks;
-  uint64_t pagesInBlock;
-  uint32_t pageSize;
-  uint32_t ioUnitInPage;
-  uint32_t pageCountToMaxPerf;  
-  bool bRandomTweak;
-  float ftl_fill_ratio;
-  float ftl_invalid_page_ratio;
-  FILLING_MODE ftl_filling_mode; // or FILLING_MODE
-  float ftl_gc_threshold_ratio;
-  GC_MODE ftl_gc_mode;
-  EVICT_POLICY ftl_evict_policy;
-  uint32_t choiceParam;
-  uint64_t ftl_gc_reclaim_block;
-  float ftl_gc_reclaim_threshold;
-  uint64_t bad_block_threshold;
-};
+namespace ICL {
+
+typedef struct _Request {
+  uint64_t reqID;
+  uint64_t reqSubID;
+  uint64_t offset;
+  uint64_t length;
+  LPNRange range;
+  ICL_REQ_TYPE reqType;
+  _Request();
+} Request;
+
+}
 
 namespace FTL {
 
@@ -95,8 +103,8 @@ typedef struct _Request {
   uint64_t reqSubID;
   uint64_t lpn;
   Bitset ioFlag;
-  FTL_REQ_TYPE reqType;
-  _Request(uint32_t);
+  _Request(uint32_t, ICL::Request &);
+  _Request(uint32_t iocount);
   _Request();
 } Request;
 
@@ -126,5 +134,10 @@ uint8_t popcount(T v) {
 
   return (uint8_t)v;
 }
+
+void process_request(uint64_t req_time);
+void process_request_failed();
+uint64_t getTick();
+uint64_t getCoreId();
 
 #endif

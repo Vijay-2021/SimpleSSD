@@ -71,9 +71,10 @@ class Core {
 
         int lr_valid;
         rv_word_t lr_address;
-        
-        Core(SOC *soc, bus_access_func bus_acc);
-        
+        uint64_t core_id;
+
+        Core(SOC *soc, bus_access_func bus_acc, uint64_t cid);
+
         uint64_t rv_core_run();
         void rv_core_process_interrupts(uint8_t mei, uint8_t mti, uint8_t msi);
         void rv_core_reg_dump();

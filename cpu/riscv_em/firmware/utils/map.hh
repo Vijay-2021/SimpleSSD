@@ -137,13 +137,22 @@ public:
         }
     }
 
-    void erase(iterator iter) {
+    // void erase(iterator iter) {
+    //     if (iter != end()) {
+    //         iter.ptr->data.~Pair<K, V>();
+    //         iter.ptr->occupied = false;
+    //         --size_;
+    //         ++iter; // Move iterator to next valid position
+    //     }
+    // }
+    iterator& erase(iterator& iter) {
         if (iter != end()) {
             iter.ptr->data.~Pair<K, V>();
             iter.ptr->occupied = false;
             --size_;
             ++iter; // Move iterator to next valid position
         }
+        return iter;
     }
     iterator begin() { return iterator(table_, table_ + capacity_); }
     iterator end()   { return iterator(table_ + capacity_, table_ + capacity_); }

@@ -29,7 +29,29 @@
 #include "block.hh"
 #include "limits.hh"
 
-class Firmware {
+namespace FTL {
+
+struct ftl_params {
+  uint64_t totalPhysicalBlocks;
+  uint64_t totalLogicalBlocks;
+  uint64_t pagesInBlock;
+  uint32_t pageSize;
+  uint32_t ioUnitInPage;
+  uint32_t pageCountToMaxPerf;  
+  bool bRandomTweak;
+  float ftl_fill_ratio;
+  float ftl_invalid_page_ratio;
+  FILLING_MODE ftl_filling_mode; // or FILLING_MODE
+  float ftl_gc_threshold_ratio;
+  GC_MODE ftl_gc_mode;
+  EVICT_POLICY ftl_evict_policy;
+  uint32_t choiceParam;
+  uint64_t ftl_gc_reclaim_block;
+  float ftl_gc_reclaim_threshold;
+  uint64_t bad_block_threshold;
+};
+
+class FTL {
   
   private:
     HashMap<uint64_t, Vector<Pair<uint32_t, uint32_t>>>
@@ -52,34 +74,36 @@ class Firmware {
       uint64_t validPageCopies;
     } stat;
     
-    firmware_params params;
+    ftl_params params;
     float freeBlockRatio();
     uint32_t convertBlockIdx(uint32_t);
     uint32_t getFreeBlock(uint32_t);
     uint32_t getLastFreeBlock(Bitset &);
     void calculateVictimWeight(Vector<Pair<uint32_t, float>> &,
-                              const EVICT_POLICY, uint64_t);
-    void selectVictimBlock(Vector<uint32_t> &, uint64_t &);
-    void doGarbageCollection(Vector<uint32_t> &, uint64_t &);
+                              const EVICT_POLICY);
+    void selectVictimBlock(Vector<uint32_t> &);
+    uint64_t doGarbageCollection(Vector<uint32_t> &);
 
     float calculateWearLeveling();
     void calculateTotalPages(uint64_t &, uint64_t &);
 
-    void readInternal(FTL::Request &, uint64_t &);
-    void writeInternal(FTL::Request &, uint64_t &, bool = true);
-    void trimInternal(FTL::Request &, uint64_t &);
-    void eraseInternal(PAL::Request &, uint64_t &);
+    uint64_t readInternal(Request &);
+    uint64_t writeInternal(Request &, bool = true);
+    uint64_t trimInternal(Request &);
+    void eraseInternal(PAL::Request &, uint64_t &tick);
 
  public:
-    Firmware(firmware_params& ssd_params);
-    ~Firmware();
+    FTL(ftl_params& fparams);
+    ~FTL();
 
     bool initialize();
 
-    void read(FTL::Request &, uint64_t &);
-    void write(FTL::Request &, uint64_t &);
-    void trim(FTL::Request &, uint64_t &);
+    uint64_t read(Request &);
+    uint64_t write(Request &);
+    uint64_t trim(Request &);
+    uint64_t format(LPNRange &);
 };
 
+}
 
 #endif

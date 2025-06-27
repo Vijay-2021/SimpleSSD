@@ -267,7 +267,7 @@ bool Block::getPageInfo(uint32_t pageIndex, Vector<uint64_t> &lpn,
   return map.any();
 }
 
-bool Block::read(uint32_t pageIndex, uint32_t idx, uint64_t tick) {
+bool Block::read(uint32_t pageIndex, uint32_t idx) {
   bool read = false;
 
   if (ioUnitInPage == 1 && idx == 0) {
@@ -281,14 +281,13 @@ bool Block::read(uint32_t pageIndex, uint32_t idx, uint64_t tick) {
   }
 
   if (read) {
-    lastAccessed = tick;
+    lastAccessed = getTick();
   }
 
   return read;
 }
 
-bool Block::write(uint32_t pageIndex, uint64_t lpn, uint32_t idx,
-                  uint64_t tick) {
+bool Block::write(uint32_t pageIndex, uint64_t lpn, uint32_t idx) {
   bool write = false;
 
   if (ioUnitInPage == 1 && idx == 0) {
@@ -306,7 +305,7 @@ bool Block::write(uint32_t pageIndex, uint64_t lpn, uint32_t idx,
       panic("Write to block should sequential");
     }
 
-    lastAccessed = tick;
+    lastAccessed = getTick();
 
     if (ioUnitInPage == 1) {
       pErasedBits->reset(pageIndex);

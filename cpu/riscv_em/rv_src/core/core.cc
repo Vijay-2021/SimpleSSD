@@ -1407,23 +1407,33 @@ static uint64_t instr_LTRIM(Core * rv_core) {
 }
 
 static uint64_t instr_PREAD(Core * rv_core) {
-    return rv_core->pSOC->pread(rv_core->pSOC->get_ram() + ((rv_core->reg_file[rv_core->rd] - RAM_BASE_ADDR)), rv_core->reg_file[rv_core->rs1], rv_core->reg_file[rv_core->rs2]);
+    rv_core->pSOC->pread(rv_core->pSOC->get_ram() + ((rv_core->reg_file[rv_core->rd] - RAM_BASE_ADDR)), rv_core->reg_file[rv_core->rs1], rv_core->reg_file[rv_core->rs2]);
+    return getTick() + rv_core->pSOC->get_period();
 }
 
 static uint64_t instr_PWRITE(Core * rv_core) {
-    return rv_core->pSOC->pread(rv_core->pSOC->get_ram() + ((rv_core->reg_file[rv_core->rd] - RAM_BASE_ADDR)), rv_core->reg_file[rv_core->rs1], rv_core->reg_file[rv_core->rs2]);
+    rv_core->pSOC->pwrite(rv_core->pSOC->get_ram() + ((rv_core->reg_file[rv_core->rd] - RAM_BASE_ADDR)), rv_core->reg_file[rv_core->rs1], rv_core->reg_file[rv_core->rs2]);
+    return getTick() + rv_core->pSOC->get_period();
 }
 
 static uint64_t instr_PERASE(Core * rv_core) {
-    return rv_core->pSOC->perase(rv_core->pSOC->get_ram() + ((rv_core->reg_file[rv_core->rd] - RAM_BASE_ADDR)), rv_core->reg_file[rv_core->rs1], rv_core->reg_file[rv_core->rs2]);
+    rv_core->pSOC->perase(rv_core->pSOC->get_ram() + ((rv_core->reg_file[rv_core->rd] - RAM_BASE_ADDR)), rv_core->reg_file[rv_core->rs1], rv_core->reg_file[rv_core->rs2]);
+    return getTick() + rv_core->pSOC->get_period();
 }
 
 static uint64_t instr_READBUFF(Core *rv_core) {
     if (rv_core->reg_file[rv_core->rs1] == FIRMWARE_CYCLE) {
         memcpy(rv_core->pSOC->get_ram() + ((rv_core->reg_file[rv_core->rd] - RAM_BASE_ADDR)), &rv_core->curr_cycle, sizeof(rv_core->curr_cycle));
+    } else if (rv_core->reg_file[rv_core->rs1] == FIRMWARE_CORE_ID) {
+        memcpy(rv_core->pSOC->get_ram() + ((rv_core->reg_file[rv_core->rd] - RAM_BASE_ADDR)), &rv_core->core_id, sizeof(rv_core->core_id));
     } else {
         rv_core->pSOC->read_buffer(rv_core->pSOC->get_ram() + ((rv_core->reg_file[rv_core->rd] - RAM_BASE_ADDR)), rv_core->reg_file[rv_core->rs1]);
     }
+    return getTick() + rv_core->pSOC->get_period();
+}
+
+static uint64_t instr_WRITEBUFF(Core *rv_core) {
+    rv_core->pSOC->write_buffer(rv_core->pSOC->get_ram() + ((rv_core->reg_file[rv_core->rd] - RAM_BASE_ADDR)), rv_core->reg_file[rv_core->rs1], rv_core->reg_file[rv_core->rs2] );
     return getTick() + rv_core->pSOC->get_period();
 }
 
@@ -2409,7 +2419,7 @@ static void rv_core_init_csr_regs(Core *rv_core)
         INIT_CSR_REG_DEFAULT(rv_core->csr_regs, (CSR_ADDR_CYCLEH+i), CSR_ACCESS_RO(machine_mode) | CSR_ACCESS_RO(supervisor_mode) | CSR_ACCESS_RO(user_mode), 0, CSR_MASK_ZERO, CSR_MASK_ZERO);
 }
 
-Core::Core(SOC *soc, bus_access_func bus_acc) : pSOC(soc), bus_access(bus_acc)
+Core::Core(SOC *soc, bus_access_func bus_acc, uint64_t cid) : pSOC(soc), bus_access(bus_acc), core_id(cid)
 {
     init_instruction_hooks();
     curr_priv_mode = machine_mode;

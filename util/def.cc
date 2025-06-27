@@ -55,27 +55,28 @@ bool Request::operator()(const Request &a, const Request &b) {
 
 namespace ICL {
 
-Request::_Request() : reqID(0), reqSubID(0), offset(0), length(0) {}
+Request::_Request() : reqID(0), reqSubID(0), offset(0), length(0), reqType(ICL_REQ_EMPTY) {}
 
 Request::_Request(HIL::Request &r)
     : reqID(r.reqID),
       reqSubID(r.reqSubID),
       offset(r.offset),
       length(r.length),
-      range(r.range) {}
+      range(r.range),
+      reqType(ICL_REQ_EMPTY) {}
 
 }  // namespace ICL
 
 namespace FTL {
 
 Request::_Request(uint32_t iocount)
-    : reqID(0), reqSubID(0), lpn(0), ioFlag(iocount), reqType(FTL_REQ_EMPTY) {}
+    : reqID(0), reqSubID(0), lpn(0), ioFlag(iocount) {}
 
 Request::_Request(uint32_t iocount, ICL::Request &r)
     : reqID(r.reqID),
       reqSubID(r.reqSubID),
       lpn(r.range.slpn / iocount),
-      ioFlag(iocount), reqType(FTL_REQ_EMPTY) {
+      ioFlag(iocount) {
   ioFlag.set(r.range.slpn % iocount);
 }
 

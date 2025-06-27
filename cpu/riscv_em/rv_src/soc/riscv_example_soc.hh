@@ -35,9 +35,9 @@ class SOC {
         void rv_soc_schedule_next();
         uint64_t get_period(); 
         uint8_t* get_ram();
-        uint64_t pread(uint8_t* buffer, uint64_t offset , uint64_t len);
-        uint64_t pwrite(uint8_t *buffer, uint64_t offset, uint64_t len);
-        uint64_t perase(uint8_t *buffer, uint64_t offset, uint64_t len);
+        uint64_t pread(void* request, uint64_t* tick);
+        uint64_t pwrite(void* request, uint64_t* tick);
+        uint64_t perase(void* request, uint64_t* tick);
         uint64_t lread(uint8_t *buffer, uint64_t offset, uint64_t len);
         uint64_t lwrite(uint8_t *buffer, uint64_t offset, uint64_t len);
         uint64_t ltrim(uint8_t *buffer, uint64_t offset, uint64_t len);

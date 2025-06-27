@@ -3,7 +3,18 @@
 
 #include <stdint.h>
 
-template <typename T>
-T  
+template<typename It>
+It Unique(It begin, It end) {
+    if (begin == end) return end;
+
+    It result = begin;
+    for (It it = begin + 1; it != end; ++it) {
+        if (!(*result == *it)) {
+            ++result;
+            *result = *it;
+        }
+    }
+    return ++result;
+} 
 
 #endif

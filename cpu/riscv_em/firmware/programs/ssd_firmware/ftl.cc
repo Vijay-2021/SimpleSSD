@@ -17,17 +17,20 @@
 * along with SimpleSSD.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "ssd_firmware.hh"
+#include "ftl.hh"
 #include "utils.h"
 #include "firmware_utils.h"
 #include "move.hh"
 #include "random.h"
 #include "sort.hh"
 #include "memory.h"
+#include "unique.hh"
 
-Firmware::Firmware(firmware_params &ssd_params) : params(ssd_params), lastFreeBlock(ssd_params.pageCountToMaxPerf),
-      lastFreeBlockIOMap(ssd_params.ioUnitInPage), bReclaimMore(false), blocks(ssd_params.totalPhysicalBlocks), 
-      table(ssd_params.totalLogicalBlocks * ssd_params.pagesInBlock) {
+namespace FTL {
+
+FTL::FTL(ftl_params &fparams) : params(fparams), lastFreeBlock(fparams.pageCountToMaxPerf),
+      lastFreeBlockIOMap(fparams.ioUnitInPage), bReclaimMore(false), blocks(fparams.totalPhysicalBlocks), 
+      table(fparams.totalLogicalBlocks * fparams.pagesInBlock) {
   printf("constructor called with total physical blocks: %u\n", params.totalPhysicalBlocks);
   printf("total page count to max perf: %u\n", params.pageCountToMaxPerf);
   for (uint32_t i = 0; i < 16; i++) {
@@ -53,9 +56,9 @@ Firmware::Firmware(firmware_params &ssd_params) : params(ssd_params), lastFreeBl
   initialize();
 }
 
-Firmware::~Firmware() {}
+FTL::~FTL() {}
  
-bool Firmware::initialize() {
+bool FTL::initialize() {
   uint64_t nPagesToWarmup;
   uint64_t nPagesToInvalidate;
   uint64_t nTotalLogicalPages;
@@ -65,7 +68,7 @@ bool Firmware::initialize() {
   uint64_t invalid;
   FILLING_MODE mode;
 
-  FTL::Request req(params.ioUnitInPage);
+  Request req(params.ioUnitInPage);
 
   print("Initialization started\n");
 
@@ -87,51 +90,43 @@ bool Firmware::initialize() {
   // Step 1. Filling
   if (mode == FILLING_MODE_0 || mode == FILLING_MODE_1) {
     // Sequential
-    printf("using sequential fillings mode\n");
     for (uint64_t i = 0; i < nPagesToWarmup; i++) {
-      printf("Filling page %lu\n", i);
       req.lpn = i;
-      printf("set lpn issue?");
-      writeInternal(req, tick, false);
+      writeInternal(req, false);
     }
-    printf("down here\n");
   }
   else {
     // Random
-    printf("using random filling mode\n");
     for (uint64_t i = 0; i < nPagesToWarmup; i++) {
       tick = 0;
       req.lpn = rand64_range(0, nTotalLogicalPages - 1);
-      writeInternal(req, tick, false);
+      writeInternal(req, false);
     }
   }
 
   // Step 2. Invalidating
   if (mode == FILLING_MODE_0) {
     // Sequential
-    printf("using sequential invalidation mode\n");
     for (uint64_t i = 0; i < nPagesToInvalidate; i++) {
       tick = 0;
       printf("okay...\n");
       req.lpn = i;
-      writeInternal(req, tick, false);
+      writeInternal(req, false);
     }
   }
   else if (mode == FILLING_MODE_1) {
-    printf("using sequential invalidation mode with warmup\n");
     for (uint64_t i = 0; i < nPagesToInvalidate; i++) {
       tick = 0;
       req.lpn = rand64_range(0, nPagesToWarmup - 1);
-      writeInternal(req, tick, false);
+      writeInternal(req, false);
     }
   }
   else {
     // Random
-    printf("using random invalidation mode\n");
     for (uint64_t i = 0; i < nPagesToInvalidate; i++) {
       tick = 0;
       req.lpn = rand64_range(0, nTotalLogicalPages - 1);
-      writeInternal(req, tick, false);
+      writeInternal(req, false);
     }
   }
   
@@ -140,45 +135,34 @@ bool Firmware::initialize() {
   return true;
 }
 
-void Firmware::read(FTL::Request &req, uint64_t &tick) {
-  uint64_t begin = tick;
-  printf("FTL read called\n");
+uint64_t FTL::read(Request &req) {
   if (req.ioFlag.count() > 0) {
-    printf("calling readInternal\n");
-    readInternal(req, tick);
-
-    printf("FTL READ | LPN %u | %u - %u (%u)\n", req.lpn, begin, tick, tick - begin);
+    return readInternal(req);
   }
   else {
     print("FTL got empty request\n");
+    return getTick();
   }
 
 }
 
-void Firmware::write(FTL::Request &req, uint64_t &tick) {
-  uint64_t begin = tick;
-
+uint64_t FTL::write(Request &req) {
   if (req.ioFlag.count() > 0) {
-    writeInternal(req, tick);
-
-    printf("FTL WRITE  | LPN %u | %u - %u (%u)\n", req.lpn, begin, tick, tick - begin);
+    return writeInternal(req);
   }
   else {
     print("FTL got empty request\n");
+    return getTick();
   }
 
 }
 
-void Firmware::trim(FTL::Request &req, uint64_t &tick) {
-  uint64_t begin = tick;
-
-  trimInternal(req, tick);
-
-  printf("FTL TRIM  | LPN %u | %u - %u (%u)\n", req.lpn, begin, tick, tick - begin);
+uint64_t FTL::trim(Request &req) {
+  return trimInternal(req);
 }
 
-/** 
-void Firmware::format(LPNRange &range, uint64_t &tick) {
+
+uint64_t FTL::format(LPNRange &range) {
   PAL::Request req(params.ioUnitInPage);
   Vector<uint32_t> list;
 
@@ -206,31 +190,33 @@ void Firmware::format(LPNRange &range, uint64_t &tick) {
       iter = table.erase(iter);
     }
     else {
-      iter++;
+      ++iter;
     }
   }
 
   // Get blocks to erase
-  Sort(list.begin(), list.end(), [](const uint32_t &a, const uint32_t &b) {
+  introsort(list.begin(), list.end(), [](const uint32_t &a, const uint32_t &b) {
     return a < b;
   });
   auto last = Unique(list.begin(), list.end());
-  list.erase(last, list.end());
+  while (last != list.end()) {
+    list.pop_back();
+  }
 
   // Do GC only in specified blocks
-  doGarbageCollection(list, tick);
+  return doGarbageCollection(list);
 
-} */
+} 
 
-float Firmware::freeBlockRatio() {
+float FTL::freeBlockRatio() {
   return (float)nFreeBlocks / params.totalPhysicalBlocks;
 }
 
-uint32_t Firmware::convertBlockIdx(uint32_t blockIdx) {
+uint32_t FTL::convertBlockIdx(uint32_t blockIdx) {
   return blockIdx % params.pageCountToMaxPerf;
 }
 
-uint32_t Firmware::getFreeBlock(uint32_t idx) {
+uint32_t FTL::getFreeBlock(uint32_t idx) {
   uint32_t blockIndex = 0;
 
   if (idx >= params.pageCountToMaxPerf) {
@@ -271,7 +257,7 @@ uint32_t Firmware::getFreeBlock(uint32_t idx) {
   return blockIndex;
 }
 
-uint32_t Firmware::getLastFreeBlock(Bitset &iomap) {
+uint32_t FTL::getLastFreeBlock(Bitset &iomap) {
   if (!bRandomTweak || (lastFreeBlockIOMap & iomap).any()) {
     // Update lastFreeBlockIndex
     lastFreeBlockIndex++;
@@ -304,9 +290,8 @@ uint32_t Firmware::getLastFreeBlock(Bitset &iomap) {
 }
 
 // calculate weight of each block regarding victim selection policy
-void Firmware::calculateVictimWeight(
-    Vector<Pair<uint32_t, float>> &weight, const EVICT_POLICY policy,
-    uint64_t tick) {
+void FTL::calculateVictimWeight(
+    Vector<Pair<uint32_t, float>> &weight, const EVICT_POLICY policy) {
   float temp;
 
   weight.reserve(blocks.size());
@@ -334,7 +319,7 @@ void Firmware::calculateVictimWeight(
 
         weight.push_back(
             {iter.first,
-             temp / ((1 - temp) * (tick - iter.second.getLastAccessedTime()))});
+             temp / ((1 - temp) * (getTick() - iter.second.getLastAccessedTime()))});
       }
 
       break;
@@ -343,8 +328,7 @@ void Firmware::calculateVictimWeight(
   }
 }
 
-void Firmware::selectVictimBlock(Vector<uint32_t> &list,
-                                    uint64_t &tick) {
+void FTL::selectVictimBlock(Vector<uint32_t> &list) {
   static const GC_MODE mode = params.ftl_gc_mode;
   static const EVICT_POLICY policy = params.ftl_evict_policy;
   static uint32_t dChoiceParam = params.choiceParam;
@@ -374,7 +358,7 @@ void Firmware::selectVictimBlock(Vector<uint32_t> &list,
   }
 
   // Calculate weights of all blocks
-  calculateVictimWeight(weight, policy, tick);
+  calculateVictimWeight(weight, policy);
 
   if (policy == POLICY_RANDOM || policy == POLICY_DCHOICE) {
     uint64_t randomRange =
@@ -409,21 +393,16 @@ void Firmware::selectVictimBlock(Vector<uint32_t> &list,
 
 }
 
-void Firmware::doGarbageCollection(Vector<uint32_t> &blocksToReclaim,
-                                      uint64_t &tick) {
+uint64_t FTL::doGarbageCollection(Vector<uint32_t> &blocksToReclaim) {
   PAL::Request req(params.ioUnitInPage);
   Vector<PAL::Request> readRequests;
   Vector<PAL::Request> writeRequests;
   Vector<PAL::Request> eraseRequests;
   Vector<uint64_t> lpns;
   Bitset bit(params.ioUnitInPage);
-  uint64_t beginAt;
-  uint64_t readFinishedAt = tick;
-  uint64_t writeFinishedAt = tick;
-  uint64_t eraseFinishedAt = tick;
 
   if (blocksToReclaim.size() == 0) {
-    return;
+    return getTick();
   }
 
   // For all blocks to reclaim, collecting request structure only
@@ -473,7 +452,7 @@ void Firmware::doGarbageCollection(Vector<uint32_t> &blocksToReclaim,
             mapping.first = newBlockIdx;
             mapping.second = newPageIdx;
 
-            freeBlock->second.write(newPageIdx, lpns.at(idx), idx, beginAt);
+            freeBlock->second.write(newPageIdx, lpns.at(idx), idx);
 
             // Issue Write
             req.blockIndex = newBlockIdx;
@@ -507,9 +486,14 @@ void Firmware::doGarbageCollection(Vector<uint32_t> &blocksToReclaim,
 
   // Do actual I/O here
   // This handles PAL2 limitation (SIGSEGV, infinite loop, or so-on)
+  uint64_t beginAt;
+  uint64_t readFinishedAt = getTick();
+  uint64_t writeFinishedAt = readFinishedAt;
+  uint64_t eraseFinishedAt = readFinishedAt;
+
   for (auto &iter : readRequests) {
-    beginAt = tick;
-    pread((uint64_t) &iter, 0, 0);
+    beginAt = getTick();
+    pread((uint64_t) &iter, (uint64_t)&beginAt, 0);
     //pPAL->read(iter, beginAt);
 
     readFinishedAt = MAX(readFinishedAt, beginAt);
@@ -517,7 +501,7 @@ void Firmware::doGarbageCollection(Vector<uint32_t> &blocksToReclaim,
 
   for (auto &iter : writeRequests) {
     beginAt = readFinishedAt;
-    pwrite((uint64_t) &iter, 0, 0);
+    pwrite((uint64_t) &iter, (uint64_t)&beginAt, 0); // will implement it in the backend so that ticks are handled
     // pPAL->write(iter, beginAt);
 
     writeFinishedAt = MAX(writeFinishedAt, beginAt);
@@ -531,16 +515,15 @@ void Firmware::doGarbageCollection(Vector<uint32_t> &blocksToReclaim,
     eraseFinishedAt = MAX(eraseFinishedAt, beginAt);
   }
 
-  tick = MAX(writeFinishedAt, eraseFinishedAt);
+  uint64_t tick = MAX(writeFinishedAt, eraseFinishedAt);
+  return tick;
 }
 
-void Firmware::readInternal(FTL::Request &req, uint64_t &tick) {
+uint64_t FTL::readInternal(Request &req) {
   PAL::Request palRequest(req);
   uint64_t beginAt;
-  uint64_t finishedAt = tick;
-  printf("this is fine read internal\n");
+  uint64_t finishedAt = getTick();
   auto mappingList = table.find(req.lpn);
-  printf("find is not working?\n");
   if (mappingList != table.end()) {
 
     for (uint32_t idx = 0; idx < bitsetSize; idx++) {
@@ -566,10 +549,10 @@ void Firmware::readInternal(FTL::Request &req, uint64_t &tick) {
             panic("Block is not in use");
           }
 
-          beginAt = tick;
+          beginAt = getTick();
 
-          block->second.read(palRequest.pageIndex, idx, beginAt);
-          pread((uint64_t) &palRequest, 0, 0);
+          block->second.read(palRequest.pageIndex, idx);
+          pread((uint64_t) &palRequest, (uint64_t)&beginAt, 0);
           // pPAL->read(palRequest, beginAt);
 
           finishedAt = MAX(finishedAt, beginAt);
@@ -577,17 +560,18 @@ void Firmware::readInternal(FTL::Request &req, uint64_t &tick) {
       }
     }
 
-    tick = finishedAt;
+    return finishedAt;
   }
+  return getTick(); // No mapping found, return current tick
 }
 
-void Firmware::writeInternal(FTL::Request &req, uint64_t &tick, bool sendToPAL) {
+uint64_t FTL::writeInternal(Request &req, bool sendToPAL) {
   printf("calling write interal!\n");
   PAL::Request palRequest(req);
   HashMap<uint32_t, Block>::iterator block;
   auto mappingList = table.find(req.lpn);
   uint64_t beginAt;
-  uint64_t finishedAt = tick;
+  uint64_t finishedAt = getTick();
   bool readBeforeWrite = false;
 
   if (mappingList != table.end()) {
@@ -636,9 +620,9 @@ void Firmware::writeInternal(FTL::Request &req, uint64_t &tick, bool sendToPAL) 
       uint32_t pageIndex = block->second.getNextWritePageIndex(idx);
       auto &mapping = mappingList->second.at(idx);
 
-      beginAt = tick;
+      beginAt = getTick();
 
-      block->second.write(pageIndex, req.lpn, idx, beginAt);
+      block->second.write(pageIndex, req.lpn, idx);
 
       // Read old data if needed (Only executed when bRandomTweak = false)
       // Maybe some other init procedures want to perform 'partial-write'
@@ -650,7 +634,8 @@ void Firmware::writeInternal(FTL::Request &req, uint64_t &tick, bool sendToPAL) 
         // We don't need to read old data
         palRequest.ioFlag = req.ioFlag;
         palRequest.ioFlag.flip();
-        pread((uint64_t) &palRequest, 0, 0);
+        beginAt = getTick();
+        pread((uint64_t) &palRequest, (uint64_t)&beginAt, 0);
         //pPAL->read(palRequest, beginAt);
       }
 
@@ -669,7 +654,7 @@ void Firmware::writeInternal(FTL::Request &req, uint64_t &tick, bool sendToPAL) 
         else {
           palRequest.ioFlag.set();
         }
-        pwrite((uint64_t) &palRequest, 0, 0);
+        pwrite((uint64_t) &palRequest, (uint64_t)&beginAt, 0);
         //pPAL->write(palRequest, beginAt);
       }
 
@@ -678,9 +663,9 @@ void Firmware::writeInternal(FTL::Request &req, uint64_t &tick, bool sendToPAL) 
   }
 
   // Exclude CPU operation when initializing
-  if (sendToPAL) {
-    tick = finishedAt;
-  }
+  // if (sendToPAL) {
+  //   tick = finishedAt;
+  // }
 
   // GC if needed
   // I assumed that init procedure never invokes GC
@@ -692,22 +677,24 @@ void Firmware::writeInternal(FTL::Request &req, uint64_t &tick, bool sendToPAL) 
     }
 
     Vector<uint32_t> list;
-    uint64_t beginAt = tick;
+    uint64_t beginAt = getTick();
 
-    selectVictimBlock(list, beginAt);
+    selectVictimBlock(list);
 
     printf("GC   | On-demand | %u blocks will be reclaimed", list.size());
 
-    doGarbageCollection(list, beginAt);
+    uint64_t ret_time = doGarbageCollection(list);
 
-    printf(" GC Done | %u - %u (%u)", tick, beginAt, beginAt - tick);
+    printf(" GC Done | %u - %u (%u)", ret_time, beginAt, ret_time - beginAt);
 
     stat.gcCount++;
     stat.reclaimedBlocks += list.size();
   }
+  return finishedAt; // ignore gc time in PAL(the cpu time will still be considered as well as the time for writing to PAL for specific request and extra GC requests will affect PAL performance of subsequent requests)
+    
 }
 
-void Firmware::trimInternal(FTL::Request &req, uint64_t &tick) {
+uint64_t FTL::trimInternal(Request &req) {
   auto mappingList = table.find(req.lpn);
 
   if (mappingList != table.end()) {
@@ -726,14 +713,15 @@ void Firmware::trimInternal(FTL::Request &req, uint64_t &tick) {
 
     // Remove mapping
     table.erase(mappingList);
-
   }
+  return getTick();
 }
 
-void Firmware::eraseInternal(PAL::Request &req, uint64_t &tick) {
+void FTL::eraseInternal(PAL::Request &req, uint64_t &tick) {
+  uint64_t beginAt = getTick();
   static uint64_t threshold = params.bad_block_threshold;
   auto block = blocks.find(req.blockIndex);
-
+  uint64_t pal_time;
   // Sanity checks
   if (block == blocks.end()) {
     panic("No such block");
@@ -745,7 +733,7 @@ void Firmware::eraseInternal(PAL::Request &req, uint64_t &tick) {
 
   // Erase block
   block->second.erase();
-  perase((uint64_t) &req, 0, 0);
+  perase((uint64_t) &req, (uint64_t)&tick, 0);
   // pPAL->erase(req, tick);
 
   // Check erase count
@@ -777,9 +765,11 @@ void Firmware::eraseInternal(PAL::Request &req, uint64_t &tick) {
 
   // Remove block from block list
   blocks.erase(block);
+  uint64_t endAt = getTick();
+  tick += endAt - beginAt;
 }
 
-float Firmware::calculateWearLeveling() {
+float FTL::calculateWearLeveling() {
   uint64_t totalEraseCnt = 0;
   uint64_t sumOfSquaredEraseCnt = 0;
   uint64_t numOfBlocks = params.totalLogicalBlocks;
@@ -812,7 +802,7 @@ float Firmware::calculateWearLeveling() {
          (numOfBlocks * sumOfSquaredEraseCnt);
 }
 
-void Firmware::calculateTotalPages(uint64_t &valid, uint64_t &invalid) {
+void FTL::calculateTotalPages(uint64_t &valid, uint64_t &invalid) {
   valid = 0;
   invalid = 0;
   int i = 0;
@@ -821,3 +811,5 @@ void Firmware::calculateTotalPages(uint64_t &valid, uint64_t &invalid) {
     invalid += iter.second.getDirtyPageCount();
   }
 }
+
+} // namespace FTL

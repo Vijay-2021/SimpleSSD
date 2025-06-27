@@ -38,12 +38,12 @@ typedef struct _LPNRange {
 } LPNRange;
 
 typedef enum {
-  FTL_REQ_READ = 0,
-  FTL_REQ_WRITE = 1,
-  FTL_REQ_TRIM = 2,
-  FTL_REQ_FORMAT = 3,
-  FTL_REQ_EMPTY = 4,
-} FTL_REQ_TYPE;
+  ICL_REQ_READ = 0,
+  ICL_REQ_WRITE = 1,
+  ICL_REQ_TRIM = 2,
+  ICL_REQ_FORMAT = 3,
+  ICL_REQ_EMPTY = 4,
+} ICL_REQ_TYPE;
 
 namespace HIL {
 
@@ -74,7 +74,7 @@ typedef struct _Request {
   uint64_t offset;
   uint64_t length;
   LPNRange range;
-
+  ICL_REQ_TYPE reqType;
   _Request();
   _Request(HIL::Request &);
 } Request;
@@ -88,7 +88,6 @@ typedef struct _Request {
   uint64_t reqSubID;
   uint64_t lpn;
   Bitset ioFlag;
-  FTL_REQ_TYPE reqType;
   _Request(uint32_t);
   _Request(uint32_t, ICL::Request &);
 } Request;

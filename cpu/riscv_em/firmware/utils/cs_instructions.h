@@ -31,6 +31,7 @@ extern "C" {
         #define FUNC7_STOPSIM 0x02 // execute once every cycle
         #define FUNC7_NEXTSIMTICK 0x03 // sets the next tick
         #define FUNC7_PUTC 0x04
+        #define FUNC7_WRITEBUFF 0x05 // write to the buffer
 
 void pread(uint64_t rd, uint64_t rs1, uint64_t rs2);
 void pwrite(uint64_t rd, uint64_t rs1, uint64_t rs2);
@@ -45,6 +46,7 @@ void start_sim();
 void stop_sim();
 void next_tick(uint64_t rs1);
 void putc(uint64_t rs1);
+void write_buffer(uint64_t rd, uint64_t rs1, uint64_t rs2);
 
 #ifdef __cplusplus
 }

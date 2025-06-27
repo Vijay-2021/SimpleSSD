@@ -150,7 +150,7 @@ SOC::SOC(char *fw_file_name, char *dtb_file_name, char *initrd_file_name, CPU *c
         tmp_ptr[i] = reset_vec[i];
     }
     for (uint32_t core_id = 0; core_id < num_cores; core_id++) {
-        rv_cores.push_back(Core(this, rv_soc_bus_access));
+        rv_cores.push_back(Core(this, rv_soc_bus_access, core_id));
     }
     /* initialize one core with a csr table */
     simple_uart_init(&uart);
@@ -263,20 +263,23 @@ uint64_t SOC::ltrim(uint8_t *buffer, uint64_t offset, uint64_t len) {
     return pCPU->trim_flash_icl(buffer, offset, len);
 }
 
-uint64_t SOC::pread(uint8_t* buffer, uint64_t offset , uint64_t len) {
-    return pCPU->read_flash_pal(buffer, offset, len);
+void SOC::pread(void* request, uint64_t* tick) {
+    pCPU->read_flash_pal(request, tick);
 }
-uint64_t SOC::pwrite(uint8_t *buffer, uint64_t offset, uint64_t len) {
-    return pCPU->write_flash_pal(buffer, offset, len);
+void SOC::pwrite(void* request, uint64_t* tick) {
+    pCPU->write_flash_pal(request, tick);
 }
-uint64_t SOC::perase(uint8_t* buffer, uint64_t offset , uint64_t len) {
-    return pCPU->erase_flash_pal(buffer, offset, len);
+void SOC::perase(void* request, uint64_t* tick) {
+    pCPU->erase_flash_pal(request, tick);
 }
 
 uint64_t SOC::read_buffer(uint8_t *buffer, uint64_t req_type) {
     return pCPU->read_buffer(buffer, req_type);
 }
 
+uint64_t SOC::write_buffer(uint8_t* buffer, uint64_t req_data, uint64_t req_type) {
+    return pCPU->write_buffer(buffer, req_data, req_type);
+}
 uint64_t SOC::get_period() {
     return clock_period;
 }
