@@ -127,7 +127,6 @@ class ICL {
     uint64_t cache[2];
   } stat;
 
-  ICLStats icl_stats;
 
   icl_params params;
 
@@ -142,6 +141,8 @@ class ICL {
   void format(LPNRange &);
 
   void resetStatValues();
+  
+  ICLStats icl_stats;
 };
 
 }

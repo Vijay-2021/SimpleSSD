@@ -35,7 +35,7 @@ typedef enum {
   CPU_CORE_ICL,
   CPU_CORE_FTL,
   CPU_FW_PATH,
-  CPU_CORE_CSD,
+  CPU_CORE_RISCV,
   BURST_CYCLES,
 } CPU_CONFIG;
 
@@ -45,7 +45,7 @@ class Config : public BaseConfig {
   uint32_t hilCore;  //!< Default: 1
   uint32_t iclCore;  //!< Default: 1
   uint32_t ftlCore;  //!< Default: 1
-  uint32_t csdCore; //!< Default: 1
+  uint32_t riscvCore; //!< Default: 1
   uint32_t burst_cycles; 
   std::string  fw_path; //!< Default: ""
 

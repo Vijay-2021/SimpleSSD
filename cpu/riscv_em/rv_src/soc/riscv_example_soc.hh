@@ -21,42 +21,10 @@ class CPU;
 
 namespace RISCV {
 
-struct ICLStats {
-    uint64_t read_requests;
-    uint64_t write_requests;
-    uint64_t trim_requests;
-    uint64_t format_requests;
-    uint64_t flush_requests;
-    uint64_t read_cache_hits;
-    uint64_t write_cache_hits;
-    uint64_t read_cache_misses;
-    uint64_t write_cache_misses;
-    uint64_t read_cache_evictions;
-    uint64_t write_cache_evictions;
-    uint64_t read_req_cycles;
-    uint64_t write_req_cycles;
-    uint64_t trim_req_cycles;
-    uint64_t format_req_cycles;
-    uint64_t flush_req_cycles;
-};
-
-struct FTLStats {
-    uint64_t read_requests;
-    uint64_t write_requests;
-    uint64_t trim_requests;
-    uint64_t format_requests;
-    uint64_t garbage_collection_requests;
-    uint64_t read_req_cycles;
-    uint64_t write_req_cycles;
-    uint64_t trim_req_cycles;
-    uint64_t format_req_cycles;
-    uint64_t gc_req_cycles;
-};
-
-struct Stats {
-    FTLStats ftl_stats;
-    ICLStats icl_stats;
-    CoreStats* core_stats; // Pointer to an array of CoreStats, one for each core
+struct RISCVStats {
+    FTLStats* ftl_stats; // these  don't have definite addreses at init
+    ICLStats* icl_stats; 
+    // CoreStats* core_stats; // Pointer to an array of CoreStats, one for each core
     uint64_t total_cycles;
 };
 
@@ -86,6 +54,7 @@ class SOC {
         void start_simulation();
         void stop_simulation();
         void next_simulation_tick(uint64_t next_tick);
+        void resetStatValues();
         typedef struct rv_soc_mem_access_cb_struct
         {
             bus_access_func bus_access;
@@ -98,10 +67,15 @@ class SOC {
         rv_soc_mem_access_cb_td mem_access_cbs[6];
         DRAM::AbstractDRAM *pDRAM;
         std::vector<Core> rv_cores;
-
+        FTLStats* getFTLStats() {
+            return stats.ftl_stats;
+        }
+        ICLStats* getICLStats() {
+            return stats.icl_stats;
+        }
     private: 
         CPU *pCPU; 
-    
+        RISCVStats stats;
         uint8_t *mrom; /* Contains reset vector and device-tree? */
         uint8_t *ram;
         uint8_t *from; /* Contains filesystem */

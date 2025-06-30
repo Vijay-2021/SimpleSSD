@@ -36,7 +36,6 @@ struct ProcessStat {
     char* process_name;
 };
 
-struct  
 
 class Core {
     public: 

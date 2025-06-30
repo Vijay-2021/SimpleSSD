@@ -142,33 +142,33 @@ void CPU::Core::addStat(InstStat &inst) {
   stat.instStat += inst;
 }
 
-void CPU::csdCycle() {
+void CPU::RISCVCycle() {
   uint64_t next_tick = 0;
   uint32_t burst_cycles = conf.readUint(CONFIG_CPU, BURST_CYCLES);
   switch(RISCV::soc_run_mode_) {
     case RISCV::FAST_FORWARD_MODE:
-      csd->rv_soc_run(); // don't schedule the next cycle, just run until the next stop signal
+      riscv_soc->rv_soc_run(); // don't schedule the next cycle, just run until the next stop signal
       break;
     case RISCV::CYCLE_MODE:
-      csd->rv_soc_tick(1);
-      schedule(csdCycleEvent, getTick() + clockPeriod);
+      riscv_soc->rv_soc_tick(1);
+      schedule(RISCVCycleEvent, getTick() + clockPeriod);
       break;
     case RISCV::PAUSED_MODE:
       // Do nothing
       break;
     case RISCV::FAILED_MODE:
-      debugprint(LOG_CPU, "CSD core is in FAILED mode, stopping further execution");
+      debugprint(LOG_CPU, "RISCV core is in FAILED mode, stopping further execution");
       break;
     case RISCV::TIMING_MODE:
-      next_tick = csd->rv_soc_tick(1);
-      schedule(csdCycleEvent, next_tick);
+      next_tick = riscv_soc->rv_soc_tick(1);
+      schedule(RISCVCycleEvent, next_tick);
       break;
     case RISCV::BURST_MODE:
-      csd->rv_soc_tick(burst_cycles);
-      schedule(csdCycleEvent, getTick() + burst_cycles * clockPeriod);
+      riscv_soc->rv_soc_tick(burst_cycles);
+      schedule(RISCVCycleEvent, getTick() + burst_cycles * clockPeriod);
       break;
     default:
-      panic("Invalid CSD mode");
+      panic("Invalid RISCV mode");
   }
 }
 
@@ -178,12 +178,12 @@ CPU::CPU(ConfigReader &c, ICL::ICL *icl, FTL::FTL *ftl, PAL::PAL *pal, DRAM::Abs
   hilCore.resize(conf.readUint(CONFIG_CPU, CPU_CORE_HIL));
   iclCore.resize(conf.readUint(CONFIG_CPU, CPU_CORE_ICL));
   ftlCore.resize(conf.readUint(CONFIG_CPU, CPU_CORE_FTL));
-  uint64_t csd_cores = conf.readUint(CONFIG_CPU, CPU_CORE_CSD);
-  csd = new RISCV::SOC(const_cast<char*>(conf.readString(CONFIG_CPU, CPU_FW_PATH).c_str()), nullptr, nullptr, this, csd_cores, pDRAM); // TO-DO: make this less hacky
-  csdCycleEvent = allocate([this](uint64_t) {
-    csdCycle();
+  uint64_t riscv_cores = conf.readUint(CONFIG_CPU, CPU_CORE_RISCV);
+  riscv_soc = new RISCV::SOC(const_cast<char*>(conf.readString(CONFIG_CPU, CPU_FW_PATH).c_str()), nullptr, nullptr, this, riscv_cores, pDRAM); // TO-DO: make this less hacky
+  RISCVCycleEvent = allocate([this](uint64_t) {
+    RISCVCycle();
   });
-  callbacks.resize(csd_cores);
+  callbacks.resize(riscv_cores);
   page_size = pPAL->getInfo()->pageSize;
   pDisk = new Disk();
   
@@ -224,7 +224,7 @@ CPU::CPU(ConfigReader &c, ICL::ICL *icl, FTL::FTL *ftl, PAL::PAL *pal, DRAM::Abs
              iparams.cacheSize, (int)iparams.iclEvictGranularity, (int)iparams.iclPrefetchGranularity);
   // unsigned char buffer[256];
   // read_flash(buffer, 4096, 4096);
-  // schedule(csdCycleEvent, getTick()); // start the csd core(s) as soon as possible
+  // schedule(RISCVCycleEvent, getTick()); // start the riscv core(s) as soon as possible
   // Initialize CPU table
   cpi.insert({FTL, std::unordered_map<uint16_t, InstStat>()});
   cpi.insert({FTL__PAGE_MAPPING, std::unordered_map<uint16_t, InstStat>()});
@@ -381,26 +381,26 @@ CPU::CPU(ConfigReader &c, ICL::ICL *icl, FTL::FTL *ftl, PAL::PAL *pal, DRAM::Abs
 }
 
 CPU::~CPU() {
-  delete csd;
+  delete riscv_soc;
 }
 
-void CPU::initCSD() {
+void CPU::initRISCV() {
   RISCV::soc_run_mode_ = RISCV::SOC_RUN_MODE::FAST_FORWARD_MODE;
-  schedule(csdCycleEvent, getTick());  
+  schedule(RISCVCycleEvent, getTick());  
 }
 
-void CPU::startCSD() {
-  debugprint(LOG_CPU, "start csd called\n");
+void CPU::startRISCV() {
+  debugprint(LOG_CPU, "start riscv called\n");
   RISCV::soc_run_mode_ = RISCV::SOC_RUN_MODE::TIMING_MODE;
-  schedule(csdCycleEvent, getTick());
+  schedule(RISCVCycleEvent, getTick());
 }
 
-void CPU::stopCSD() {
-  debugprint(LOG_CPU, "stop csd called\n");
-  uint64_t csdCycleTick = 0;
-  scheduled(csdCycleEvent, &csdCycleTick);
-  if (csdCycleTick >= getTick()) {
-    deschedule(csdCycleEvent);
+void CPU::stopRISCV() {
+  debugprint(LOG_CPU, "stop riscv called\n");
+  uint64_t RISCVCycleTick = 0;
+  scheduled(RISCVCycleEvent, &RISCVCycleTick);
+  if (RISCVCycleTick >= getTick()) {
+    deschedule(RISCVCycleEvent);
   }
   RISCV::soc_run_mode_ = RISCV::SOC_RUN_MODE::PAUSED_MODE;
 }
@@ -1003,6 +1003,122 @@ void CPU::getStatList(std::vector<Stats> &list, std::string prefix) {
     temp.desc = "CPU for FTL core " + number + " executed other instructions";
     list.push_back(temp);
   }
+  // for (uint32_t i = 0; i < riscv_soc.rv_cores.size(); i++) {
+  //   number = std::to_string(i);
+    
+  //   temp.name = prefix + ".riscv" + number + ".busy";
+  //   temp.desc = "CPU for RISCV core " + number + " busy ticks";
+  //   list.push_back(temp);
+
+  //   temp.name = prefix + ".riscv" + number + ".insts.branch";
+  //   temp.desc = "CPU for RISCV core " + number + " executed branch instructions";
+  //   list.push_back(temp);
+
+  //   temp.name = prefix + ".riscv" + number + ".insts.load";
+  //   temp.desc = "CPU for RISCV core " + number + " executed load instructions";
+  //   list.push_back(temp);
+
+  //   temp.name = prefix + ".riscv" + number + ".insts.store";
+  //   temp.desc = "CPU for RISCV core " + number + " executed store instructions";
+  //   list.push_back(temp);
+
+  //   temp.name = prefix + ".riscv" + number + ".insts.arithmetic";
+  //   temp.desc =
+  //       "CPU for RISCV core " + number + " executed arithmetic instructions";
+  //   list.push_back(temp);
+
+  //   temp.name = prefix + ".riscv" + number + ".insts.fp";
+  //   temp.desc =
+  //       "CPU for RISCV core " + number + " executed floating point instructions";
+  //   list.push_back(temp);
+
+  //   temp.name = prefix + ".riscv" + number + ".insts.others";
+  //   temp.desc = "CPU for RISCV core " + number +
+  //               " executed other instructions (e.g. system calls)";
+  //   list.push_back(temp);
+  // }
+
+  temp.name = prefix + ".riscv" + ".icl_read_requests";
+  temp.desc = "Total ICL read requests";
+  list.push_back(temp);
+  temp.name = prefix + ".riscv" + ".icl_write_requests";
+  temp.desc = "Total ICL write requests";
+  list.push_back(temp);
+  temp.name = prefix + ".riscv" + ".icl_trim_requests";
+  temp.desc = "Total ICL trim requests";
+  list.push_back(temp);
+  temp.name = prefix + ".riscv" + ".icl_format_requests";
+  temp.desc = "Total ICL format requests";
+  list.push_back(temp);
+  temp.name = prefix + ".riscv" + ".icl_flush_requests";
+  temp.desc = "Total ICL flush requests";
+  list.push_back(temp);
+  temp.name = prefix + ".riscv" + ".read_cache_hits";
+  temp.desc = "Total read cache hits";
+  list.push_back(temp);
+  temp.name = prefix + ".riscv" + ".read_cache_misses";
+  temp.desc = "Total read cache misses";
+  list.push_back(temp);
+  temp.name = prefix + ".riscv" + ".write_cache_hits";
+  temp.desc = "Total write cache hits";
+  list.push_back(temp);
+  temp.name = prefix + ".riscv" + ".write_cache_misses";
+  temp.desc = "Total write cache misses";
+  list.push_back(temp);
+  temp.name = prefix + ".riscv" + ".read_cache_evictions";
+  temp.desc = "Total read cache evictions";
+  list.push_back(temp);
+  temp.name = prefix + ".riscv" + ".write_cache_evictions";
+  temp.desc = "Total write cache evictions";
+  list.push_back(temp);
+  temp.name = prefix + ".riscv" + ".icl_read_cycles";
+  temp.desc = "Total ICL read cycles";
+  list.push_back(temp);
+  temp.name = prefix + ".riscv" + ".icl_write_cycles";
+  temp.desc = "Total ICL write cycles";
+  list.push_back(temp);
+  temp.name = prefix + ".riscv" + ".icl_trim_cycles";
+  temp.desc = "Total ICL trim cycles";
+  list.push_back(temp);
+  temp.name = prefix + ".riscv" + ".icl_format_cycles";
+  temp.desc = "Total ICL format cycles";
+  list.push_back(temp);
+  temp.name = prefix + ".riscv" + ".icl_flush_cycles";
+  temp.desc = "Total ICL flush cycles";
+  list.push_back(temp);
+
+  temp.name = prefix + ".riscv" + ".ftl_read_requests";
+  temp.desc = "Total FTL read requests";
+  list.push_back(temp);
+  temp.name = prefix + ".riscv" + ".ftl_write_requests";
+  temp.desc = "Total FTL write requests";
+  list.push_back(temp);
+  temp.name = prefix + ".riscv" + ".ftl_trim_requests";
+  temp.desc = "Total FTL trim requests";
+  list.push_back(temp);
+  temp.name = prefix + ".riscv" + ".ftl_format_requests";
+  temp.desc = "Total FTL format requests";
+  list.push_back(temp);
+  temp.name = prefix + ".riscv" + ".ftl_garbage_collection_requests";
+  temp.desc = "Total FTL garbage collection requests";
+  list.push_back(temp);
+  temp.name = prefix + ".riscv" + ".ftl_read_cycles";
+  temp.desc = "Total FTL read cycles";
+  list.push_back(temp);
+  temp.name = prefix + ".riscv" + ".ftl_write_cycles";
+  temp.desc = "Total FTL write cycles";
+  list.push_back(temp);
+  temp.name = prefix + ".riscv" + ".ftl_trim_cycles";
+  temp.desc = "Total FTL trim cycles";
+  list.push_back(temp);
+  temp.name = prefix + ".riscv" + ".ftl_format_cycles";
+  temp.desc = "Total FTL format cycles";
+  list.push_back(temp);
+  temp.name = prefix + ".riscv" + ".ftl_garbage_collection_cycles";
+  temp.desc = "Total FTL garbage collection cycles";
+  list.push_back(temp);  
+
+
 }
 
 void CPU::getStatValues(std::vector<double> &values) {
@@ -1041,6 +1157,36 @@ void CPU::getStatValues(std::vector<double> &values) {
     values.push_back(stat.instStat.floatingPoint);
     values.push_back(stat.instStat.otherInsts);
   }
+
+  auto *icl_stats = riscv_soc->getICLStats();
+  values.push_back(icl_stats->read_requests);
+  values.push_back(icl_stats->write_requests);
+  values.push_back(icl_stats->trim_requests);
+  values.push_back(icl_stats->format_requests);
+  values.push_back(icl_stats->flush_requests);
+  values.push_back(icl_stats->read_cache_hits);
+  values.push_back(icl_stats->read_cache_misses);
+  values.push_back(icl_stats->write_cache_hits);
+  values.push_back(icl_stats->write_cache_misses);
+  values.push_back(icl_stats->read_cache_evictions);
+  values.push_back(icl_stats->write_cache_evictions);
+  values.push_back(icl_stats->read_req_cycles);
+  values.push_back(icl_stats->write_req_cycles);
+  values.push_back(icl_stats->trim_req_cycles);
+  values.push_back(icl_stats->format_req_cycles);
+  values.push_back(icl_stats->flush_req_cycles);
+
+  auto *ftl_stats = riscv_soc->getFTLStats();
+  values.push_back(ftl_stats->read_requests);
+  values.push_back(ftl_stats->write_requests);
+  values.push_back(ftl_stats->trim_requests);
+  values.push_back(ftl_stats->format_requests);
+  values.push_back(ftl_stats->garbage_collection_requests);
+  values.push_back(ftl_stats->read_req_cycles);
+  values.push_back(ftl_stats->write_req_cycles);
+  values.push_back(ftl_stats->trim_req_cycles);   
+  values.push_back(ftl_stats->format_req_cycles);
+  values.push_back(ftl_stats->gc_req_cycles);
 }
 
 void CPU::resetStatValues() {
@@ -1066,6 +1212,7 @@ void CPU::resetStatValues() {
     stat.busy = 0;
     stat.instStat = InstStat();
   }
+  riscv_soc->resetStatValues();
 }
 
 void CPU::printLastStat() {
@@ -1107,7 +1254,7 @@ void CPU::printLastStat() {
 }
 
 uint64_t CPU::read_flash_icl(uint8_t* buffer, uint64_t offset , uint64_t len) {
-  debugprint(LOG_CPU, "Read flash ICL from CSD at offset %u, length %u",
+  debugprint(LOG_CPU, "Read flash ICL from RISCV Core at offset %u, length %u",
              offset, len);
   ICL::Request req;
   LPNRange lpnRange;
@@ -1130,7 +1277,7 @@ uint64_t CPU::read_flash_icl(uint8_t* buffer, uint64_t offset , uint64_t len) {
 }
 
 uint64_t CPU::write_flash_icl(uint8_t* buffer, uint64_t offset , uint64_t len) {
-  debugprint(SimpleSSD::LOG_CPU, "Write flash ICL from CSD at offset %u, length %u",
+  debugprint(SimpleSSD::LOG_CPU, "Write flash ICL from RISCV Core at offset %u, length %u",
       offset, len);
   ICL::Request req;
   LPNRange lpnRange;
@@ -1154,7 +1301,7 @@ uint64_t CPU::write_flash_icl(uint8_t* buffer, uint64_t offset , uint64_t len) {
 }
 
 uint64_t CPU::trim_flash_icl(uint8_t* buffer, uint64_t offset , uint64_t len) {
-  debugprint(SimpleSSD::LOG_CPU, "Trim flash ICL from CSD at offset %u, length %u",
+  debugprint(SimpleSSD::LOG_CPU, "Trim flash ICL from RISCV Core at offset %u, length %u",
     offset, len);
   LPNRange lpnRange;
   uint32_t page_per_lba = page_size / lba_size;
@@ -1167,7 +1314,7 @@ uint64_t CPU::trim_flash_icl(uint8_t* buffer, uint64_t offset , uint64_t len) {
 
 // TO-DO: implement!
 void CPU::read_flash_pal(uint8_t* request, uint64_t* tick) {
-  debugprint(LOG_CPU, "Read flash PAL from CSD at tick %llu", *tick);
+  debugprint(LOG_CPU, "Read flash PAL from RISCV Core at tick %llu", *tick);
   PAL::Request* req = (PAL::Request*)request;
   uint64_t reqTick = *tick;
   pPAL->read(*req, reqTick);
@@ -1175,7 +1322,7 @@ void CPU::read_flash_pal(uint8_t* request, uint64_t* tick) {
 }
 
 void CPU::write_flash_pal(uint8_t* request, uint64_t* tick) {
-  debugprint(LOG_CPU, "Write flash PAL from CSD at tick %llu", *tick);
+  debugprint(LOG_CPU, "Write flash PAL from RISCV Core at tick %llu", *tick);
   PAL::Request* req = (PAL::Request*)request;
   uint64_t reqTick = *tick;
   pPAL->write(*req, reqTick);
@@ -1184,7 +1331,7 @@ void CPU::write_flash_pal(uint8_t* request, uint64_t* tick) {
 
 // TO-DO: implement!
 void CPU::erase_flash_pal(uint8_t* request, uint64_t* tick) {
-  debugprint(LOG_CPU, "Erase flash PAL from CSD at tick %llu", *tick);
+  debugprint(LOG_CPU, "Erase flash PAL from RISCV Core at tick %llu", *tick);
   PAL::Request* req = (PAL::Request*)request;
   uint64_t reqTick = *tick;
   pPAL->erase(*req, reqTick);
@@ -1203,8 +1350,8 @@ void CPU::closeDisk() {
   }
 }
 
-void CPU::addCSDTask(char* input_command) {
-  csd->rv_soc_add_task(input_command);
+void CPU::addRISCVTask(char* input_command) {
+  riscv_soc->rv_soc_add_task(input_command);
 }
 
 void CPU::read_buffer(uint8_t* buffer, uint64_t req_info, uint64_t req_type) {
@@ -1213,10 +1360,7 @@ void CPU::read_buffer(uint8_t* buffer, uint64_t req_info, uint64_t req_type) {
   } else if (req_type == RISCV::FIRMWARE_ICL_PARAMS) {
     memcpy(buffer, &iparams, sizeof(icl_params));
   } else if (req_type == RISCV::FIRMWARE_QUEUE_TOP) {
-    debugprint(LOG_CPU, "Reading firmware queue with %zu requests",
-             req_queue.size());
     RISCVJob req_job = req_queue.front();
-    debugprint(LOG_CPU, "Address of request job request: %p", &req_job.request);
     memcpy(buffer, &req_job.request, sizeof(ICL::Request));
     uint64_t core_id = req_info;
     if (core_id < callbacks.size()) {
@@ -1272,7 +1416,7 @@ uint64_t CPU::submitRead(HIL::Request *req, DMAFunction &callback) {
   request.reqType = ICL_REQ_READ;
   req_queue.push({request, callback, (void*)req});
   if (socIsPaused()) {
-    startCSD();
+    startRISCV();
   }
   return getTick() + clockPeriod;
 }
@@ -1283,7 +1427,7 @@ uint64_t CPU::submitWrite(HIL::Request *req, DMAFunction &callback) {
   request.reqType = ICL_REQ_WRITE;
   req_queue.push({request, callback, (void*)req});
   if (socIsPaused()) {
-    startCSD();
+    startRISCV();
   }
   return getTick() + clockPeriod;
 }
@@ -1294,7 +1438,7 @@ uint64_t CPU::submitTrim(HIL::Request *req, DMAFunction &callback) {
   request.reqType = ICL_REQ_TRIM;
   req_queue.push({request, callback, (void*)req});
   if (socIsPaused()) {
-    startCSD();
+    startRISCV();
   }
   return getTick() + clockPeriod;
 }  
@@ -1305,7 +1449,7 @@ uint64_t CPU::submitFormat(HIL::Request *req, DMAFunction &callback) {
   request.reqType = ICL_REQ_FORMAT;
   req_queue.push({request, callback, (void*)req});
   if (socIsPaused()) {
-    startCSD();
+    startRISCV();
   }
   return getTick() + clockPeriod;
 }
@@ -1316,7 +1460,7 @@ uint64_t CPU::submitFlush(HIL::Request *req, DMAFunction &callback) {
   request.reqType = ICL_REQ_FLUSH;
   req_queue.push({request, callback, (void*)req});
   if (socIsPaused()) {
-    startCSD();
+    startRISCV();
   }
   return getTick() + clockPeriod;
 

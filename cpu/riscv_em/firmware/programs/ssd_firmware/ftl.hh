@@ -76,7 +76,6 @@ class FTL {
 
     
     ftl_params params;
-    FTLStats ftl_stats;
     float freeBlockRatio();
     uint32_t convertBlockIdx(uint32_t);
     uint32_t getFreeBlock(uint32_t);
@@ -104,6 +103,8 @@ class FTL {
     uint64_t write(Request &);
     uint64_t trim(Request &);
     uint64_t format(LPNRange &);
+    
+    FTLStats ftl_stats;
 };
 
 }

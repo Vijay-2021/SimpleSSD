@@ -69,7 +69,7 @@ FTL::~FTL() {
 void FTL::read(Request &req, uint64_t &tick) {
   //debugprint(LOG_FTL, "READ  | LPN %" PRIu64, req.lpn);
   if (pCPU->socIsPaused()) {
-    pCPU->startCSD();
+    pCPU->startRISCV();
   }
  // tick = pCPU->submitReadRequest(req);
 }
@@ -77,7 +77,7 @@ void FTL::read(Request &req, uint64_t &tick) {
 void FTL::write(Request &req, uint64_t &tick) {
   //debugprint(LOG_FTL, "WRITE | LPN %" PRIu64, req.lpn);
   if (pCPU->socIsPaused()) {
-    pCPU->startCSD();
+    pCPU->startRISCV();
   }
   //tick = pCPU->submitWriteRequest(req);
 }
@@ -85,7 +85,7 @@ void FTL::write(Request &req, uint64_t &tick) {
 void FTL::trim(Request &req, uint64_t &tick) {
   //debugprint(LOG_FTL, "TRIM  | LPN %" PRIu64, req.lpn);
   if (pCPU->socIsPaused()) {
-    pCPU->startCSD();
+    pCPU->startRISCV();
   }
   //tick = pCPU->submitTrim(req);
 }
@@ -93,7 +93,7 @@ void FTL::trim(Request &req, uint64_t &tick) {
 void FTL::format(LPNRange &range, uint64_t &tick) {
   // // debugprint(LOG_FTL, "FORMAT  | LPN %" PRIu64, req.lpn);
   if (pCPU->socIsPaused()) {
-    pCPU->startCSD();
+    pCPU->startRISCV();
   }
   //tick = cpu->submitFormatRequest(range);
   pFTL->format(range, tick); // we don't really support this yet

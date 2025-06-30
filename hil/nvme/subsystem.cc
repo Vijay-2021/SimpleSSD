@@ -76,7 +76,7 @@ void Subsystem::init() {
   setCPU(pCPU);
   ftl->setCPU(pCPU);
   pHIL->setCPU(pCPU);
-  pCPU->initCSD();
+  pCPU->initRISCV();
   uint16_t nNamespaces =
       (uint16_t)conf.readUint(CONFIG_NVME, NVME_ENABLE_DEFAULT_NAMESPACE);
 
@@ -1327,7 +1327,7 @@ bool Subsystem::csdSOCInit(SQEntryWrapper &req, RequestFunction &func) {
   // debugprint(LOG_HIL_NVME, "ADMIN   | CSD SOC Init | NSID %d",
   //           req.entry.namespaceID);
   // start soc
-  pCPU->startCSD();
+  pCPU->startRISCV();
   // init file system
   func(resp);
   return true; // Not implemented yet
@@ -1351,7 +1351,7 @@ bool Subsystem::csdAddTask(SQEntryWrapper &req, RequestFunction &func) {
   static DMAFunction dmaDone = [this](uint64_t, void *context) {
     RequestContext *pContext = (RequestContext *)context;
     pContext->function(pContext->resp);
-    pCPU->addCSDTask((char*)pContext->buffer);
+    pCPU->addRISCVTask((char*)pContext->buffer);
     delete pContext->dma;
     delete pContext;
   };

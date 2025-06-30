@@ -151,7 +151,7 @@ class CPU : public StatObject {
 
       CoreStat();
     };
-    Event csdCycleEvent; // cycle for computational storage device
+    Event RISCVCycleEvent; // cycle for computational storage device
     class Core {
     private:
       bool busy;
@@ -194,14 +194,13 @@ class CPU : public StatObject {
     std::vector<Core> hilCore;
     std::vector<Core> iclCore;
     std::vector<Core> ftlCore;
-    RISCV::SOC *csd;
+    RISCV::SOC *riscv_soc;
     // CPIs
     std::unordered_map<uint16_t, std::unordered_map<uint16_t, InstStat>> cpi;
 
     uint32_t leastBusyCPU(std::vector<Core> &);
     void calculatePower(Power &);
-    void csdCycle();
-    bool csd_in_progress;
+    void RISCVCycle(); 
     uint32_t page_size = 16834; // Default page size for SimpleSSD
     uint32_t lba_size = 512;
     ftl_params fparams;
@@ -221,11 +220,11 @@ class CPU : public StatObject {
     void getStatValues(std::vector<double> &) override;
     uint64_t getClockPeriod();
     void resetStatValues() override;
-    void startCSD();
+    void startRISCV();
 
     bool socIsPaused();
-    void stopCSD();
-    void initCSD();
+    void stopRISCV();
+    void initRISCV();
     void printLastStat();
     uint64_t read_flash_icl(uint8_t* buffer, uint64_t offset , uint64_t len); // for the flash functions
     uint64_t write_flash_icl(uint8_t* buffer, uint64_t offset , uint64_t len);
@@ -238,7 +237,7 @@ class CPU : public StatObject {
     void runDMA(uint64_t finished_at, uint64_t core_id);
     void setDisk(Disk *disk);
     void closeDisk();
-    void addCSDTask(char* input_cmd);
+    void addRISCVTask(char* input_cmd);
     uint64_t submitRead(HIL::Request *req, DMAFunction &func);
     uint64_t submitWrite(HIL::Request *req, DMAFunction &func);
     uint64_t submitTrim(HIL::Request *req, DMAFunction &func);

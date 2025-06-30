@@ -182,7 +182,6 @@ void SOC::rv_soc_run()
     for (uint32_t core_id = 0; core_id < rv_cores.size(); core_id++) {
         rv_cores[core_id].rv_core_reg_dump();
     }
-    uint64_t cycle = 0;
     while(soc_run_mode_ != PAUSED_MODE && soc_run_mode_ != FAILED_MODE) 
     {
         for (uint32_t core_id = 0; core_id < rv_cores.size(); core_id++) {
@@ -195,10 +194,10 @@ void SOC::rv_soc_run()
         //clint_update(&clint, &msi, &mti);
 
         for (uint32_t core_id = 0; core_id < rv_cores.size(); core_id++) {
-            rv_cores[core_id].rv_core_process_interrupts(mei, mti, msi);
-            //rv_cores[core_id].rv_core_reg_dump();
+            // rv_cores[core_id].rv_core_process_interrupts(mei, mti, msi);
+            // rv_cores[core_id].rv_core_reg_dump();
         }
-        cycle++;
+        stats.total_cycles++;
     }
     
 }
@@ -217,20 +216,20 @@ uint64_t SOC::rv_soc_tick(uint64_t num_cycles)
             next_tick = std::min(next_tick, requested_tick);
         }
 
-        uart_irq_pending = simple_uart_update(&uart);
+        // uart_irq_pending = simple_uart_update(&uart);
 
-        /* update interrupt controllers */
-        plic_update_pending(&plic, 10, uart_irq_pending);
-        mei = plic_update(&plic);
+        // /* update interrupt controllers */
+        // plic_update_pending(&plic, 10, uart_irq_pending);
+        // mei = plic_update(&plic);
 
-        /* Feed clint and update internall states */    
-        clint_update(&clint, &msi, &mti);
+        // /* Feed clint and update internall states */    
+        // clint_update(&clint, &msi, &mti);
 
-        /* update CSRs for actual interrupt processing */
-        for (uint32_t core_id = 0; core_id < rv_cores.size(); core_id++) {
-            rv_cores[core_id].rv_core_process_interrupts(mei, mti, msi);
-        }
-        
+        // /* update CSRs for actual interrupt processing */
+        // for (uint32_t core_id = 0; core_id < rv_cores.size(); core_id++) {
+        //     rv_cores[core_id].rv_core_process_interrupts(mei, mti, msi);
+        // }
+        stats.total_cycles++;
     }
     return next_tick;
 }
@@ -283,15 +282,24 @@ uint8_t* SOC::get_ram() {
 }
 
 void SOC::start_simulation() {
-    pCPU->startCSD();
+    pCPU->startRISCV();
 }
 
 void SOC::stop_simulation() {
-    pCPU->stopCSD();
+    pCPU->stopRISCV();
 }
 
 void SOC::next_simulation_tick(uint64_t next_tick) {
     // To-do
+}
+
+void SOC::resetStatValues() {
+    // for (auto &core : rv_cores) {
+    //     core.reset_stats();
+    // }
+    memset(stats.ftl_stats, 0, sizeof(FTLStats));
+    memset(stats.icl_stats, 0, sizeof(ICLStats));
+    stats.total_cycles = 0;
 }
 
 } // namespace RISCV

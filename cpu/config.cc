@@ -31,7 +31,7 @@ const char NAME_CORE_HIL[] = "HILCoreCount";
 const char NAME_CORE_ICL[] = "ICLCoreCount";
 const char NAME_CORE_FTL[] = "FTLCoreCount";
 const char NAME_FW_PATH[] = "FirmwarePath";
-const char NAME_CORE_CSD[] = "CSDCoreCount";
+const char NAME_CORE_RISCV[] = "RISCVCoreCount";
 const char NAME_BURST_CYCLES[] = "BurstCycles";
 
 Config::Config() {
@@ -39,7 +39,7 @@ Config::Config() {
   hilCore = 1;
   iclCore = 1;
   ftlCore = 1;
-  csdCore = 1;
+  riscvCore = 1;
   burst_cycles = 1000;
   fw_path = "";
 }
@@ -58,8 +58,8 @@ bool Config::setConfig(const char *name, const char *value) {
   }
   else if (MATCH_NAME(NAME_CORE_FTL)) {
     ftlCore = (uint32_t)strtoul(value, nullptr, 10);
-  } else if (MATCH_NAME(NAME_CORE_CSD)) {
-    csdCore = (uint32_t)strtoul(value, nullptr, 10);
+  } else if (MATCH_NAME(NAME_CORE_RISCV)) {
+    riscvCore = (uint32_t)strtoul(value, nullptr, 10);
   }
   else if (MATCH_NAME(NAME_FW_PATH)) {
     fw_path = value;
@@ -95,8 +95,8 @@ uint64_t Config::readUint(uint32_t idx) {
     case CPU_CORE_FTL:
       ret = ftlCore;
       break;
-    case CPU_CORE_CSD:
-      ret = csdCore;
+    case CPU_CORE_RISCV:
+      ret = riscvCore;
       break;
     case BURST_CYCLES:
       ret = burst_cycles;
