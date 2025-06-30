@@ -25,6 +25,19 @@ namespace RISCV {
 
 class SOC;
 
+struct ProcessStat {
+    uint64_t branch;
+    uint64_t load;
+    uint64_t store;
+    uint64_t arithmetic;
+    uint64_t floatingPoint;
+    uint64_t otherInsts;
+    uint64_t cycles_run;
+    char* process_name;
+};
+
+struct  
+
 class Core {
     public: 
         privilege_level curr_priv_mode;

@@ -21,6 +21,45 @@ class CPU;
 
 namespace RISCV {
 
+struct ICLStats {
+    uint64_t read_requests;
+    uint64_t write_requests;
+    uint64_t trim_requests;
+    uint64_t format_requests;
+    uint64_t flush_requests;
+    uint64_t read_cache_hits;
+    uint64_t write_cache_hits;
+    uint64_t read_cache_misses;
+    uint64_t write_cache_misses;
+    uint64_t read_cache_evictions;
+    uint64_t write_cache_evictions;
+    uint64_t read_req_cycles;
+    uint64_t write_req_cycles;
+    uint64_t trim_req_cycles;
+    uint64_t format_req_cycles;
+    uint64_t flush_req_cycles;
+};
+
+struct FTLStats {
+    uint64_t read_requests;
+    uint64_t write_requests;
+    uint64_t trim_requests;
+    uint64_t format_requests;
+    uint64_t garbage_collection_requests;
+    uint64_t read_req_cycles;
+    uint64_t write_req_cycles;
+    uint64_t trim_req_cycles;
+    uint64_t format_req_cycles;
+    uint64_t gc_req_cycles;
+};
+
+struct Stats {
+    FTLStats ftl_stats;
+    ICLStats icl_stats;
+    CoreStats* core_stats; // Pointer to an array of CoreStats, one for each core
+    uint64_t total_cycles;
+};
+
 class SOC {
     public: 
         SOC(char *fw_file_name, char *dtb_file_name, char *initrd_file_name, CPU *cpu, uint32_t num_cores, DRAM::AbstractDRAM *dram);

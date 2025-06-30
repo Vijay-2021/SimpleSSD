@@ -185,26 +185,19 @@ void SOC::rv_soc_run()
     uint64_t cycle = 0;
     while(soc_run_mode_ != PAUSED_MODE && soc_run_mode_ != FAILED_MODE) 
     {
-        if (cycle < 1000000 && cycle % 10000 == 0) {
-            printf("Running cycle: %lu\n", cycle);
-        }
-        if (cycle % 10000000 == 0) {
-            printf("Running cycle: %lu\n", cycle);
-        }
         for (uint32_t core_id = 0; core_id < rv_cores.size(); core_id++) {
             rv_cores[core_id].rv_core_run();
         }
-        /**
-        uart_irq_pending = simple_uart_update(&uart);
-        plic_update_pending(&plic, 10, uart_irq_pending);
-        mei = plic_update(&plic);
-        clint_update(&clint, &msi, &mti);
+        
+        //uart_irq_pending = simple_uart_update(&uart);
+        //plic_update_pending(&plic, 10, uart_irq_pending);
+        //mei = plic_update(&plic);
+        //clint_update(&clint, &msi, &mti);
 
         for (uint32_t core_id = 0; core_id < rv_cores.size(); core_id++) {
             rv_cores[core_id].rv_core_process_interrupts(mei, mti, msi);
-
-            rv_cores[core_id].rv_core_reg_dump();
-        }*/
+            //rv_cores[core_id].rv_core_reg_dump();
+        }
         cycle++;
     }
     

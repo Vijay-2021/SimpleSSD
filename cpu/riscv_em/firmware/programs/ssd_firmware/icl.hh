@@ -127,6 +127,8 @@ class ICL {
     uint64_t cache[2];
   } stat;
 
+  ICLStats icl_stats;
+
   icl_params params;
 
  public:

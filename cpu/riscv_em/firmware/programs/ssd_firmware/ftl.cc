@@ -136,33 +136,50 @@ bool FTL::initialize() {
 }
 
 uint64_t FTL::read(Request &req) {
+  uint64_t ret_val;
+  ftl_stats.read_requests++;
+  uint64_t start_cycle = getCycle();
   if (req.ioFlag.count() > 0) {
-    return readInternal(req);
+    ret_val = readInternal(req);
   }
   else {
     print("FTL got empty request\n");
-    return getTick();
+    ret_val = getTick();
   }
+  ftl_stats.read_req_cycles += getCycle() - start_cycle;
+  return ret_val;
 
 }
 
 uint64_t FTL::write(Request &req) {
+  uint64_t ret_val;
+  ftl_stats.write_requests++;
+  uint64_t start_cycle = getCycle();
   if (req.ioFlag.count() > 0) {
-    return writeInternal(req);
+    ret_val = writeInternal(req);
   }
   else {
     print("FTL got empty request\n");
-    return getTick();
+    ret_val = getTick();
   }
+  ftl_stats.write_req_cycles += getCycle() - start_cycle;
+  return ret_val;
 
 }
 
 uint64_t FTL::trim(Request &req) {
-  return trimInternal(req);
+  uint64_t ret_val;
+  ftl_stats.trim_requests++;
+  uint64_t start_cycle = getCycle();
+  ret_val = trimInternal(req);
+  ftl_stats.trim_req_cycles += getCycle() - start_cycle;
+  return ret_val;
 }
 
 
 uint64_t FTL::format(LPNRange &range) {
+  ftl_stats.format_requests++;
+  uint64_t start_cycle = getCycle();
   PAL::Request req(params.ioUnitInPage);
   Vector<uint32_t> list;
 
@@ -204,8 +221,9 @@ uint64_t FTL::format(LPNRange &range) {
   }
 
   // Do GC only in specified blocks
-  return doGarbageCollection(list);
-
+  uint64_t ret_val = doGarbageCollection(list);
+  ftl_stats.format_req_cycles += getCycle() - start_cycle;
+  return ret_val;
 } 
 
 float FTL::freeBlockRatio() {
@@ -695,6 +713,7 @@ uint64_t FTL::writeInternal(Request &req, bool sendToPAL) {
 }
 
 uint64_t FTL::trimInternal(Request &req) {
+  printf("calling trim interal!\n");
   auto mappingList = table.find(req.lpn);
 
   if (mappingList != table.end()) {

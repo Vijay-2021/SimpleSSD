@@ -72,7 +72,8 @@ typedef enum {
 typedef enum {
   FIRMWARE_REQ_DONE = 0,
   FIRMWARE_REQ_FAILED = 1,
-  STAT_WRITE = 2,
+  ICL_STAT_LOC = 2,
+  FTL_STAT_LOC = 3,
 } DATA_RESP; 
 
 typedef enum {
@@ -83,6 +84,39 @@ typedef enum {
   ICL_REQ_FLUSH = 4,
   ICL_REQ_EMPTY = 5,
 } ICL_REQ_TYPE;
+
+struct ICLStats {
+    uint64_t read_requests;
+    uint64_t write_requests;
+    uint64_t trim_requests;
+    uint64_t format_requests;
+    uint64_t flush_requests;
+    uint64_t read_cache_hits;
+    uint64_t write_cache_hits;
+    uint64_t read_cache_misses;
+    uint64_t write_cache_misses;
+    uint64_t read_cache_evictions;
+    uint64_t write_cache_evictions;
+    uint64_t read_req_cycles;
+    uint64_t write_req_cycles;
+    uint64_t trim_req_cycles;
+    uint64_t format_req_cycles;
+    uint64_t flush_req_cycles;
+};
+
+struct FTLStats {
+    uint64_t read_requests;
+    uint64_t write_requests;
+    uint64_t trim_requests;
+    uint64_t format_requests;
+    uint64_t garbage_collection_requests;
+    uint64_t read_req_cycles;
+    uint64_t write_req_cycles;
+    uint64_t trim_req_cycles;
+    uint64_t format_req_cycles;
+    uint64_t gc_req_cycles;
+};
+
 
 namespace ICL {
 
@@ -140,6 +174,7 @@ uint8_t popcount(T v) {
 void process_request(uint64_t req_time);
 void process_request_failed();
 uint64_t getTick();
+uint64_t getCycle();
 uint64_t getCoreId();
 uint64_t getReqQueueSize();
 #endif

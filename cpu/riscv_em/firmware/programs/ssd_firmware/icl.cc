@@ -234,6 +234,8 @@ void ICL::evictCache(bool flush) {
 // True when hit
 bool ICL::read(Request &req) {
   bool ret = false;
+  icl_stats.read_requests++;
+  uint64_t start_cycle = getCycle();
 
   // debugprint(LOG_ICL_GENERIC_CACHE,
   //           "READ  | REQ %7u-%-4u | LCA %" PRIu64 " | SIZE %" PRIu64,
@@ -256,6 +258,8 @@ bool ICL::read(Request &req) {
       // }
 
       // Update last accessed time
+      icl_stats.read_cache_hits++;
+      icl_stats.read_req_cycles += getCycle() - start_cycle;
       cacheData[setIdx][wayIdx].lastAccessed = getTick();
 
       // DRAM access
@@ -426,6 +430,8 @@ bool ICL::write(Request &req) {
   uint64_t tick = getTick();
   uint64_t flash = tick;
   bool dirty = false;
+  icl_stats.write_requests++;
+  uint64_t start_cycle = getCycle();
 
   // debugprint(LOG_ICL_GENERIC_CACHE,
   //           "WRITE | REQ %7u-%-4u | LCA %" PRIu64 " | SIZE %" PRIu64,
@@ -635,6 +641,9 @@ bool ICL::write(Request &req) {
 
 // True when flushed
 void ICL::flush(LPNRange &range) {
+  printf("Icl flush called!\n");
+  icl_stats.flush_requests++;
+  uint64_t start_cycle = getCycle();
   if (useReadCaching || useWriteCaching) {
     uint64_t finishedAt = getTick();
     FTL::Request reqInternal(lineCountInSuperPage);
@@ -663,6 +672,9 @@ void ICL::flush(LPNRange &range) {
 
 // True when hit
 void ICL::trim(LPNRange &range) {
+  printf("Icl trim called!\n");
+  icl_stats.trim_requests++;
+  uint64_t start_cycle = getCycle();
   if (useReadCaching || useWriteCaching) {
     uint64_t finishedAt = getTick();
     FTL::Request reqInternal(lineCountInSuperPage);
@@ -687,6 +699,9 @@ void ICL::trim(LPNRange &range) {
 }
 
 void ICL::format(LPNRange &range) {
+  printf("Icl format called!\n");
+  icl_stats.format_requests++;
+  uint64_t start_cycle = getCycle();
   if (useReadCaching || useWriteCaching) {
     uint64_t lpn;
     uint32_t setIdx;
@@ -713,7 +728,7 @@ void ICL::format(LPNRange &range) {
 
 
 void ICL::resetStatValues() {
-  memset(&stat, 0, sizeof(stat));
+  memset(&icl_stats, 0, sizeof(icl_stats));
 }
 
 uint32_t ICL::evictFunction(uint32_t setIdx) {

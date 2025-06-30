@@ -62,6 +62,12 @@ uint64_t getTick() {
     return tick;
 }
 
+uint64_t getCycle() {
+    uint64_t cycle = 0;
+    read_buffer((uint64_t)&cycle, 0, FIRMWARE_CYCLE);
+    return cycle;
+}
+
 uint64_t getCoreId() {
     uint64_t core_id;
     read_buffer((uint64_t)&core_id, 0, FIRMWARE_CORE_ID);

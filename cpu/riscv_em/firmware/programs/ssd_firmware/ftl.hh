@@ -73,8 +73,10 @@ class FTL {
       uint64_t validSuperPageCopies;
       uint64_t validPageCopies;
     } stat;
+
     
     ftl_params params;
+    FTLStats ftl_stats;
     float freeBlockRatio();
     uint32_t convertBlockIdx(uint32_t);
     uint32_t getFreeBlock(uint32_t);
