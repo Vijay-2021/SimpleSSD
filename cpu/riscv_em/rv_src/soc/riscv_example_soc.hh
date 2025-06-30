@@ -7,6 +7,7 @@
 #include "rv_src/peripherals/uart/simple_uart.hh"
 
 #include <vector>
+#include <queue>
 
 namespace SimpleSSD {
 

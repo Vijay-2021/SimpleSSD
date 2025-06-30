@@ -72,6 +72,7 @@ typedef enum {
 typedef enum {
   FIRMWARE_REQ_DONE = 0,
   FIRMWARE_REQ_FAILED = 1,
+  STAT_WRITE = 2,
 } DATA_RESP; 
 
 typedef enum {

@@ -396,7 +396,7 @@ void Subsystem::submitCommand(SQEntryWrapper &req, RequestFunction func) {
       case OPCODE_CSD_SOC_ADD_TASK:
         processed = csdAddTask(req, func);
         break;
-      case OPCODE_CSD_SOC_POLL:
+      case OPCODE_CSD_SOC_POLL_DATA:
         processed = csdPoll(req, func);
         break;
       default:

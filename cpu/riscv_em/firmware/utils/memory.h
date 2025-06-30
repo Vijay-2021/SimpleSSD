@@ -30,6 +30,9 @@ extern void* memset (void * ptr, int value, size_t num );
 
 extern void print_heap_top();
 
+extern void set_heap_top(uint64_t top); // allows for fine grained control of memory regions without virtual memory
+extern void set_heap_bottom(uint64_t bottom);
+
 #ifdef __cplusplus
 }
 #endif

@@ -248,6 +248,7 @@ void SOC::rv_soc_add_task(char *input_cmd)
     // For now, we just print the input command
     printf("Adding CSD task from soc: %s\n", input_cmd);
     strtok(input_cmd, " "); // Tokenize the input command if needed
+    
     // You can implement the actual task addition logic here
 }
 
