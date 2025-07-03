@@ -14,6 +14,6 @@ class Mutex {
         void lock();
         void unlock();
 
-}
+};
 
 #endif // __RISCV_MUTEX__

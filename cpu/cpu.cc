@@ -196,14 +196,14 @@ CPU::CPU(ConfigReader &c, ICL::ICL *icl, FTL::FTL *ftl, PAL::PAL *pal, DRAM::Abs
   fparams.bRandomTweak = conf.readBoolean(CONFIG_FTL, SimpleSSD::FTL::FTL_USE_RANDOM_IO_TWEAK);
   fparams.ftl_fill_ratio = conf.readFloat(CONFIG_FTL, SimpleSSD::FTL::FTL_FILL_RATIO);
   fparams.ftl_invalid_page_ratio = conf.readFloat(CONFIG_FTL, SimpleSSD::FTL::FTL_INVALID_PAGE_RATIO);
-  fparams.ftl_filling_mode = (FTL::FILLING_MODE)conf.readInt(CONFIG_FTL, SimpleSSD::FTL::FTL_FILLING_MODE);
+  fparams.ftl_filling_mode = (FTL::FILLING_MODE)conf.readUint(CONFIG_FTL, SimpleSSD::FTL::FTL_FILLING_MODE);
   fparams.ftl_gc_threshold_ratio = conf.readFloat(CONFIG_FTL, SimpleSSD::FTL::FTL_GC_THRESHOLD_RATIO);
   fparams.ftl_gc_mode = (FTL::GC_MODE)conf.readInt(CONFIG_FTL, SimpleSSD::FTL::FTL_GC_MODE);
   fparams.ftl_evict_policy = (FTL::EVICT_POLICY)conf.readInt(CONFIG_FTL, SimpleSSD::FTL::FTL_GC_EVICT_POLICY);
   fparams.choiceParam = conf.readInt(CONFIG_FTL, SimpleSSD::FTL::FTL_GC_D_CHOICE_PARAM);
-  fparams.ftl_gc_reclaim_block = conf.readInt(CONFIG_FTL, SimpleSSD::FTL::FTL_GC_RECLAIM_BLOCK);
+  fparams.ftl_gc_reclaim_block = conf.readUint(CONFIG_FTL, SimpleSSD::FTL::FTL_GC_RECLAIM_BLOCK);
   fparams.ftl_gc_reclaim_threshold = conf.readFloat(CONFIG_FTL, SimpleSSD::FTL::FTL_GC_RECLAIM_BLOCK);
-  fparams.bad_block_threshold = conf.readInt(CONFIG_FTL, SimpleSSD::FTL::FTL_BAD_BLOCK_THRESHOLD);
+  fparams.bad_block_threshold = conf.readUint(CONFIG_FTL, SimpleSSD::FTL::FTL_BAD_BLOCK_THRESHOLD);
   
   iparams.pageSize = fparams.pageSize;
   iparams.pageCountToMaxPerf = fparams.pageCountToMaxPerf;
@@ -218,10 +218,6 @@ CPU::CPU(ConfigReader &c, ICL::ICL *icl, FTL::FTL *ftl, PAL::PAL *pal, DRAM::Abs
   iparams.cacheSize = conf.readUint(CONFIG_ICL, ICL::ICL_CACHE_SIZE);
   iparams.iclEvictGranularity = (ICL::EVICT_MODE)conf.readInt(CONFIG_ICL, ICL::ICL_EVICT_GRANULARITY);
   iparams.iclPrefetchGranularity = (ICL::PREFETCH_MODE)conf.readInt(CONFIG_ICL, ICL::ICL_PREFETCH_GRANULARITY);
-  debugprint(LOG_CPU, "page size is %u, page count to max perf is %u, io unit in page is %u and waySize is %u and prefetch count is %u and prefetch ratio is %f and useReadCaching is %u, useWriteCaching is %u, useReadPrefetch is %u, useRandomIOTweak is %u, cache size is %" PRIu64 " and iclEvictGranularity is %d and iclPrefetchGranularity is %d",
-             iparams.pageSize, iparams.pageCountToMaxPerf, iparams.ioUnitInPage, iparams.waySize, iparams.prefetchCount, iparams.prefetchRatio,
-             (uint32_t)iparams.useReadCaching, (uint32_t)iparams.useWriteCaching, (uint32_t)iparams.useReadPrefetch, (uint32_t)iparams.useRandomIOTweak,
-             iparams.cacheSize, (int)iparams.iclEvictGranularity, (int)iparams.iclPrefetchGranularity);
   // unsigned char buffer[256];
   // read_flash(buffer, 4096, 4096);
   // schedule(RISCVCycleEvent, getTick()); // start the riscv core(s) as soon as possible
@@ -1159,34 +1155,67 @@ void CPU::getStatValues(std::vector<double> &values) {
   }
 
   auto *icl_stats = riscv_soc->getICLStats();
-  values.push_back(icl_stats->read_requests);
-  values.push_back(icl_stats->write_requests);
-  values.push_back(icl_stats->trim_requests);
-  values.push_back(icl_stats->format_requests);
-  values.push_back(icl_stats->flush_requests);
-  values.push_back(icl_stats->read_cache_hits);
-  values.push_back(icl_stats->read_cache_misses);
-  values.push_back(icl_stats->write_cache_hits);
-  values.push_back(icl_stats->write_cache_misses);
-  values.push_back(icl_stats->read_cache_evictions);
-  values.push_back(icl_stats->write_cache_evictions);
-  values.push_back(icl_stats->read_req_cycles);
-  values.push_back(icl_stats->write_req_cycles);
-  values.push_back(icl_stats->trim_req_cycles);
-  values.push_back(icl_stats->format_req_cycles);
-  values.push_back(icl_stats->flush_req_cycles);
-
+  if (icl_stats != nullptr) {
+    values.push_back(icl_stats->read_requests);
+    values.push_back(icl_stats->write_requests);
+    values.push_back(icl_stats->trim_requests);
+    values.push_back(icl_stats->format_requests);
+    values.push_back(icl_stats->flush_requests);
+    values.push_back(icl_stats->read_cache_hits);
+    values.push_back(icl_stats->read_cache_misses);
+    values.push_back(icl_stats->write_cache_hits);
+    values.push_back(icl_stats->write_cache_misses);
+    values.push_back(icl_stats->read_cache_evictions);
+    values.push_back(icl_stats->write_cache_evictions);
+    values.push_back(icl_stats->read_req_cycles);
+    values.push_back(icl_stats->write_req_cycles);
+    values.push_back(icl_stats->trim_req_cycles);
+    values.push_back(icl_stats->format_req_cycles);
+    values.push_back(icl_stats->flush_req_cycles);
+  } else {
+    // If ICL stats are not available, push zeros
+    values.push_back(0);
+    values.push_back(0);
+    values.push_back(0);
+    values.push_back(0);
+    values.push_back(0);
+    values.push_back(0);
+    values.push_back(0);
+    values.push_back(0);
+    values.push_back(0);
+    values.push_back(0);
+    values.push_back(0);
+    values.push_back(0);
+    values.push_back(0);
+    values.push_back(0);
+    values.push_back(0);
+    values.push_back(0);
+  }
   auto *ftl_stats = riscv_soc->getFTLStats();
-  values.push_back(ftl_stats->read_requests);
-  values.push_back(ftl_stats->write_requests);
-  values.push_back(ftl_stats->trim_requests);
-  values.push_back(ftl_stats->format_requests);
-  values.push_back(ftl_stats->garbage_collection_requests);
-  values.push_back(ftl_stats->read_req_cycles);
-  values.push_back(ftl_stats->write_req_cycles);
-  values.push_back(ftl_stats->trim_req_cycles);   
-  values.push_back(ftl_stats->format_req_cycles);
-  values.push_back(ftl_stats->gc_req_cycles);
+  if (ftl_stats != nullptr) {
+    values.push_back(ftl_stats->read_requests);
+    values.push_back(ftl_stats->write_requests);
+    values.push_back(ftl_stats->trim_requests);
+    values.push_back(ftl_stats->format_requests);
+    values.push_back(ftl_stats->garbage_collection_requests);
+    values.push_back(ftl_stats->read_req_cycles);
+    values.push_back(ftl_stats->write_req_cycles);
+    values.push_back(ftl_stats->trim_req_cycles);   
+    values.push_back(ftl_stats->format_req_cycles);
+    values.push_back(ftl_stats->gc_req_cycles);
+  } else {
+    // If FTL stats are not available, push zeros
+    values.push_back(0);
+    values.push_back(0);
+    values.push_back(0);
+    values.push_back(0);
+    values.push_back(0);
+    values.push_back(0);
+    values.push_back(0);
+    values.push_back(0);
+    values.push_back(0);
+    values.push_back(0);
+  }
 }
 
 void CPU::resetStatValues() {

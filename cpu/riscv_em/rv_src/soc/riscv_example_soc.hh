@@ -67,12 +67,10 @@ class SOC {
         rv_soc_mem_access_cb_td mem_access_cbs[6];
         DRAM::AbstractDRAM *pDRAM;
         std::vector<Core> rv_cores;
-        FTLStats* getFTLStats() {
-            return stats.ftl_stats;
-        }
-        ICLStats* getICLStats() {
-            return stats.icl_stats;
-        }
+        FTLStats* getFTLStats();
+        ICLStats* getICLStats();
+        void setFTLStats(FTLStats *ftl_stats);
+        void setICLStats(ICLStats *icl_stats);
     private: 
         CPU *pCPU; 
         RISCVStats stats;

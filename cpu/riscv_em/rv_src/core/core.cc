@@ -12,7 +12,8 @@
 #include "core.hh"
 
 #include "sim/simulator.hh"
-
+#include "util/def.hh"
+#include "util/bitset.hh"
 // #define CORE_DEBUG
 #ifdef CORE_DEBUG
     #define CORE_DBG(...) do{ printf( __VA_ARGS__ ); } while( 0 )
@@ -1407,17 +1408,29 @@ static uint64_t instr_LTRIM(Core * rv_core) {
 }
 
 static uint64_t instr_PREAD(Core * rv_core) {
-    rv_core->pSOC->pread(rv_core->pSOC->get_ram() + ((rv_core->reg_file[rv_core->rd] - RAM_BASE_ADDR)), (uint64_t*) (rv_core->pSOC->get_ram() + ((rv_core->reg_file[rv_core->rs1] - RAM_BASE_ADDR))));
+    PAL::Request* req = (PAL::Request *) (rv_core->pSOC->get_ram() + (rv_core->reg_file[rv_core->rd] - RAM_BASE_ADDR));
+    uint8_t* stored_addr = req->ioFlag.data;
+    req->ioFlag.data = rv_core->pSOC->get_ram() + ((uint64_t)req->ioFlag.data - RAM_BASE_ADDR);
+    rv_core->pSOC->pread((uint8_t*) req, (uint64_t*) (rv_core->pSOC->get_ram() + ((rv_core->reg_file[rv_core->rs1] - RAM_BASE_ADDR))));
+    req->ioFlag.data = stored_addr;
     return getTick() + rv_core->pSOC->get_period();
 }
 
 static uint64_t instr_PWRITE(Core * rv_core) {
-    rv_core->pSOC->pwrite(rv_core->pSOC->get_ram() + ((rv_core->reg_file[rv_core->rd] - RAM_BASE_ADDR)), (uint64_t*) (rv_core->pSOC->get_ram() + ((rv_core->reg_file[rv_core->rs1] - RAM_BASE_ADDR))));
+    PAL::Request* req = (PAL::Request *) (rv_core->pSOC->get_ram() + (rv_core->reg_file[rv_core->rd] - RAM_BASE_ADDR));
+    uint8_t* stored_addr = req->ioFlag.data;
+    req->ioFlag.data = rv_core->pSOC->get_ram() + ((uint64_t)req->ioFlag.data - RAM_BASE_ADDR);
+    rv_core->pSOC->pwrite((uint8_t*) req, (uint64_t*) (rv_core->pSOC->get_ram() + ((rv_core->reg_file[rv_core->rs1] - RAM_BASE_ADDR))));
+    req->ioFlag.data = stored_addr;
     return getTick() + rv_core->pSOC->get_period();
 }
 
 static uint64_t instr_PERASE(Core * rv_core) {
-    rv_core->pSOC->perase(rv_core->pSOC->get_ram() + ((rv_core->reg_file[rv_core->rd] - RAM_BASE_ADDR)), (uint64_t*) (rv_core->pSOC->get_ram() + ((rv_core->reg_file[rv_core->rs1] - RAM_BASE_ADDR))));
+    PAL::Request* req = (PAL::Request *) (rv_core->pSOC->get_ram() + (rv_core->reg_file[rv_core->rd] - RAM_BASE_ADDR));
+    uint8_t* stored_addr = req->ioFlag.data;
+    req->ioFlag.data = rv_core->pSOC->get_ram() + ((uint64_t)req->ioFlag.data - RAM_BASE_ADDR);
+    rv_core->pSOC->perase((uint8_t*) req, (uint64_t*) (rv_core->pSOC->get_ram() + ((rv_core->reg_file[rv_core->rs1] - RAM_BASE_ADDR))));
+    req->ioFlag.data = stored_addr;
     return getTick() + rv_core->pSOC->get_period();
 }
 
@@ -1433,6 +1446,11 @@ static uint64_t instr_READBUFF(Core *rv_core) {
 }
 
 static uint64_t instr_WRITEBUFF(Core *rv_core) {
+    if (rv_core->reg_file[rv_core->rs2] == ICL_STAT_LOC) {
+        rv_core->pSOC->setICLStats((ICLStats *) (rv_core->pSOC->get_ram() + (rv_core->reg_file[rv_core->rd] - RAM_BASE_ADDR)));
+    } else if (rv_core->reg_file[rv_core->rs2] == FTL_STAT_LOC) {
+        rv_core->pSOC->setFTLStats((FTLStats *) (rv_core->pSOC->get_ram() + (rv_core->reg_file[rv_core->rd] - RAM_BASE_ADDR)));
+    }
     rv_core->pSOC->write_buffer(rv_core->pSOC->get_ram() + ((rv_core->reg_file[rv_core->rd] - RAM_BASE_ADDR)), rv_core->reg_file[rv_core->rs1], rv_core->reg_file[rv_core->rs2] );
     return getTick() + rv_core->pSOC->get_period();
 }

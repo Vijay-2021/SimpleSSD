@@ -75,6 +75,8 @@ typedef enum {
 typedef enum {
   FIRMWARE_REQ_DONE = 0,
   FIRMWARE_REQ_FAILED = 1,
+  ICL_STAT_LOC = 2,
+  FTL_STAT_LOC = 3,
 } DATA_RESP; 
 
 

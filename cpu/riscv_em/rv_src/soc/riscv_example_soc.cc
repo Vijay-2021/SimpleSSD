@@ -94,6 +94,9 @@ SOC::SOC(char *fw_file_name, char *dtb_file_name, char *initrd_file_name, CPU *c
     uint64_t fdt_size = 0;
     uint64_t tmp = 0;
 
+    stats.ftl_stats = nullptr; // set to null until firmware overwrites it
+    stats.icl_stats = nullptr;
+
     clock_period = pCPU->getClockPeriod(); 
     /* Init everything to zero */
     // memset(rv_soc, 0, sizeof(rv_soc_td));
@@ -297,9 +300,26 @@ void SOC::resetStatValues() {
     // for (auto &core : rv_cores) {
     //     core.reset_stats();
     // }
-    memset(stats.ftl_stats, 0, sizeof(FTLStats));
-    memset(stats.icl_stats, 0, sizeof(ICLStats));
+    if (stats.ftl_stats) {
+        memset(stats.ftl_stats, 0, sizeof(FTLStats));
+    } 
+    if (stats.icl_stats) {
+        memset(stats.icl_stats, 0, sizeof(ICLStats));
+    }
     stats.total_cycles = 0;
+}
+
+FTLStats* SOC::getFTLStats() {
+    return stats.ftl_stats;
+}
+ICLStats* SOC::getICLStats() {
+    return stats.icl_stats;
+}
+void SOC::setFTLStats(FTLStats *ftl_stats) {
+    stats.ftl_stats = ftl_stats;
+}
+void SOC::setICLStats(ICLStats *icl_stats) {
+    stats.icl_stats = icl_stats;
 }
 
 } // namespace RISCV

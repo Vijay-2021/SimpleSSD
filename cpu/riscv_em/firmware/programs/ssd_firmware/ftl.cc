@@ -33,7 +33,9 @@ FTL::FTL(ftl_params &fparams) : params(fparams), lastFreeBlock(fparams.pageCount
       table(fparams.totalLogicalBlocks * fparams.pagesInBlock) {
   printf("constructor called with total physical blocks: %u\n", params.totalPhysicalBlocks);
   printf("total page count to max perf: %u\n", params.pageCountToMaxPerf);
-  for (uint32_t i = 0; i < 16; i++) {
+  printf("io Unit in page: %u and pageCountToMaxPerf: %u and bRandomTweak %u and ftl_gc_mode %d and ftl_filling_mode %d and choice param %u and reclaim block %u\n", 
+         params.ioUnitInPage, params.pageCountToMaxPerf, (uint32_t)params.bRandomTweak, (int)params.ftl_gc_mode, (int)params.ftl_filling_mode, params.choiceParam, params.ftl_gc_reclaim_block);
+  for (uint32_t i = 0; i < 128; i++) {
     freeBlocks.emplace_back(move(Block(i, params.pagesInBlock, params.ioUnitInPage)));
   }
 
@@ -212,9 +214,7 @@ uint64_t FTL::format(LPNRange &range) {
   }
 
   // Get blocks to erase
-  introsort(list.begin(), list.end(), [](const uint32_t &a, const uint32_t &b) {
-    return a < b;
-  });
+  merge_sort(list.begin(), list.end());
   auto last = Unique(list.begin(), list.end());
   while (last != list.end()) {
     list.pop_back();
@@ -311,30 +311,32 @@ uint32_t FTL::getLastFreeBlock(Bitset &iomap) {
 void FTL::calculateVictimWeight(
     Vector<Pair<uint32_t, float>> &weight, const EVICT_POLICY policy) {
   float temp;
-
+  printf("fine here\n");
   weight.reserve(blocks.size());
-
+  printf("this is okay too\n");
   switch (policy) {
     case POLICY_GREEDY:
     case POLICY_RANDOM:
     case POLICY_DCHOICE:
-      for (auto iter : blocks) {
+      printf("looping through blocks\n");
+      for (auto& iter : blocks) {
         if (iter.second.getNextWritePageIndex() != params.pagesInBlock) {
           continue;
         }
-
+        printf("adding to weights\n");
         weight.push_back({iter.first, iter.second.getValidPageCountRaw()});
       }
 
       break;
     case POLICY_COST_BENEFIT:
-      for (auto iter : blocks) {
+      printf("cost benefit policy selected\n");
+      for (auto& iter : blocks) {
         if (iter.second.getNextWritePageIndex() != params.pagesInBlock) {
           continue;
         }
 
         temp = (float)(iter.second.getValidPageCountRaw()) / params.pagesInBlock;
-
+        printf("adding to weights\n");
         weight.push_back(
             {iter.first,
              temp / ((1 - temp) * (getTick() - iter.second.getLastAccessedTime()))});
@@ -347,12 +349,13 @@ void FTL::calculateVictimWeight(
 }
 
 void FTL::selectVictimBlock(Vector<uint32_t> &list) {
-  static const GC_MODE mode = params.ftl_gc_mode;
-  static const EVICT_POLICY policy = params.ftl_evict_policy;
-  static uint32_t dChoiceParam = params.choiceParam;
+  const GC_MODE mode = params.ftl_gc_mode;
+  const EVICT_POLICY policy = params.ftl_evict_policy;
+  uint32_t dChoiceParam = params.choiceParam;
   uint64_t nBlocks = params.ftl_gc_reclaim_block;
   Vector<Pair<uint32_t, float>> weight;
-
+  printf("started selectVictimBlock with mode: %d, policy: %d, reclaim block: %u\n",
+         mode, policy, nBlocks);
   list.clear();
 
   // Calculate number of blocks to reclaim
@@ -360,7 +363,8 @@ void FTL::selectVictimBlock(Vector<uint32_t> &list) {
     // DO NOTHING
   }
   else if (mode == GC_MODE_1) {
-    static const float t = params.ftl_gc_reclaim_threshold;
+    printf("GC_MODE_1 selected\n");
+    const float t = params.ftl_gc_reclaim_threshold;
 
     nBlocks = params.totalPhysicalBlocks * t - nFreeBlocks;
   }
@@ -374,9 +378,11 @@ void FTL::selectVictimBlock(Vector<uint32_t> &list) {
 
     bReclaimMore = false;
   }
+  printf("nBlocks to reclaim: %u\n", nBlocks);
 
   // Calculate weights of all blocks
   calculateVictimWeight(weight, policy);
+  printf("calculated victim weights, size: %u\n", weight.size());
 
   if (policy == POLICY_RANDOM || policy == POLICY_DCHOICE) {
     uint64_t randomRange =
@@ -394,9 +400,10 @@ void FTL::selectVictimBlock(Vector<uint32_t> &list) {
 
     weight = move(selected);
   }
+  printf("finished all of this\n");
 
   // Sort weights
-  introsort(
+  merge_sort(
       weight.begin(), weight.end(),
       [](Pair<uint32_t, float> a, Pair<uint32_t, float> b) -> bool {
         return a.second < b.second;
@@ -406,12 +413,14 @@ void FTL::selectVictimBlock(Vector<uint32_t> &list) {
   nBlocks = MIN(nBlocks, weight.size());
 
   for (uint64_t i = 0; i < nBlocks; i++) {
+    printf("adding %u to list\n", weight.at(i).first);
     list.push_back(weight.at(i).first);
   }
 
 }
 
 uint64_t FTL::doGarbageCollection(Vector<uint32_t> &blocksToReclaim) {
+  printf("doGarbageCollection called with %u blocks to reclaim\n", blocksToReclaim.size());
   PAL::Request req(params.ioUnitInPage);
   Vector<PAL::Request> readRequests;
   Vector<PAL::Request> writeRequests;
@@ -586,6 +595,7 @@ uint64_t FTL::readInternal(Request &req) {
 uint64_t FTL::writeInternal(Request &req, bool sendToPAL) {
   printf("calling write interal!\n");
   PAL::Request palRequest(req);
+  printf("original pal request address: %u\n", (uint64_t)&palRequest);
   HashMap<uint32_t, Block>::iterator block;
   auto mappingList = table.find(req.lpn);
   uint64_t beginAt;
@@ -672,6 +682,7 @@ uint64_t FTL::writeInternal(Request &req, bool sendToPAL) {
         else {
           palRequest.ioFlag.set();
         }
+        printf("address of pal write is: %u\n", (uint64_t)&palRequest);
         pwrite((uint64_t) &palRequest, (uint64_t)&beginAt);
         //pPAL->write(palRequest, beginAt);
       }
@@ -687,12 +698,15 @@ uint64_t FTL::writeInternal(Request &req, bool sendToPAL) {
 
   // GC if needed
   // I assumed that init procedure never invokes GC
-  static float gcThreshold = params.ftl_gc_threshold_ratio;;
-
+  printf("now checking if we need to do GC\n");
+  float gcThreshold = params.ftl_gc_threshold_ratio;
+  printf("decided to do gc\n");
   if (freeBlockRatio() < gcThreshold) {
+    printf("send to pal was the issue?\n");
     if (!sendToPAL) {
       panic("ftl: GC triggered while in initialization");
     }
+    printf("doing garbage collection\n");
 
     Vector<uint32_t> list;
     uint64_t beginAt = getTick();
@@ -703,10 +717,11 @@ uint64_t FTL::writeInternal(Request &req, bool sendToPAL) {
 
     uint64_t ret_time = doGarbageCollection(list);
 
-    printf(" GC Done | %u - %u (%u)", ret_time, beginAt, ret_time - beginAt);
-
-    stat.gcCount++;
-    stat.reclaimedBlocks += list.size();
+    printf(" GC Done | %u - %u (%u) and finished at is: %u", ret_time, beginAt, ret_time - beginAt, finishedAt);
+    for (size_t i = 0; i < list.size(); i++) {
+      printf("list has element %u\n", list.at(i));
+    }
+    printf("list begin address: %u\n",(uint64_t)list.begin());
   }
   return finishedAt; // ignore gc time in PAL(the cpu time will still be considered as well as the time for writing to PAL for specific request and extra GC requests will affect PAL performance of subsequent requests)
     
@@ -738,7 +753,7 @@ uint64_t FTL::trimInternal(Request &req) {
 
 void FTL::eraseInternal(PAL::Request &req, uint64_t &tick) {
   uint64_t beginAt = getTick();
-  static uint64_t threshold = params.bad_block_threshold;
+  uint64_t threshold = params.bad_block_threshold;
   auto block = blocks.find(req.blockIndex);
   uint64_t pal_time;
   // Sanity checks
@@ -794,7 +809,7 @@ float FTL::calculateWearLeveling() {
   uint64_t numOfBlocks = params.totalLogicalBlocks;
   uint64_t eraseCnt;
 
-  for (auto iter : blocks) {
+  for (auto& iter : blocks) {
     eraseCnt = iter.second.getEraseCount();
     totalEraseCnt += eraseCnt;
     sumOfSquaredEraseCnt += eraseCnt * eraseCnt;
