@@ -101,6 +101,7 @@ set(SRC_DRAM
   dram/abstract_dram.cc
   dram/config.cc
   dram/simple.cc
+  dram/sram.cc
 )
 set(SRC_FTL_COMMON
   ftl/common/block.cc
@@ -185,7 +186,7 @@ set (SRC_RISCV_EM
   cpu/riscv_em/rv_src/peripherals/clint/clint.cc
   cpu/riscv_em/rv_src/peripherals/plic/plic.cc
   cpu/riscv_em/rv_src/peripherals/uart/simple_uart.cc  
-  cpu/riscv_em/rv_src/soc/riscv_example_soc.cc
+  cpu/riscv_em/rv_src/soc/riscv_soc.cc
 )
 
 # Source group for MSVC

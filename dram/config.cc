@@ -95,7 +95,10 @@ Config::Config() {
   dram.activationLimit = 4;
   dram.useDLL = false;
   dram.pageSize = 4096;
-
+  dram.bankBits = 3;
+  dram.colBits = 10;
+  dram.rowSize = 8192; // 10 bits for column + 3 bits for offset
+  
   dramTiming.tCK = 1250;
   dramTiming.tRCD = 18000;
   dramTiming.tCL = 15000;

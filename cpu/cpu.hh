@@ -42,7 +42,7 @@
 #include "sim/simulator.hh"
 #include "sim/statistics.hh"
 
-#include "rv_src/soc/riscv_example_soc.hh"
+#include "rv_src/soc/riscv_soc.hh"
 #include "rv_src/core/riscv_helper.hh"
 #include "rv_src/peripherals/uart/simple_uart.hh"
 #include "rv_src/core/riscv_types.hh"

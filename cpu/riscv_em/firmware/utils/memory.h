@@ -32,6 +32,7 @@ extern void print_heap_top();
 
 extern void set_heap_top(uint64_t top); // allows for fine grained control of memory regions without virtual memory
 extern void set_heap_bottom(uint64_t bottom);
+extern uint64_t get_heap_top();
 
 #ifdef __cplusplus
 }

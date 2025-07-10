@@ -47,6 +47,9 @@ class Config : public BaseConfig {
     bool useDLL;
     uint64_t chipSize;
     uint64_t pageSize;
+    uint64_t colBits;
+    uint64_t bankBits;
+    uint64_t rowSize; 
   } DRAMStructure;
 
   typedef struct {    // Unit: ps

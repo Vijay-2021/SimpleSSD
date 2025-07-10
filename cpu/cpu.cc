@@ -1402,6 +1402,7 @@ void CPU::read_buffer(uint8_t* buffer, uint64_t req_info, uint64_t req_type) {
     req_queue.pop();
   } else if (req_type == RISCV::FIRMWARE_TICK) {
     uint64_t tick = getTick();
+    printf("Current tick: %llu\n", tick);
     memcpy(buffer, &tick, sizeof(uint64_t));
   } else if (req_type == RISCV::FIRMWARE_QUEUE_SIZE) {
     uint64_t size = req_queue.size();

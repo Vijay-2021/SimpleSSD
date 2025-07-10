@@ -15,6 +15,10 @@ namespace DRAM {
     class AbstractDRAM; 
 }
 
+namespace SRAM {
+    class SRAM; 
+}
+
 namespace CPU {
 
 class CPU;
@@ -66,11 +70,21 @@ class SOC {
         uint64_t clock_period;
         rv_soc_mem_access_cb_td mem_access_cbs[6];
         DRAM::AbstractDRAM *pDRAM;
+        SRAM::SRAM *pCache; // SRAM for RISCV
         std::vector<Core> rv_cores;
+        std::vector<uint64_t> next_core_ticks;
+        uint64_t ICL_HIGH;
+        uint64_t ICL_LOW;
         FTLStats* getFTLStats();
         ICLStats* getICLStats();
         void setFTLStats(FTLStats *ftl_stats);
         void setICLStats(ICLStats *icl_stats);
+        void setICLLow(uint64_t *icl_low);
+        void setICLHigh(uint64_t *icl_high);
+        uint64_t read(uint64_t addr, uint64_t len);
+        uint64_t write(uint64_t addr, uint64_t len);
+        bool instruction_access(rv_word_t address, void *value, uint8_t len);
+
     private: 
         CPU *pCPU; 
         RISCVStats stats;

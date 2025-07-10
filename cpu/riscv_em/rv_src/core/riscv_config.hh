@@ -36,4 +36,8 @@
 #define FROM_BASE_ADDR 0xc0000000UL
 #define FROM_SIZE_BYTES 0xc800000UL
 
+#define SRAM_SIZE 0x10000UL /* 64KB */
+#define SRAM_BLOCK_SIZE 0x40UL /* 64B */
+#define SRAM_NUM_WAYS 8 /* 8-way set associative */
+
 #endif /* RISCV_CONFIG_H */

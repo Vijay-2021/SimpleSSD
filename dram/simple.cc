@@ -42,12 +42,45 @@ SimpleDRAM::SimpleDRAM(ConfigReader &p)
 
     schedule(autoRefresh, now + REFRESH_PERIOD);
   });
+  for (size_t i = 0; i < pStructure->bank; i++) {
+    open_rows.push_back(0);
+  }
 
   schedule(autoRefresh, getTick() + REFRESH_PERIOD);
 }
 
 SimpleDRAM::~SimpleDRAM() {
   // DO NOTHING
+}
+
+uint64_t SimpleDRAM::getBank(uint64_t addr) {
+  return (addr >> pStructure->colBits) & ((1 << pStructure->bankBits) - 1);
+}
+
+uint64_t SimpleDRAM::getRow(uint64_t addr) {
+  return addr >> (pStructure->colBits + pStructure->bankBits);
+}
+
+uint64_t SimpleDRAM::access(uint64_t addr, uint64_t size) {
+    uint64_t ticks = 0;
+    uint64_t offset = 0;
+    while (offset < size) {
+        uint64_t a = addr + offset;
+        uint64_t bank = getBank(a);
+        uint64_t row = getRow(a);
+        uint64_t rowOffset = a % pStructure->rowSize;
+        uint64_t chunk = std::min(size - offset, pStructure->rowSize - rowOffset);
+        uint64_t bursts = std::ceil(chunk / pStructure->burstLength);
+
+        if (open_rows[bank] == row) {
+            ticks += pTiming->tCL + bursts * pTiming->tBURST;
+        } else {
+            ticks += pTiming->tRP + pTiming->tRAS + pTiming->tRCD + pTiming->tCL + bursts * pTiming->tBURST;
+            open_rows[bank] = row;
+        }
+        offset += chunk;
+    }
+    return ticks;
 }
 
 uint64_t SimpleDRAM::updateDelay(uint64_t latency, uint64_t &tick) {

@@ -86,6 +86,8 @@ class ICL {
   const bool useReadPrefetch;
 
   bool bSuperPage;
+  uint8_t* copy_buffer;
+  uint8_t* cache_buffer;
 
   struct SequentialDetect {
     bool enabled;

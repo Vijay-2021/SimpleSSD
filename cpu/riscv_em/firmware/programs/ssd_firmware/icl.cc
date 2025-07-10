@@ -48,7 +48,16 @@ ICL::ICL(icl_params& cparams, FTL::FTL *ftl) :
       useReadPrefetch(cparams.useReadPrefetch)  {
   printf("calling icl initializer!\n");
   uint64_t cacheSize = params.cacheSize;
-
+  uint64_t heap_top = get_heap_top();
+  write_buffer((uint64_t)&heap_top, 0, ICL_LOW);
+  cache_buffer = (uint8_t*)malloc(cacheSize);
+  if (cache_buffer == NULL) {
+    printf("ICL: Failed to allocate cache memory of size %u bytes.\n", cacheSize);
+    return;
+  }
+  heap_top = get_heap_top();
+  write_buffer((uint64_t)&heap_top, 0, ICL_HIGH);
+  
   lineSize = superPageSize / lineCountInSuperPage;
 
   if (lineSize != superPageSize) {
@@ -60,7 +69,7 @@ ICL::ICL(icl_params& cparams, FTL::FTL *ftl) :
     lineCountInSuperPage = 1;
     lineCountInMaxIO = parallelIO;
   }
-
+  copy_buffer = (uint8_t*)malloc(lineSize); // use this to simulate reading cache data out to a buffer for HIL processing
   if (!useReadCaching && !useWriteCaching) {
     printf("Read and write caching are disabled, not creating cache.\n");
     printf("useReadCaching: %u useWriteCaching: %u useReadPrefetch: %u\n",
@@ -116,6 +125,8 @@ ICL::~ICL() {
   for (uint32_t i = 0; i < lineCountInSuperPage; i++) {
     free(evictData[i]);
   }
+  free(cache_buffer);
+  free(copy_buffer);
 }
 
 uint32_t ICL::calcSetIndex(uint64_t lca) {
@@ -137,9 +148,6 @@ uint32_t ICL::getEmptyWay(uint32_t setIdx) {
     Line &line = cacheData[setIdx][wayIdx];
 
     if (!line.valid) {
-      // pDRAM->read(MAKE_META_ADDR(setIdx, wayIdx, offsetof(Line, insertedAt)),
-      // 8, tick);
-
       if (minInsertedAt > line.insertedAt) {
         minInsertedAt = line.insertedAt;
         retIdx = wayIdx;
@@ -155,8 +163,6 @@ uint32_t ICL::getValidWay(uint64_t lca) {
   uint32_t wayIdx;
   for (wayIdx = 0; wayIdx < waySize; wayIdx++) {
     Line &line = cacheData[setIdx][wayIdx];
-    // pDRAM->read(MAKE_META_ADDR(setIdx, wayIdx, offsetof(Line, tag)), 8,
-    // tick);
     if (line.valid && line.tag == lca) {
       break;
     }
@@ -198,8 +204,6 @@ void ICL::checkSequential(Request &req, SequentialDetect &data) {
 
 void ICL::evictCache(bool flush) {
   FTL::Request reqInternal(lineCountInSuperPage);
-
-  // debugprint(LOG_ICL_GENERIC_CACHE, "----- | Begin eviction");
 
   for (uint32_t row = 0; row < lineCountInSuperPage; row++) {
     uint64_t tick = getTick();
@@ -262,9 +266,16 @@ bool ICL::read(Request &req) {
       icl_stats.read_req_cycles += getCycle() - start_cycle;
       cacheData[setIdx][wayIdx].lastAccessed = getTick();
 
-      // DRAM access
-      //pDRAM->read(&cacheData[setIdx][wayIdx], req.length, tick);
-
+      if (req.length < lineSize) {
+        memcpy(copy_buffer, cache_buffer + (setIdx * waySize + wayIdx) * lineSize, req.length);
+      } else {
+        uint64_t length = req.length;
+        while (length > 0) {
+          uint64_t read_length = MIN(length, lineSize);
+          memcpy(copy_buffer, cache_buffer + (setIdx * waySize + wayIdx) * lineSize, read_length);
+          length -= read_length;
+        }
+      }
       // debugprint(LOG_ICL_GENERIC_CACHE,
       //           "READ  | Cache hit at (%u, %u) | %" PRIu64 " - %" PRIu64
       //           " (%" PRIu64 ")",
@@ -293,8 +304,6 @@ bool ICL::read(Request &req) {
       
 
       if (readDetect.enabled) {
-        // TEMP: Disable DRAM calculation for prevent conflict
-        //pDRAM->setScheduling(false);
 
         if (!ret) {
           // debugprint(LOG_ICL_GENERIC_CACHE, "READ  | Read ahead triggered");
@@ -367,7 +376,7 @@ bool ICL::read(Request &req) {
 
         // DRAM delay
         // dramAt = pLine->insertedAt;
-        //pDRAM->write(pLine, lineSize, dramAt);
+        memcpy(cache_buffer + (iter.second >> 32) * waySize * lineSize + (iter.second & 0xFFFFFFFF) * lineSize, copy_buffer, lineSize);
 
         // Set cache data
         beginAt = MAX(beginAt, read_time);
@@ -388,29 +397,23 @@ bool ICL::read(Request &req) {
       }
 
       process_request(finishedAt);
-
-      // if (readDetect.enabled) {
-      //   if (ret) {
-      //     // This request was prefetch
-      //     // debugprint(LOG_ICL_GENERIC_CACHE, "READ  | Prefetch done");
-
-      //     // Restore tick
-      //     tick = arrived;
-      //   }
-      //   else {
-      //     // debugprint(LOG_ICL_GENERIC_CACHE, "READ  | Read ahead done");
-      //   }
-
-      //   // TEMP: Restore
-      //   //pDRAM->setScheduling(true);
-      // }
     }
   }
   else {
     FTL::Request reqInternal(lineCountInSuperPage, req);
 
-    //pDRAM->write(nullptr, req.length, tick);
-
+    //simulates writing data to dram after retrieving it from NVM, however we do in opposite order for timing correctness
+    if (req.length <= lineSize) {
+      memcpy(cache_buffer, copy_buffer, req.length);
+    }
+    else {
+      uint64_t length = req.length;
+      while (length > 0) {
+        uint64_t read_length = MIN(length, lineSize);
+        memcpy(cache_buffer, copy_buffer, read_length); // the exact location of copy doesn't matter, we just need to simulate writing data
+        length -= read_length;
+      }
+    }
     process_request(pFTL->read(reqInternal));
   }
 
@@ -479,7 +482,16 @@ bool ICL::write(Request &req) {
       cacheData[setIdx][wayIdx].dirty = dirty; 
 
       // DRAM access
-      //pDRAM->write(&cacheData[setIdx][wayIdx], req.length, tick);
+      if (req.length < lineSize) {
+        memcpy(cache_buffer + (setIdx * waySize + wayIdx) * lineSize, copy_buffer, req.length);
+      } else {
+        uint64_t length = req.length;
+        while (length > 0) {
+          uint64_t write_length = MIN(length, lineSize);
+          memcpy(cache_buffer + (setIdx * waySize + wayIdx) * lineSize, copy_buffer, write_length);
+          length -= write_length;
+        }
+      }
 
       // debugprint(LOG_ICL_GENERIC_CACHE,
       //           "WRITE | Cache hit at (%u, %u) | %" PRIu64 " - %" PRIu64
@@ -521,7 +533,16 @@ bool ICL::write(Request &req) {
         cacheData[setIdx][wayIdx].tag = req.range.slpn;
 
         // DRAM access
-        //pDRAM->write(&cacheData[setIdx][wayIdx], req.length, tick);
+        if (req.length < lineSize) {
+          memcpy(cache_buffer + (setIdx * waySize + wayIdx) * lineSize, copy_buffer, req.length);
+        } else {
+          uint64_t length = req.length;
+          while (length > 0) {
+            uint64_t write_length = MIN(length, lineSize);
+            memcpy(cache_buffer + (setIdx * waySize + wayIdx) * lineSize, copy_buffer, write_length);
+            length -= write_length;
+          }
+        }
         if (dirty) {
           process_request(getTick());
         }
@@ -597,7 +618,16 @@ bool ICL::write(Request &req) {
         }
 
         // DRAM latency
-        //pDRAM->write(&cacheData[setIdx][wayIdx], req.length, tick);
+        if (req.length < lineSize) {
+          memcpy(cache_buffer + (setIdx * waySize + wayIdx) * lineSize, copy_buffer, req.length);
+        } else {
+          uint64_t length = req.length;
+          while (length > 0) {
+            uint64_t write_length = MIN(length, lineSize);
+            memcpy(cache_buffer + (setIdx * waySize + wayIdx) * lineSize, copy_buffer, write_length);
+            length -= write_length;
+          }
+        }
 
         // Update cache data
         cacheData[setIdx][wayIdx].insertedAt = getTick();
@@ -623,11 +653,17 @@ bool ICL::write(Request &req) {
     }
 
     // TEMP: Disable DRAM calculation for prevent conflict
-    //pDRAM->setScheduling(false);
 
-    //pDRAM->read(nullptr, req.length, tick);
-
-    //pDRAM->setScheduling(true);
+    if (req.length < lineSize) {
+      memcpy(copy_buffer, cache_buffer + req.range.slpn * lineSize, req.length);
+    } else {
+      uint64_t length = req.length;
+      while (length > 0) {
+        uint64_t read_length = MIN(length, lineSize);
+        memcpy(copy_buffer, cache_buffer + req.range.slpn * lineSize, read_length);
+        length -= read_length;
+      }
+    }
   }
 
   stat.request[1]++;

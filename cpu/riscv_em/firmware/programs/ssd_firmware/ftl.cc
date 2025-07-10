@@ -702,7 +702,7 @@ uint64_t FTL::writeInternal(Request &req, bool sendToPAL) {
   float gcThreshold = params.ftl_gc_threshold_ratio;
   printf("decided to do gc\n");
   if (freeBlockRatio() < gcThreshold) {
-    printf("send to pal was the issue?\n");
+    printf("send to pal was the issue with free block ratio?\n");
     if (!sendToPAL) {
       panic("ftl: GC triggered while in initialization");
     }

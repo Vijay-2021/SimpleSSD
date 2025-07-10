@@ -7,13 +7,15 @@
 #include "riscv_types.hh"
 #include "riscv_helper.hh"
 #include "riscv_instr.hh"
-#include "rv_src/soc/riscv_example_soc.hh"
+#include "rv_src/soc/riscv_soc.hh"
 #include "rv_src/core/mmu/mmu.hh"
 #include "core.hh"
 
 #include "sim/simulator.hh"
 #include "util/def.hh"
 #include "util/bitset.hh"
+#include "instruction_timings.hh"
+
 // #define CORE_DEBUG
 #ifdef CORE_DEBUG
     #define CORE_DBG(...) do{ printf( __VA_ARGS__ ); } while( 0 )
@@ -65,7 +67,7 @@ uint64_t pmp_checked_bus_access(void *priv, privilege_level priv_level, bus_acce
     {
         printf("PMP Violation!\n");
         prepare_sync_trap(rv_core, trap_cause, addr);
-        return getTick() + rv_core->pSOC->get_period();
+        return 0; // return 0 to indicate error
     }
 
     return rv_core->bus_access(rv_core->pSOC, priv_level, access_type, addr, value, len);
@@ -93,7 +95,7 @@ uint64_t mmu_checked_bus_access(void *priv, privilege_level priv_level, bus_acce
         if(mmu_ret_val != mmu_ok)
         {
             prepare_sync_trap(rv_core, trap_cause, addr);
-            return getTick() + rv_core->pSOC->get_period();;
+            return 0; // return 0 to indicate error
         }
         #ifdef PMP_SUPPORT 
             return rv_core->mmu.bus_access(rv_core->mmu.priv, internal_priv_level, access_type, phys_addr, value, len);
@@ -116,7 +118,7 @@ static uint64_t instr_NOP(Core *rv_core)
 {
     CORE_DBG("%s: %x\n", __func__, rv_core->instruction);
     (void) rv_core;
-    return getTick() + rv_core->pSOC->get_period(); // 1 cycle
+    return 1; // 1 cycle
 }
 
 /* RISCV Instructions */
@@ -124,14 +126,14 @@ static uint64_t instr_LUI(Core *rv_core)
 {
     CORE_DBG("%s: %x\n", __func__, rv_core->instruction);
     rv_core->reg_file[rv_core->rd] = (rv_core->immediate << 12);
-    return getTick() + rv_core->pSOC->get_period();
+    return LUI_CYCLE_COUNT;
 }
 
 static uint64_t instr_AUIPC(Core *rv_core)
 {
     CORE_DBG("%s: %x\n", __func__, rv_core->instruction);
     rv_core->reg_file[rv_core->rd] = (rv_core->pc) + (rv_core->immediate << 12);
-    return getTick() + rv_core->pSOC->get_period();
+    return AUIPC_CYCLE_COUNT;
 }
 
 static uint64_t instr_JAL(Core *rv_core)
@@ -143,11 +145,11 @@ static uint64_t instr_JAL(Core *rv_core)
     {
         die_msg("Addr misaligned!\n");
         prepare_sync_trap(rv_core, trap_cause_instr_addr_misalign, 0);
-        return getTick();
+        return 0;
     }
 
     rv_core->next_pc = rv_core->pc + rv_core->jump_offset;
-    return getTick() + rv_core->pSOC->get_period();
+    return JAL_CYCLE_COUNT;
 }
 
 static uint64_t instr_JALR(Core *rv_core)
@@ -163,11 +165,11 @@ static uint64_t instr_JALR(Core *rv_core)
     {
         die_msg("Addr misaligned!\n");
         prepare_sync_trap(rv_core, trap_cause_instr_addr_misalign, 0);
-        return getTick();
+        return 0;
     }
 
     rv_core->reg_file[rv_core->rd] = curr_pc;
-    return getTick() + rv_core->pSOC->get_period();
+    return JALR_CYCLE_COUNT;
 }
 
 static uint64_t instr_BEQ(Core *rv_core)
@@ -179,12 +181,12 @@ static uint64_t instr_BEQ(Core *rv_core)
         {
             die_msg("Addr misaligned!\n");
             prepare_sync_trap(rv_core, trap_cause_instr_addr_misalign, 0);
-            return getTick();
+            return 0;
         }
 
         rv_core->next_pc = rv_core->pc + rv_core->jump_offset;
     }
-    return getTick() + rv_core->pSOC->get_period();
+    return BEQ_CYCLE_COUNT;
 }
 
 static uint64_t instr_BNE(Core *rv_core)
@@ -196,12 +198,12 @@ static uint64_t instr_BNE(Core *rv_core)
         {
             die_msg("Addr misaligned!\n");
             prepare_sync_trap(rv_core, trap_cause_instr_addr_misalign, 0);
-            return getTick();
+            return 0;
         }
 
         rv_core->next_pc = rv_core->pc + rv_core->jump_offset;
     }
-    return getTick() + rv_core->pSOC->get_period();
+    return BNE_CYCLE_COUNT;
 }
 
 static uint64_t instr_BLT(Core *rv_core)
@@ -216,12 +218,12 @@ static uint64_t instr_BLT(Core *rv_core)
         {
             die_msg("Addr misaligned!\n");
             prepare_sync_trap(rv_core, trap_cause_instr_addr_misalign, 0);
-            return getTick();
+            return 0;
         }
 
         rv_core->next_pc = rv_core->pc + rv_core->jump_offset;
     }
-    return getTick() + rv_core->pSOC->get_period();
+    return BLT_CYCLE_COUNT;
 }
 
 static uint64_t instr_BGE(Core *rv_core)
@@ -236,12 +238,12 @@ static uint64_t instr_BGE(Core *rv_core)
         {
             die_msg("Addr misaligned!\n");
             prepare_sync_trap(rv_core, trap_cause_instr_addr_misalign, 0);
-            return getTick();
+            return 0;
         }
 
         rv_core->next_pc = rv_core->pc + rv_core->jump_offset;
     }
-    return getTick() + rv_core->pSOC->get_period();
+    return BGE_CYCLE_COUNT;
 }
 
 static uint64_t instr_BLTU(Core *rv_core)
@@ -253,12 +255,12 @@ static uint64_t instr_BLTU(Core *rv_core)
         {
             die_msg("Addr misaligned!\n");
             prepare_sync_trap(rv_core, trap_cause_instr_addr_misalign, 0);
-            return getTick();
+            return 0;
         }
 
         rv_core->next_pc = rv_core->pc + rv_core->jump_offset;
     }
-    return getTick() + rv_core->pSOC->get_period();
+    return BLTU_CYCLE_COUNT;
 }
 
 static uint64_t instr_BGEU(Core *rv_core)
@@ -270,12 +272,12 @@ static uint64_t instr_BGEU(Core *rv_core)
         {
             die_msg("Addr misaligned!\n");
             prepare_sync_trap(rv_core, trap_cause_instr_addr_misalign, 0);
-            return getTick();
+            return 0;
         }
 
         rv_core->next_pc = rv_core->pc + rv_core->jump_offset;
     }
-    return getTick() + rv_core->pSOC->get_period();
+    return BGEU_CYCLE_COUNT;
 }
 
 static uint64_t instr_ADDI(Core *rv_core)
@@ -285,7 +287,7 @@ static uint64_t instr_ADDI(Core *rv_core)
     rv_sword_t signed_rs_val = rv_core->reg_file[rv_core->rs1];
     CORE_DBG("%s: "PRINTF_FMT" "PRINTF_FMT" "PRINTF_FMT" %x\n", __func__, rv_core->reg_file[rv_core->rs1], signed_rs_val, signed_immediate, rv_core->rs1);
     rv_core->reg_file[rv_core->rd] = (signed_immediate + signed_rs_val);
-    return getTick() + rv_core->pSOC->get_period();
+    return ADDI_CYCLE_COUNT;
 }
 
 static uint64_t instr_SLTI(Core *rv_core)
@@ -298,7 +300,7 @@ static uint64_t instr_SLTI(Core *rv_core)
         rv_core->reg_file[rv_core->rd] = 1;
     else
         rv_core->reg_file[rv_core->rd] = 0;
-    return getTick() + rv_core->pSOC->get_period();
+    return SLTI_CYCLE_COUNT;
 }
 
 static uint64_t instr_SLTIU(Core *rv_core)
@@ -311,7 +313,7 @@ static uint64_t instr_SLTIU(Core *rv_core)
         rv_core->reg_file[rv_core->rd] = 1;
     else
         rv_core->reg_file[rv_core->rd] = 0;
-    return getTick() + rv_core->pSOC->get_period();
+    return SLTIU_CYCLE_COUNT;
 }
 
 static uint64_t instr_XORI(Core *rv_core)
@@ -324,7 +326,7 @@ static uint64_t instr_XORI(Core *rv_core)
         rv_core->reg_file[rv_core->rd] = rv_core->reg_file[rv_core->rs1] ^ -1;
     else
         rv_core->reg_file[rv_core->rd] = rv_core->reg_file[rv_core->rs1] ^ rv_core->immediate;
-    return getTick() + rv_core->pSOC->get_period();
+    return XORI_CYCLE_COUNT;
 }
 
 static uint64_t instr_ORI(Core *rv_core)
@@ -332,7 +334,7 @@ static uint64_t instr_ORI(Core *rv_core)
     CORE_DBG("%s: %x\n", __func__, rv_core->instruction);
     rv_core->immediate = SIGNEX_BIT_11(rv_core->immediate);
     rv_core->reg_file[rv_core->rd] = rv_core->reg_file[rv_core->rs1] | rv_core->immediate;
-    return getTick() + rv_core->pSOC->get_period();
+    return ORI_CYCLE_COUNT;
 }
 
 static uint64_t instr_ANDI(Core *rv_core)
@@ -340,14 +342,14 @@ static uint64_t instr_ANDI(Core *rv_core)
     CORE_DBG("%s: %x\n", __func__, rv_core->instruction);
     rv_core->immediate = SIGNEX_BIT_11(rv_core->immediate);
     rv_core->reg_file[rv_core->rd] = rv_core->reg_file[rv_core->rs1] & rv_core->immediate;
-    return getTick() + rv_core->pSOC->get_period();
+    return ANDI_CYCLE_COUNT;
 }
 
 static uint64_t instr_SLLI(Core *rv_core)
 {
     CORE_DBG("%s: %x\n", __func__, rv_core->instruction);
     rv_core->reg_file[rv_core->rd] = (rv_core->reg_file[rv_core->rs1] << (rv_core->immediate & SHIFT_OP_MASK));
-    return getTick() + rv_core->pSOC->get_period();
+    return SLLI_CYCLE_COUNT;
 }
 
 static uint64_t instr_SRAI(Core *rv_core)
@@ -358,14 +360,14 @@ static uint64_t instr_SRAI(Core *rv_core)
     /* a right shift on signed ints seem to be always arithmetic */
     rs_val = rs_val >> (rv_core->immediate & SHIFT_OP_MASK);
     rv_core->reg_file[rv_core->rd] = rs_val;
-    return getTick() + rv_core->pSOC->get_period();
+    return SRAI_CYCLE_COUNT;
 }
 
 static uint64_t instr_SRLI(Core *rv_core)
 {
     CORE_DBG("%s: %x\n", __func__, rv_core->instruction);
     rv_core->reg_file[rv_core->rd] = (rv_core->reg_file[rv_core->rs1] >> (rv_core->immediate & SHIFT_OP_MASK));
-    return getTick() + rv_core->pSOC->get_period();
+    return SRLI_CYCLE_COUNT;
 }
 
 static uint64_t instr_ADD(Core *rv_core)
@@ -373,21 +375,21 @@ static uint64_t instr_ADD(Core *rv_core)
     CORE_DBG("%s: %x\n", __func__, rv_core->instruction);
     CORE_DBG("%s: "PRINTF_FMT" %x\n", __func__, rv_core->reg_file[rv_core->rs1], rv_core->rs1);
     rv_core->reg_file[rv_core->rd] = rv_core->reg_file[rv_core->rs1] + rv_core->reg_file[rv_core->rs2];
-    return getTick() + rv_core->pSOC->get_period();
+    return ADD_CYCLE_COUNT;
 }
 
 static uint64_t instr_SUB(Core *rv_core)
 {
     CORE_DBG("%s: %x\n", __func__, rv_core->instruction);
     rv_core->reg_file[rv_core->rd] = rv_core->reg_file[rv_core->rs1] - rv_core->reg_file[rv_core->rs2];
-    return getTick() + rv_core->pSOC->get_period();
+    return SUB_CYCLE_COUNT;
 }
 
 static uint64_t instr_SLL(Core *rv_core)
 {
     CORE_DBG("%s: %x\n", __func__, rv_core->instruction);
     rv_core->reg_file[rv_core->rd] = rv_core->reg_file[rv_core->rs1] << (rv_core->reg_file[rv_core->rs2] & SHIFT_OP_MASK);
-    return getTick() + rv_core->pSOC->get_period();
+    return SLL_CYCLE_COUNT;
 }
 
 static uint64_t instr_SLT(Core *rv_core)
@@ -398,7 +400,7 @@ static uint64_t instr_SLT(Core *rv_core)
 
     if(signed_rs < signed_rs2) rv_core->reg_file[rv_core->rd] = 1;
     else rv_core->reg_file[rv_core->rd] = 0;
-    return getTick() + rv_core->pSOC->get_period();
+    return SLT_CYCLE_COUNT;
 }
 
 static uint64_t instr_SLTU(Core *rv_core)
@@ -418,35 +420,35 @@ static uint64_t instr_SLTU(Core *rv_core)
         else
             rv_core->reg_file[rv_core->rd] = 0;
     }
-    return getTick() + rv_core->pSOC->get_period();
+    return SLTU_CYCLE_COUNT;
 }
 
 static uint64_t instr_XOR(Core *rv_core)
 {
     CORE_DBG("%s: %x\n", __func__, rv_core->instruction);
     rv_core->reg_file[rv_core->rd] = rv_core->reg_file[rv_core->rs1] ^ rv_core->reg_file[rv_core->rs2];
-    return getTick() + rv_core->pSOC->get_period();
+    return XOR_CYCLE_COUNT;
 }
 
 static uint64_t instr_SRL(Core *rv_core)
 {
     CORE_DBG("%s: %x\n", __func__, rv_core->instruction);
     rv_core->reg_file[rv_core->rd] = rv_core->reg_file[rv_core->rs1] >> (rv_core->reg_file[rv_core->rs2] & SHIFT_OP_MASK);
-    return getTick() + rv_core->pSOC->get_period();
+    return SRL_CYCLE_COUNT;
 }
 
 static uint64_t instr_OR(Core *rv_core)
 {
     CORE_DBG("%s: %x\n", __func__, rv_core->instruction);
     rv_core->reg_file[rv_core->rd] = rv_core->reg_file[rv_core->rs1] | (rv_core->reg_file[rv_core->rs2]);
-    return getTick() + rv_core->pSOC->get_period();
+    return OR_CYCLE_COUNT;
 }
 
 static uint64_t instr_AND(Core *rv_core)
 {
     CORE_DBG("%s: %x\n", __func__, rv_core->instruction);
     rv_core->reg_file[rv_core->rd] = rv_core->reg_file[rv_core->rs1] & (rv_core->reg_file[rv_core->rs2]);
-    return getTick() + rv_core->pSOC->get_period();
+    return AND_CYCLE_COUNT;
 }
 
 static uint64_t instr_SRA(Core *rv_core)
@@ -454,7 +456,7 @@ static uint64_t instr_SRA(Core *rv_core)
     CORE_DBG("%s: %x\n", __func__, rv_core->instruction);
     rv_sword_t signed_rs = rv_core->reg_file[rv_core->rs1];
     rv_core->reg_file[rv_core->rd] = signed_rs >> (rv_core->reg_file[rv_core->rs2] & SHIFT_OP_MASK);
-    return getTick() + rv_core->pSOC->get_period();
+    return SRA_CYCLE_COUNT;
 }
 
 static uint64_t instr_LB(Core *rv_core)
@@ -464,7 +466,7 @@ static uint64_t instr_LB(Core *rv_core)
     rv_sword_t signed_offset = SIGNEX_BIT_11(rv_core->immediate);
     rv_word_t address = rv_core->reg_file[rv_core->rs1] + signed_offset;
     uint64_t ret_val = mmu_checked_bus_access(rv_core, rv_core->curr_priv_mode, bus_read_access, address, &tmp_load_val, 1);
-    if(ret_val != getTick())
+    if(ret_val != 0)
         rv_core->reg_file[rv_core->rd] = SIGNEX_BIT_7(tmp_load_val);
     return ret_val;
     
@@ -477,7 +479,7 @@ static uint64_t instr_LH(Core *rv_core)
     rv_sword_t signed_offset = SIGNEX_BIT_11(rv_core->immediate);
     rv_word_t address = rv_core->reg_file[rv_core->rs1] + signed_offset;
     uint64_t ret_val = mmu_checked_bus_access(rv_core, rv_core->curr_priv_mode, bus_read_access, address, &tmp_load_val, 2);
-    if (ret_val != getTick())
+    if (ret_val != 0)
         rv_core->reg_file[rv_core->rd] = SIGNEX_BIT_15(tmp_load_val);
     return ret_val;
 }
@@ -489,9 +491,9 @@ static uint64_t instr_LW(Core *rv_core)
     rv_sword_t signed_offset = SIGNEX_BIT_11(rv_core->immediate);
     rv_word_t address = rv_core->reg_file[rv_core->rs1] + signed_offset;
     uint64_t ret_val = mmu_checked_bus_access(rv_core, rv_core->curr_priv_mode, bus_read_access, address, &tmp_load_val, 4);
-    if (ret_val != getTick())
+    if (ret_val != 0)
         rv_core->reg_file[rv_core->rd] = tmp_load_val;
-    return ret_val;
+    return ret_val + LW_EXTRA_CYCLE_COUNT;
 }
 
 static uint64_t instr_LBU(Core *rv_core)
@@ -501,9 +503,9 @@ static uint64_t instr_LBU(Core *rv_core)
     rv_sword_t signed_offset = SIGNEX_BIT_11(rv_core->immediate);
     rv_word_t address = rv_core->reg_file[rv_core->rs1] + signed_offset;
     uint64_t ret_val = mmu_checked_bus_access(rv_core, rv_core->curr_priv_mode, bus_read_access, address, &tmp_load_val, 1);
-    if (ret_val != getTick()) 
+    if (ret_val != 0) 
         rv_core->reg_file[rv_core->rd] = tmp_load_val;
-    return ret_val;
+    return ret_val + LBU_EXTRA_CYCLE_COUNT;
 }
 
 static uint64_t instr_LHU(Core *rv_core)
@@ -513,9 +515,9 @@ static uint64_t instr_LHU(Core *rv_core)
     rv_sword_t signed_offset = SIGNEX_BIT_11(rv_core->immediate);
     rv_word_t address = rv_core->reg_file[rv_core->rs1] + signed_offset;
     uint64_t ret_val = mmu_checked_bus_access(rv_core, rv_core->curr_priv_mode, bus_read_access, address, &tmp_load_val, 2);
-    if (ret_val != getTick())
+    if (ret_val != 0)
         rv_core->reg_file[rv_core->rd] = tmp_load_val;
-    return ret_val;
+    return ret_val + LHU_EXTRA_CYCLE_COUNT;
 }
 
 static uint64_t instr_SB(Core *rv_core)
@@ -524,7 +526,7 @@ static uint64_t instr_SB(Core *rv_core)
     rv_sword_t signed_offset = SIGNEX_BIT_11(rv_core->immediate);
     rv_word_t address = rv_core->reg_file[rv_core->rs1] + signed_offset;
     uint8_t value_to_write = (uint8_t)rv_core->reg_file[rv_core->rs2];
-    return mmu_checked_bus_access(rv_core, rv_core->curr_priv_mode, bus_write_access, address, &value_to_write, 1);
+    return mmu_checked_bus_access(rv_core, rv_core->curr_priv_mode, bus_write_access, address, &value_to_write, 1) + SB_EXTRA_CYCLE_COUNT;
 }
 
 static uint64_t instr_SH(Core *rv_core)
@@ -533,7 +535,7 @@ static uint64_t instr_SH(Core *rv_core)
     rv_sword_t signed_offset = SIGNEX_BIT_11(rv_core->immediate);
     rv_word_t address = rv_core->reg_file[rv_core->rs1] + signed_offset;
     uint16_t value_to_write = (uint16_t)rv_core->reg_file[rv_core->rs2];
-    return mmu_checked_bus_access(rv_core, rv_core->curr_priv_mode, bus_write_access, address, &value_to_write, 2);
+    return mmu_checked_bus_access(rv_core, rv_core->curr_priv_mode, bus_write_access, address, &value_to_write, 2) + SH_EXTRA_CYCLE_COUNT;
 }
 
 static uint64_t instr_SW(Core *rv_core)
@@ -542,7 +544,7 @@ static uint64_t instr_SW(Core *rv_core)
     rv_sword_t signed_offset = SIGNEX_BIT_11(rv_core->immediate);
     rv_word_t address = rv_core->reg_file[rv_core->rs1] + signed_offset;
     rv_word_t value_to_write = (rv_word_t)rv_core->reg_file[rv_core->rs2];
-    return mmu_checked_bus_access(rv_core, rv_core->curr_priv_mode, bus_write_access, address, &value_to_write, 4);
+    return mmu_checked_bus_access(rv_core, rv_core->curr_priv_mode, bus_write_access, address, &value_to_write, 4) + SW_EXTRA_CYCLE_COUNT;
 }
 
 #ifdef RV64
@@ -553,9 +555,9 @@ static uint64_t instr_SW(Core *rv_core)
         rv_word_t unsigned_offset = SIGNEX_BIT_11(rv_core->immediate);
         rv_word_t address = rv_core->reg_file[rv_core->rs1] + unsigned_offset;
         uint64_t ret_val = mmu_checked_bus_access(rv_core, rv_core->curr_priv_mode, bus_read_access, address, &tmp_load_val, 4);
-        if (ret_val != getTick())
+        if (ret_val != 0)
             rv_core->reg_file[rv_core->rd] = tmp_load_val;
-        return ret_val;
+        return ret_val + LWU_EXTRA_CYCLE_COUNT;
     }
 
     static uint64_t instr_LD(Core *rv_core)
@@ -565,9 +567,9 @@ static uint64_t instr_SW(Core *rv_core)
         rv_sword_t signed_offset = SIGNEX_BIT_11(rv_core->immediate);
         rv_sword_t address = rv_core->reg_file[rv_core->rs1] + signed_offset;
         uint64_t ret_val = mmu_checked_bus_access(rv_core, rv_core->curr_priv_mode, bus_read_access, address, &tmp_load_val, 8);
-        if (ret_val != getTick())
+        if (ret_val != 0)
             rv_core->reg_file[rv_core->rd] = tmp_load_val;
-        return ret_val;
+        return ret_val + LD_EXTRA_CYCLE_COUNT;
     }
 
     static uint64_t instr_SD(Core *rv_core)
@@ -576,7 +578,7 @@ static uint64_t instr_SW(Core *rv_core)
         rv_sword_t signed_offset = SIGNEX_BIT_11(rv_core->immediate);
         rv_word_t address = rv_core->reg_file[rv_core->rs1] + signed_offset;
         rv_word_t value_to_write = (rv_word_t)rv_core->reg_file[rv_core->rs2];
-        return mmu_checked_bus_access(rv_core, rv_core->curr_priv_mode, bus_write_access, address, &value_to_write, 8);
+        return mmu_checked_bus_access(rv_core, rv_core->curr_priv_mode, bus_write_access, address, &value_to_write, 8) + SD_EXTRA_CYCLE_COUNT;
     }
 
     static uint64_t instr_SRAIW(Core *rv_core)
@@ -584,7 +586,7 @@ static uint64_t instr_SW(Core *rv_core)
         CORE_DBG("%s: %x\n", __func__, rv_core->instruction);
         int32_t signed_rs_val = rv_core->reg_file[rv_core->rs1];
         rv_core->reg_file[rv_core->rd] = (signed_rs_val >> (rv_core->immediate & 0x1F));
-        return getTick() + rv_core->pSOC->get_period();
+        return SRAIW_CYCLE_COUNT;
         
     }
 
@@ -594,7 +596,7 @@ static uint64_t instr_SW(Core *rv_core)
         int32_t signed_immediate = SIGNEX_BIT_11(rv_core->immediate);
         int32_t signed_rs_val = rv_core->reg_file[rv_core->rs1];
         rv_core->reg_file[rv_core->rd] = (signed_rs_val + signed_immediate);
-        return getTick() + rv_core->pSOC->get_period();
+        return ADDIW_CYCLE_COUNT;
     }
 
     static uint64_t instr_SLLIW(Core *rv_core)
@@ -602,7 +604,7 @@ static uint64_t instr_SW(Core *rv_core)
         CORE_DBG("%s: %x\n", __func__, rv_core->instruction);
         int32_t signed_tmp32 = (rv_core->reg_file[rv_core->rs1] << (rv_core->immediate & 0x1F)) & 0xFFFFFFFF;
         rv_core->reg_file[rv_core->rd] = (rv_sword_t)signed_tmp32;
-        return getTick() + rv_core->pSOC->get_period();
+        return SLLIW_CYCLE_COUNT;
     }
 
     static uint64_t instr_SRLIW(Core *rv_core)
@@ -611,7 +613,7 @@ static uint64_t instr_SW(Core *rv_core)
         uint32_t unsigned_rs_val = rv_core->reg_file[rv_core->rs1];
         int32_t signed_tmp32 = (unsigned_rs_val >> (rv_core->immediate & 0x1F));
         rv_core->reg_file[rv_core->rd] = (rv_sword_t)signed_tmp32;
-        return getTick() + rv_core->pSOC->get_period();
+        return SRLIW_CYCLE_COUNT;
     }
 
     static uint64_t instr_SRLW(Core *rv_core)
@@ -621,7 +623,7 @@ static uint64_t instr_SW(Core *rv_core)
         uint32_t rs2_val = (rv_core->reg_file[rv_core->rs2] & 0x1F);
         int32_t signed_tmp32 = rs1_val >> rs2_val;
         rv_core->reg_file[rv_core->rd] = (rv_sword_t)signed_tmp32;
-        return getTick() + rv_core->pSOC->get_period();
+        return SRLW_CYCLE_COUNT;
     }
 
     static uint64_t instr_SRAW(Core *rv_core)
@@ -631,7 +633,7 @@ static uint64_t instr_SW(Core *rv_core)
         uint32_t rs2_val = (rv_core->reg_file[rv_core->rs2] & 0x1F);
         int32_t signed_tmp32 = rs1_val_signed >> rs2_val;
         rv_core->reg_file[rv_core->rd] = (rv_sword_t)signed_tmp32;
-        return getTick() + rv_core->pSOC->get_period();
+        return SRAW_CYCLE_COUNT;
     }
 
     static uint64_t instr_SLLW(Core *rv_core)
@@ -641,7 +643,7 @@ static uint64_t instr_SW(Core *rv_core)
         uint32_t rs2_val = (rv_core->reg_file[rv_core->rs2] & 0x1F);
         int32_t signed_tmp32 = rs1_val << rs2_val;
         rv_core->reg_file[rv_core->rd] = (rv_sword_t)signed_tmp32;
-        return getTick() + rv_core->pSOC->get_period();
+        return SLLW_CYCLE_COUNT;
     }
 
     static uint64_t instr_ADDW(Core *rv_core)
@@ -651,7 +653,7 @@ static uint64_t instr_SW(Core *rv_core)
         uint32_t rs2_val = rv_core->reg_file[rv_core->rs2];
         int32_t signed_tmp32 = rs1_val + rs2_val;
         rv_core->reg_file[rv_core->rd] = (rv_sword_t)signed_tmp32;
-        return getTick() + rv_core->pSOC->get_period();
+        return ADDW_CYCLE_COUNT;
     }
 
     static uint64_t instr_SUBW(Core *rv_core)
@@ -661,7 +663,7 @@ static uint64_t instr_SW(Core *rv_core)
         uint32_t rs2_val = rv_core->reg_file[rv_core->rs2];
         int32_t signed_tmp32 = rs1_val - rs2_val;
         rv_core->reg_file[rv_core->rd] = (rv_sword_t)signed_tmp32;
-        return getTick() + rv_core->pSOC->get_period();
+        return SUBW_CYCLE_COUNT;
     }
 #endif
 
@@ -681,7 +683,7 @@ static uint64_t instr_SW(Core *rv_core)
             {
                 // die_msg("Error reading CSR %x "PRINTF_FMT"\n", csr_addr, rv_core->pc);
                 prepare_sync_trap(rv_core, trap_cause_illegal_instr, 0);
-                return getTick();
+                return 0;
             }
         }
 
@@ -692,11 +694,11 @@ static uint64_t instr_SW(Core *rv_core)
         {
             // die_msg("Error reading CSR %x "PRINTF_FMT"\n", csr_addr, rv_core->pc);
             prepare_sync_trap(rv_core, trap_cause_illegal_instr, 0);
-            return getTick();
+            return 0;
         }
 
         rv_core->reg_file[rv_core->rd] = csr_val & csr_mask;
-        return getTick() + rv_core->pSOC->get_period();
+        return CSRRW_CYCLE_COUNT;
     }
 
     static inline uint64_t CSRRSx(Core *rv_core, rv_word_t new_val)
@@ -711,7 +713,7 @@ static uint64_t instr_SW(Core *rv_core)
         {
             // die_msg("Error reading CSR %x "PRINTF_FMT"\n", csr_addr, rv_core->pc);
             prepare_sync_trap(rv_core, trap_cause_illegal_instr, 0);
-            return getTick();
+            return 0;
         }
 
         new_csr_val = (new_val & csr_mask);
@@ -722,12 +724,12 @@ static uint64_t instr_SW(Core *rv_core)
             {
                 // die_msg("Error reading CSR %x "PRINTF_FMT"\n", csr_addr, rv_core->pc);
                 prepare_sync_trap(rv_core, trap_cause_illegal_instr, 0);
-                return getTick();
+                return 0;
             }
         }
 
         rv_core->reg_file[rv_core->rd] = csr_val & csr_mask;
-        return getTick() + rv_core->pSOC->get_period();
+        return CSRRS_CYCLE_COUNT;
     }
 
     static inline uint64_t CSRRCx(Core *rv_core, rv_word_t new_val)
@@ -742,7 +744,7 @@ static uint64_t instr_SW(Core *rv_core)
         {
             // die_msg("Error reading CSR %x "PRINTF_FMT"\n", csr_addr, rv_core->pc);
             prepare_sync_trap(rv_core, trap_cause_illegal_instr, 0);
-            return getTick();
+            return 0;
         }
 
         new_csr_val = (new_val & csr_mask);
@@ -753,11 +755,11 @@ static uint64_t instr_SW(Core *rv_core)
             {
                 // die_msg("Error reading CSR %x "PRINTF_FMT"\n", csr_addr, rv_core->pc);
                 prepare_sync_trap(rv_core, trap_cause_illegal_instr, 0);
-                return getTick();
+                return 0;
             }
         }
         rv_core->reg_file[rv_core->rd] = csr_val & csr_mask;
-        return getTick() + rv_core->pSOC->get_period();
+        return CSRRC_CYCLE_COUNT;
     }
 
     static uint64_t instr_CSRRW(Core *rv_core)
@@ -794,7 +796,7 @@ static uint64_t instr_SW(Core *rv_core)
     {
         // printf("%s: %x from: %d\n", __func__, rv_core->instruction, trap_cause_user_ecall + rv_core->curr_priv_mode);
         prepare_sync_trap(rv_core, trap_cause_user_ecall + rv_core->curr_priv_mode, 0);
-        return getTick() + rv_core->pSOC->get_period();
+        return ECALL_CYCLE_COUNT;
     }
 
     static uint64_t instr_EBREAK(Core *rv_core)
@@ -802,7 +804,7 @@ static uint64_t instr_SW(Core *rv_core)
         /* not implemented */
         (void)rv_core;
         CORE_DBG("%s: %x\n", __func__, rv_core->instruction);
-        return getTick() + rv_core->pSOC->get_period();
+        return EBREAK_CYCLE_COUNT;
     }
 
     static uint64_t instr_MRET(Core *rv_core)
@@ -811,7 +813,7 @@ static uint64_t instr_SW(Core *rv_core)
         privilege_level restored_priv_level = trap_restore_irq_settings(&rv_core->trap, rv_core->curr_priv_mode);
         rv_core->curr_priv_mode = restored_priv_level;
         rv_core->next_pc = *rv_core->trap.m.regs[trap_reg_epc];
-        return getTick() + rv_core->pSOC->get_period();
+        return MRET_CYCLE_COUNT;
     }
 
     static uint64_t instr_SRET(Core *rv_core)
@@ -820,7 +822,7 @@ static uint64_t instr_SW(Core *rv_core)
         privilege_level restored_priv_level = trap_restore_irq_settings(&rv_core->trap, rv_core->curr_priv_mode);
         rv_core->curr_priv_mode = restored_priv_level;
         rv_core->next_pc = *rv_core->trap.s.regs[trap_reg_epc];
-        return getTick() + rv_core->pSOC->get_period();
+        return SRET_CYCLE_COUNT;
     }
 
     static uint64_t instr_URET(Core *rv_core)
@@ -830,7 +832,7 @@ static uint64_t instr_SW(Core *rv_core)
         while(1);
         /* not implemented */
         (void)rv_core;
-        return getTick() + rv_core->pSOC->get_period();
+        return URET_CYCLE_COUNT;
     }
 #endif
 
@@ -846,7 +848,7 @@ static uint64_t instr_SW(Core *rv_core)
     static uint64_t instr_SC_W(Core *rv_core)
     {
         CORE_DBG("%s: %x\n", __func__, rv_core->instruction);
-        uint64_t ret_val = getTick() + rv_core->pSOC->get_period();
+        uint64_t ret_val = 0;
         if(rv_core->lr_valid && (rv_core->lr_address == rv_core->reg_file[rv_core->rs1]))
         {
             ret_val = instr_SW(rv_core);
@@ -869,7 +871,7 @@ static uint64_t instr_SW(Core *rv_core)
         uint32_t rs2_val = rv_core->reg_file[rv_core->rs2];
         uint32_t result = 0;
 
-        uint64_t load_time = instr_LW(rv_core) - getTick();
+        uint64_t load_time = instr_LW(rv_core);
         result = rs2_val;
 
         return mmu_checked_bus_access(rv_core, rv_core->curr_priv_mode, bus_write_access, address, &result, 4) + load_time;
@@ -883,7 +885,7 @@ static uint64_t instr_SW(Core *rv_core)
         uint32_t rs2_val = rv_core->reg_file[rv_core->rs2];
         uint32_t result = 0;
 
-        uint64_t load_time = instr_LW(rv_core) - getTick();
+        uint64_t load_time = instr_LW(rv_core);
         rd_val = rv_core->reg_file[rv_core->rd];
         result = rd_val + rs2_val;
 
@@ -898,7 +900,7 @@ static uint64_t instr_SW(Core *rv_core)
         uint32_t rs2_val = rv_core->reg_file[rv_core->rs2];
         uint32_t result = 0;
     
-        uint64_t load_time = instr_LW(rv_core) - getTick();
+        uint64_t load_time = instr_LW(rv_core);
         rd_val = rv_core->reg_file[rv_core->rd];
         result = rd_val ^ rs2_val;
 
@@ -913,7 +915,7 @@ static uint64_t instr_SW(Core *rv_core)
         uint32_t rs2_val = rv_core->reg_file[rv_core->rs2];
         uint32_t result = 0;
 
-        uint64_t load_time = instr_LW(rv_core) - getTick();
+        uint64_t load_time = instr_LW(rv_core);
         rd_val = rv_core->reg_file[rv_core->rd];
         result = rd_val & rs2_val;
 
@@ -928,7 +930,7 @@ static uint64_t instr_SW(Core *rv_core)
         uint32_t rs2_val = rv_core->reg_file[rv_core->rs2];
         uint32_t result = 0;
 
-        uint64_t load_time = instr_LW(rv_core) - getTick();
+        uint64_t load_time = instr_LW(rv_core);
         rd_val = rv_core->reg_file[rv_core->rd];
         result = rd_val | rs2_val;
 
@@ -943,7 +945,7 @@ static uint64_t instr_SW(Core *rv_core)
         int32_t rs2_val = rv_core->reg_file[rv_core->rs2];
         rv_word_t result = 0;
 
-        uint64_t load_time = instr_LW(rv_core) - getTick();
+        uint64_t load_time = instr_LW(rv_core);
 
         rd_val = rv_core->reg_file[rv_core->rd];
         result = ASSIGN_MIN(rd_val, rs2_val);
@@ -959,7 +961,7 @@ static uint64_t instr_SW(Core *rv_core)
         int32_t rs2_val = rv_core->reg_file[rv_core->rs2];
         rv_word_t result = 0;
 
-        uint64_t load_time = instr_LW(rv_core) - getTick();
+        uint64_t load_time = instr_LW(rv_core);
 
         rd_val = rv_core->reg_file[rv_core->rd];
         result = ASSIGN_MAX(rd_val, rs2_val);
@@ -975,7 +977,7 @@ static uint64_t instr_SW(Core *rv_core)
         uint32_t rs2_val = rv_core->reg_file[rv_core->rs2];
         rv_word_t result = 0;
 
-        uint64_t load_time = instr_LW(rv_core) - getTick();
+        uint64_t load_time = instr_LW(rv_core);
 
         rd_val = rv_core->reg_file[rv_core->rd];
         result = ASSIGN_MIN(rd_val, rs2_val);
@@ -991,7 +993,7 @@ static uint64_t instr_SW(Core *rv_core)
         uint32_t rs2_val = rv_core->reg_file[rv_core->rs2];
         rv_word_t result = 0;
 
-        uint64_t load_time = instr_LW(rv_core) - getTick();
+        uint64_t load_time = instr_LW(rv_core);
 
         rd_val = rv_core->reg_file[rv_core->rd];
         result = ASSIGN_MAX(rd_val, rs2_val);
@@ -1011,7 +1013,7 @@ static uint64_t instr_SW(Core *rv_core)
         static uint64_t instr_SC_D(Core *rv_core)
         {
             CORE_DBG("%s: %x\n", __func__, rv_core->instruction);
-            uint64_t ret_time = getTick() + rv_core->pSOC->get_period();
+            uint64_t ret_time = 0;
             if(rv_core->lr_valid && (rv_core->lr_address == rv_core->reg_file[rv_core->rs1]))
             {
                 ret_time = instr_SD(rv_core);
@@ -1033,7 +1035,7 @@ static uint64_t instr_SW(Core *rv_core)
             rv_word_t address = rv_core->reg_file[rv_core->rs1];
             rv_word_t rs2_val = rv_core->reg_file[rv_core->rs2];
             rv_word_t result = 0;
-            uint64_t load_time = instr_LD(rv_core) - getTick();
+            uint64_t load_time = instr_LD(rv_core);
 
             result = rs2_val;
 
@@ -1048,7 +1050,7 @@ static uint64_t instr_SW(Core *rv_core)
             rv_word_t rs2_val = rv_core->reg_file[rv_core->rs2];
             rv_word_t result = 0;
 
-            uint64_t load_time = instr_LD(rv_core) - getTick();
+            uint64_t load_time = instr_LD(rv_core);
             rd_val = rv_core->reg_file[rv_core->rd];
             result = rd_val + rs2_val;
 
@@ -1063,7 +1065,7 @@ static uint64_t instr_SW(Core *rv_core)
             rv_word_t rs2_val = rv_core->reg_file[rv_core->rs2];
             rv_word_t result = 0;
 
-            uint64_t load_time = instr_LD(rv_core) - getTick();
+            uint64_t load_time = instr_LD(rv_core);
             rd_val = rv_core->reg_file[rv_core->rd];
             result = rd_val ^ rs2_val;
 
@@ -1078,7 +1080,7 @@ static uint64_t instr_SW(Core *rv_core)
             rv_word_t rs2_val = rv_core->reg_file[rv_core->rs2];
             rv_word_t result = 0;
 
-            uint64_t load_time = instr_LD(rv_core) - getTick();
+            uint64_t load_time = instr_LD(rv_core);
             rd_val = rv_core->reg_file[rv_core->rd];
             result = rd_val & rs2_val;
 
@@ -1093,7 +1095,7 @@ static uint64_t instr_SW(Core *rv_core)
             rv_word_t rs2_val = rv_core->reg_file[rv_core->rs2];
             rv_word_t result = 0;
 
-            uint64_t load_time = instr_LD(rv_core) - getTick();
+            uint64_t load_time = instr_LD(rv_core);
             rd_val = rv_core->reg_file[rv_core->rd];
             result = rd_val | rs2_val;
 
@@ -1108,7 +1110,7 @@ static uint64_t instr_SW(Core *rv_core)
             rv_sword_t rs2_val = rv_core->reg_file[rv_core->rs2];
             rv_word_t result = 0;
 
-            uint64_t load_time = instr_LD(rv_core) - getTick();
+            uint64_t load_time = instr_LD(rv_core);
 
             rd_val = rv_core->reg_file[rv_core->rd];
             result = ASSIGN_MIN(rd_val, rs2_val);
@@ -1124,7 +1126,7 @@ static uint64_t instr_SW(Core *rv_core)
             rv_sword_t rs2_val = rv_core->reg_file[rv_core->rs2];
             rv_word_t result = 0;
 
-            uint64_t load_time = instr_LD(rv_core) - getTick();
+            uint64_t load_time = instr_LD(rv_core);
 
             rd_val = rv_core->reg_file[rv_core->rd];
             result = ASSIGN_MAX(rd_val, rs2_val);
@@ -1140,7 +1142,7 @@ static uint64_t instr_SW(Core *rv_core)
             rv_word_t rs2_val = rv_core->reg_file[rv_core->rs2];
             rv_word_t result = 0;
 
-            uint64_t load_time = instr_LD(rv_core) - getTick();
+            uint64_t load_time = instr_LD(rv_core);
 
             rd_val = rv_core->reg_file[rv_core->rd];
             result = ASSIGN_MIN(rd_val, rs2_val);
@@ -1156,7 +1158,7 @@ static uint64_t instr_SW(Core *rv_core)
             rv_word_t rs2_val = rv_core->reg_file[rv_core->rs2];
             rv_word_t result = 0;
 
-            uint64_t load_time = instr_LD(rv_core) - getTick();
+            uint64_t load_time = instr_LD(rv_core);
 
             rd_val = rv_core->reg_file[rv_core->rd];
             result = ASSIGN_MAX(rd_val, rs2_val);
@@ -1167,6 +1169,27 @@ static uint64_t instr_SW(Core *rv_core)
 #endif
 
 #ifdef MULTIPLY_SUPPORT
+    static int divCyclesUnsigned(uint64_t a, uint64_t b) {
+        int ret_val = 0;
+        if (b == 0) 
+            ret_val = DIV_CYCLES_BASE + 1; // division-by-zero case
+        double delta = std::log2((double)a) - std::log2((double)b);
+        int iters = std::max(0, (int)std::floor(delta));
+
+        // Total cycles = base latency + iteration count (capped)
+        ret_val = DIV_CYCLES_BASE + iters;
+        return ret_val;
+    }
+
+    static int divCyclesSigned(int64_t a, int64_t b) {
+        int ret_val = 0;
+        if (b == 0) 
+            ret_val = DIV_CYCLES_BASE + 3; // extra cycles for sign handling?
+        int base = divCyclesUnsigned(a < 0 ? -a : a, b < 0 ? -b : b);
+        int negCycles = (a < 0) + (( (a<0) ^ (b<0) ) ? 1 : 0);
+        ret_val = base + negCycles;
+        return ret_val;
+    }
     static uint64_t instr_DIV(Core *rv_core)
     {
         CORE_DBG("%s: %x\n", __func__, rv_core->instruction);
@@ -1177,18 +1200,18 @@ static uint64_t instr_SW(Core *rv_core)
         if(signed_rs2 == 0)
         {
             rv_core->reg_file[rv_core->rd] = -1;
-            return getTick();
+            return 0;
         }
 
         /* overflow */
         if(((rv_word_t)signed_rs == XLEN_INT_MIN) && (signed_rs2 == -1))
         {
             rv_core->reg_file[rv_core->rd] = XLEN_INT_MIN;
-            return getTick();
+            return 0;
         }
 
         rv_core->reg_file[rv_core->rd] = (signed_rs/signed_rs2);
-        return getTick() + 32*rv_core->pSOC->get_period();
+        return divCyclesSigned(signed_rs, signed_rs2);
     }
 
     static uint64_t instr_DIVU(Core *rv_core)
@@ -1201,11 +1224,11 @@ static uint64_t instr_SW(Core *rv_core)
         if(unsigned_rs2 == 0)
         {
             rv_core->reg_file[rv_core->rd] = -1;
-            return getTick();
+            return 0;
         }
 
         rv_core->reg_file[rv_core->rd] = (unsigned_rs/unsigned_rs2);
-        return getTick() + 32*rv_core->pSOC->get_period();
+        return divCyclesUnsigned(unsigned_rs, unsigned_rs2);
     }
 
     static uint64_t instr_REM(Core *rv_core)
@@ -1218,18 +1241,18 @@ static uint64_t instr_SW(Core *rv_core)
         if(signed_rs2 == 0)
         {
             rv_core->reg_file[rv_core->rd] = signed_rs;
-            return getTick();
+            return 0;
         }
 
         /* overflow */
         if(((rv_word_t)signed_rs == XLEN_INT_MIN) && (signed_rs2 == -1))
         {
             rv_core->reg_file[rv_core->rd] = 0;
-            return getTick();
+            return 0;
         }
 
         rv_core->reg_file[rv_core->rd] = (signed_rs%signed_rs2);
-        return getTick() + 32*rv_core->pSOC->get_period();
+        return divCyclesSigned(signed_rs, signed_rs2);
     }
 
     static uint64_t instr_REMU(Core *rv_core)
@@ -1242,11 +1265,11 @@ static uint64_t instr_SW(Core *rv_core)
         if(unsigned_rs2 == 0)
         {
             rv_core->reg_file[rv_core->rd] = unsigned_rs;
-            return getTick();
+            return 0;
         }
 
         rv_core->reg_file[rv_core->rd] = (unsigned_rs%unsigned_rs2);
-        return getTick() + 32*rv_core->pSOC->get_period();
+        return divCyclesUnsigned(unsigned_rs, unsigned_rs2);
     }
 
     static uint64_t instr_MUL(Core *rv_core)
@@ -1255,7 +1278,7 @@ static uint64_t instr_SW(Core *rv_core)
         rv_sword_t signed_rs = rv_core->reg_file[rv_core->rs1];
         rv_sword_t signed_rs2 = rv_core->reg_file[rv_core->rs2];
         rv_core->reg_file[rv_core->rd] = signed_rs * signed_rs2;
-        return getTick() + 4*rv_core->pSOC->get_period();
+        return MUL_CYCLE_COUNT;
     }
 
     static uint64_t instr_MULH(Core *rv_core)
@@ -1265,7 +1288,7 @@ static uint64_t instr_SW(Core *rv_core)
         rv_sword_t result_lo = 0;
         MULI(rv_core->reg_file[rv_core->rs1], rv_core->reg_file[rv_core->rs2], &result_hi, &result_lo);
         rv_core->reg_file[rv_core->rd] = result_hi;
-        return getTick() + 4*rv_core->pSOC->get_period();
+        return MULH_CYCLE_COUNT;
     }
 
     static uint64_t instr_MULHU(Core *rv_core)
@@ -1275,7 +1298,7 @@ static uint64_t instr_SW(Core *rv_core)
         rv_word_t result_lo = 0;
         UMULI(rv_core->reg_file[rv_core->rs1], rv_core->reg_file[rv_core->rs2], &result_hi, &result_lo);
         rv_core->reg_file[rv_core->rd] = result_hi;
-        return getTick() + 4*rv_core->pSOC->get_period();
+        return MULHU_CYCLE_COUNT;
     }
 
     static uint64_t instr_MULHSU(Core *rv_core)
@@ -1285,7 +1308,7 @@ static uint64_t instr_SW(Core *rv_core)
         rv_sword_t result_lo = 0;
         MULHSU(rv_core->reg_file[rv_core->rs1], rv_core->reg_file[rv_core->rs2], &result_hi, &result_lo);
         rv_core->reg_file[rv_core->rd] = result_hi;
-        return getTick() + 4*rv_core->pSOC->get_period();
+        return MULHSU_CYCLE_COUNT;
     }
 
     #ifdef RV64
@@ -1295,7 +1318,7 @@ static uint64_t instr_SW(Core *rv_core)
             int32_t signed_rs = rv_core->reg_file[rv_core->rs1];
             int32_t signed_rs2 = rv_core->reg_file[rv_core->rs2];
             rv_core->reg_file[rv_core->rd] = (rv_sword_t)(signed_rs * signed_rs2);
-            return getTick() + 4*rv_core->pSOC->get_period();
+            return MULW_CYCLE_COUNT;
         }
 
         static uint64_t instr_DIVW(Core *rv_core)
@@ -1309,20 +1332,20 @@ static uint64_t instr_SW(Core *rv_core)
             if(signed_rs2 == 0)
             {
                 rv_core->reg_file[rv_core->rd] = -1;
-                return getTick();
+                return 0;
             }
 
             /* overflow */
             if((signed_rs == INT32_MIN) && (signed_rs2 == -1))
             {
                 rv_core->reg_file[rv_core->rd] = INT32_MIN;
-                return getTick();
+                return 0;
             }
 
             result = (signed_rs/signed_rs2);
 
             rv_core->reg_file[rv_core->rd] = (rv_sword_t)result;
-            return getTick() + 64*rv_core->pSOC->get_period();
+            return divCyclesSigned(signed_rs, signed_rs2);
         }
 
         static uint64_t instr_DIVUW(Core *rv_core)
@@ -1336,13 +1359,13 @@ static uint64_t instr_SW(Core *rv_core)
             if(unsigned_rs2 == 0)
             {
                 rv_core->reg_file[rv_core->rd] = -1;
-                return getTick();
+                return 0;
             }
 
             result = (unsigned_rs/unsigned_rs2);
 
             rv_core->reg_file[rv_core->rd] = SIGNEX_BIT_31(result);
-            return getTick() + 64*rv_core->pSOC->get_period();
+            return divCyclesUnsigned(unsigned_rs, unsigned_rs2);
         }
 
         static uint64_t instr_REMW(Core *rv_core)
@@ -1356,20 +1379,20 @@ static uint64_t instr_SW(Core *rv_core)
             if(signed_rs2 == 0)
             {
                 rv_core->reg_file[rv_core->rd] = (rv_sword_t)signed_rs;
-                return getTick();
+                return 0;
             }
 
             /* overflow */
             if((signed_rs == INT32_MIN) && (signed_rs2 == -1))
             {
                 rv_core->reg_file[rv_core->rd] = 0;
-                return getTick();
+                return 0;
             }
 
             result = (signed_rs%signed_rs2);
 
             rv_core->reg_file[rv_core->rd] = (rv_sword_t)result;
-            return getTick() + 64*rv_core->pSOC->get_period();
+            return divCyclesSigned(signed_rs, signed_rs2);
         }
 
         static uint64_t instr_REMUW(Core *rv_core)
@@ -1383,13 +1406,13 @@ static uint64_t instr_SW(Core *rv_core)
             if(unsigned_rs2 == 0)
             {
                 rv_core->reg_file[rv_core->rd] = SIGNEX_BIT_31(unsigned_rs);
-                return getTick();
+                return 0;
             }
 
             result = (unsigned_rs%unsigned_rs2);
 
             rv_core->reg_file[rv_core->rd] = SIGNEX_BIT_31(result);
-            return getTick() + 64*rv_core->pSOC->get_period();
+            return divCyclesUnsigned(unsigned_rs, unsigned_rs2);
         }
     #endif
 
@@ -1413,7 +1436,7 @@ static uint64_t instr_PREAD(Core * rv_core) {
     req->ioFlag.data = rv_core->pSOC->get_ram() + ((uint64_t)req->ioFlag.data - RAM_BASE_ADDR);
     rv_core->pSOC->pread((uint8_t*) req, (uint64_t*) (rv_core->pSOC->get_ram() + ((rv_core->reg_file[rv_core->rs1] - RAM_BASE_ADDR))));
     req->ioFlag.data = stored_addr;
-    return getTick() + rv_core->pSOC->get_period();
+    return 1;
 }
 
 static uint64_t instr_PWRITE(Core * rv_core) {
@@ -1422,7 +1445,7 @@ static uint64_t instr_PWRITE(Core * rv_core) {
     req->ioFlag.data = rv_core->pSOC->get_ram() + ((uint64_t)req->ioFlag.data - RAM_BASE_ADDR);
     rv_core->pSOC->pwrite((uint8_t*) req, (uint64_t*) (rv_core->pSOC->get_ram() + ((rv_core->reg_file[rv_core->rs1] - RAM_BASE_ADDR))));
     req->ioFlag.data = stored_addr;
-    return getTick() + rv_core->pSOC->get_period();
+    return 1;
 }
 
 static uint64_t instr_PERASE(Core * rv_core) {
@@ -1431,7 +1454,7 @@ static uint64_t instr_PERASE(Core * rv_core) {
     req->ioFlag.data = rv_core->pSOC->get_ram() + ((uint64_t)req->ioFlag.data - RAM_BASE_ADDR);
     rv_core->pSOC->perase((uint8_t*) req, (uint64_t*) (rv_core->pSOC->get_ram() + ((rv_core->reg_file[rv_core->rs1] - RAM_BASE_ADDR))));
     req->ioFlag.data = stored_addr;
-    return getTick() + rv_core->pSOC->get_period();
+    return 1;
 }
 
 static uint64_t instr_READBUFF(Core *rv_core) {
@@ -1442,7 +1465,7 @@ static uint64_t instr_READBUFF(Core *rv_core) {
     } else {
         rv_core->pSOC->read_buffer(rv_core->pSOC->get_ram() + ((rv_core->reg_file[rv_core->rd] - RAM_BASE_ADDR)), rv_core->reg_file[rv_core->rs1], rv_core->reg_file[rv_core->rs2]);
     }
-    return getTick() + rv_core->pSOC->get_period();
+    return 1;
 }
 
 static uint64_t instr_WRITEBUFF(Core *rv_core) {
@@ -1450,24 +1473,28 @@ static uint64_t instr_WRITEBUFF(Core *rv_core) {
         rv_core->pSOC->setICLStats((ICLStats *) (rv_core->pSOC->get_ram() + (rv_core->reg_file[rv_core->rd] - RAM_BASE_ADDR)));
     } else if (rv_core->reg_file[rv_core->rs2] == FTL_STAT_LOC) {
         rv_core->pSOC->setFTLStats((FTLStats *) (rv_core->pSOC->get_ram() + (rv_core->reg_file[rv_core->rd] - RAM_BASE_ADDR)));
-    }
+    } else if (rv_core->reg_file[rv_core->rs2] == ICL_LOW) {
+        rv_core->pSOC->setICLLow((uint64_t *) (rv_core->pSOC->get_ram() + (rv_core->reg_file[rv_core->rd] - RAM_BASE_ADDR)));
+    } else if (rv_core->reg_file[rv_core->rs2] == ICL_HIGH) {
+        rv_core->pSOC->setICLHigh((uint64_t *) (rv_core->pSOC->get_ram() + (rv_core->reg_file[rv_core->rd] - RAM_BASE_ADDR)));
+    } 
     rv_core->pSOC->write_buffer(rv_core->pSOC->get_ram() + ((rv_core->reg_file[rv_core->rd] - RAM_BASE_ADDR)), rv_core->reg_file[rv_core->rs1], rv_core->reg_file[rv_core->rs2] );
-    return getTick() + rv_core->pSOC->get_period();
+    return 1;
 }
 
 static uint64_t instr_STARTSIM(Core *rv_core) {
     rv_core->pSOC->start_simulation();
-    return getTick() + rv_core->pSOC->get_period();
+    return 1;
 }
 
 static uint64_t instr_STOPSIM(Core *rv_core) {
     rv_core->pSOC->stop_simulation();
-    return getTick() + rv_core->pSOC->get_period();
+    return 1;
 }
 
 static uint64_t instr_NEXTSIMTICK(Core *rv_core) {
     rv_core->pSOC->next_simulation_tick(rv_core->reg_file[rv_core->rs1]);
-    return getTick() + rv_core->pSOC->get_period();
+    return 1;
 }
 
 static uint64_t instr_PUTC(Core *rv_core) {
@@ -1476,85 +1503,85 @@ static uint64_t instr_PUTC(Core *rv_core) {
     } else {
         printf("%c", (char)rv_core->reg_file[rv_core->rs1]);
     }
-    return getTick() + rv_core->pSOC->get_period();
+    return 1;
 }
 
 static uint64_t instr_FADD(Core *rv_core) {
     rv_core->float_reg_file[rv_core->rd] = rv_core->float_reg_file[rv_core->rs1] + rv_core->float_reg_file[rv_core->rs2];
-    return getTick() + rv_core->pSOC->get_period();
+    return FLT_ADD_CYCLE_COUNT;
 }
 
 static uint64_t instr_FSUB(Core *rv_core) {
     rv_core->float_reg_file[rv_core->rd] = rv_core->float_reg_file[rv_core->rs1] - rv_core->float_reg_file[rv_core->rs2];
-    return getTick() + rv_core->pSOC->get_period();
+    return FLT_SUB_CYCLE_COUNT;
 }
 
 static uint64_t instr_FMUL(Core *rv_core) {
     rv_core->float_reg_file[rv_core->rd] = rv_core->float_reg_file[rv_core->rs1] * rv_core->float_reg_file[rv_core->rs2];
-    return getTick() + rv_core->pSOC->get_period();
+    return FLT_MUL_CYCLE_COUNT;
 }
 
 static uint64_t instr_FDIV(Core *rv_core) {
     rv_core->float_reg_file[rv_core->rd] = rv_core->float_reg_file[rv_core->rs1] / rv_core->float_reg_file[rv_core->rs2];
-    return getTick() + rv_core->pSOC->get_period();
+    return FLT_DIV_CYCLE_COUNT;
 }
 
 static uint64_t instr_FSQRT(Core *rv_core) {
     rv_core->float_reg_file[rv_core->rd] = std::sqrt(rv_core->float_reg_file[rv_core->rs1]);
     printf("executing float sqrt on %f and %f for result %f\n",  rv_core->float_reg_file[rv_core->rs1], rv_core->float_reg_file[rv_core->rs2], rv_core->float_reg_file[rv_core->rd]);
-    return getTick() + rv_core->pSOC->get_period();
+    return FLT_SQRT_CYCLE_COUNT;
 }
 
 static uint64_t instr_FSGNJ(Core *rv_core) {
     rv_core->float_reg_file[rv_core->rd] = std::copysign(rv_core->float_reg_file[rv_core->rs1], rv_core->float_reg_file[rv_core->rs2]);
     printf("executing float sign injunction on %f and %f for result %f\n",  rv_core->float_reg_file[rv_core->rs1], rv_core->float_reg_file[rv_core->rs2], rv_core->float_reg_file[rv_core->rd]);
-    return getTick() + rv_core->pSOC->get_period();
+    return FLT_SGNJ_CYCLE_COUNT;
 }
 
 static uint64_t instr_FSGNJN(Core *rv_core) {
     rv_core->float_reg_file[rv_core->rd] = std::copysign(rv_core->float_reg_file[rv_core->rs1], -rv_core->float_reg_file[rv_core->rs2]);
-    return getTick() + rv_core->pSOC->get_period();
+    return FLT_SGNJN_CYCLE_COUNT;
 }
 
 // TO-DO implement
 static uint64_t instr_FSGNJX(Core *rv_core) {
     // rv_core->float_reg_file[rv_core->rd] = std::copysign(rv_core->float_reg_file[rv_core->rs1], rv_core->float_reg_file[rv_core->rs2]);
-    return getTick() + rv_core->pSOC->get_period();
+    return FLT_SGNJX_CYCLE_COUNT;
 }
 
 static uint64_t instr_FMIN(Core *rv_core) {
     rv_core->float_reg_file[rv_core->rd] = std::min(rv_core->float_reg_file[rv_core->rs1], rv_core->float_reg_file[rv_core->rs2]);
     printf("executing float min on %f and %f for result %f\n",  rv_core->float_reg_file[rv_core->rs1], rv_core->float_reg_file[rv_core->rs2], rv_core->float_reg_file[rv_core->rd]);
-    return getTick() + rv_core->pSOC->get_period();
+    return FLT_MIN_CYCLE_COUNT;
 }
 
 static uint64_t instr_FMAX(Core *rv_core) {
     rv_core->float_reg_file[rv_core->rd] = std::max(rv_core->float_reg_file[rv_core->rs1], rv_core->float_reg_file[rv_core->rs2]);
     printf("executing float max on %f and %f for result %f\n",  rv_core->float_reg_file[rv_core->rs1], rv_core->float_reg_file[rv_core->rs2], rv_core->float_reg_file[rv_core->rd]);
-    return getTick() + rv_core->pSOC->get_period();
+    return FLT_MAX_CYCLE_COUNT;
 }
 
 static uint64_t instr_FEQ(Core *rv_core) {
     rv_core->float_reg_file[rv_core->rd] = (rv_core->float_reg_file[rv_core->rs1] == rv_core->float_reg_file[rv_core->rs2]);
     printf("executing float equal on %f and %f for result %f\n",  rv_core->float_reg_file[rv_core->rs1], rv_core->float_reg_file[rv_core->rs2], rv_core->float_reg_file[rv_core->rd]);
-    return getTick() + rv_core->pSOC->get_period();
+    return FLT_CMPEQ_CYCLE_COUNT;
 }
 
 static uint64_t instr_FLT(Core *rv_core) {
     rv_core->float_reg_file[rv_core->rd] = (rv_core->float_reg_file[rv_core->rs1] < rv_core->float_reg_file[rv_core->rs2]);
     printf("executing float less than on %f and %f for result %f\n",  rv_core->float_reg_file[rv_core->rs1], rv_core->float_reg_file[rv_core->rs2], rv_core->float_reg_file[rv_core->rd]);
-    return getTick() + rv_core->pSOC->get_period();
+    return FLT_CMPLT_CYCLE_COUNT;
 }
 
 static uint64_t instr_FLE(Core *rv_core) {
     rv_core->float_reg_file[rv_core->rd] = (rv_core->float_reg_file[rv_core->rs1] <= rv_core->float_reg_file[rv_core->rs2]);
     printf("executing float equal on %f and %f for result %f\n",  rv_core->float_reg_file[rv_core->rs1], rv_core->float_reg_file[rv_core->rs2], rv_core->float_reg_file[rv_core->rd]);
-    return getTick() + rv_core->pSOC->get_period();
+    return FLT_CMPLE_CYCLE_COUNT;
 }
 
 // TO-DO implement
 static uint64_t instr_CLASSIFY(Core *rv_core) {
-    return getTick() + rv_core->pSOC->get_period();
+    return 1;
 }
 
 static uint64_t instr_FLW(Core *rv_core) {
@@ -1562,79 +1589,79 @@ static uint64_t instr_FLW(Core *rv_core) {
     rv_sword_t signed_offset = SIGNEX_BIT_11(rv_core->immediate);
     rv_sword_t address = rv_core->reg_file[rv_core->rs1] + signed_offset;
     uint64_t ret_val = mmu_checked_bus_access(rv_core, rv_core->curr_priv_mode, bus_read_access, address, &tmp_load_val, 4);
-    if (ret_val != getTick())
+    if (ret_val != 0)
         rv_core->float_reg_file[rv_core->rd] = tmp_load_val;
-    return ret_val;
+    return ret_val + FLT_LOAD_EXTRA_CYCLE_COUNT;
 }
 
 static uint64_t instr_FSW(Core *rv_core) {
     rv_sword_t signed_offset = SIGNEX_BIT_11(rv_core->immediate);
     rv_word_t address = rv_core->reg_file[rv_core->rs1] + signed_offset;
     float value_to_write = rv_core->float_reg_file[rv_core->rs2];
-    return mmu_checked_bus_access(rv_core, rv_core->curr_priv_mode, bus_write_access, address, &value_to_write, 4); 
+    return mmu_checked_bus_access(rv_core, rv_core->curr_priv_mode, bus_write_access, address, &value_to_write, 4) + FLT_STORE_EXTRA_CYCLE_COUNT; 
 }
 
 static uint64_t instr_FTOSINT(Core *rv_core) {
     rv_core->reg_file[rv_core->rd] = static_cast<int>(rv_core->float_reg_file[rv_core->rs1]);
-    return getTick() + rv_core->pSOC->get_period();
+    return FLT_CVT_TO_SINT_CYCLE_COUNT;
 }
 
 static uint64_t instr_FTOLONG(Core *rv_core) {
     rv_core->reg_file[rv_core->rd] = static_cast<long long>(rv_core->float_reg_file[rv_core->rs1]);
-    return getTick() + rv_core->pSOC->get_period();
+    return FLT_CVT_TO_LONG_CYCLE_COUNT;
 }
 
 static uint64_t instr_FTOUINT(Core *rv_core) {
     rv_core->reg_file[rv_core->rd] = static_cast<uint32_t>(rv_core->float_reg_file[rv_core->rs1]);
-    return getTick() + rv_core->pSOC->get_period();
+    return FLT_CVT_TO_UINT_CYCLE_COUNT;
 }
 
 static uint64_t instr_FTOULONG(Core *rv_core) {
     rv_core->reg_file[rv_core->rd] = static_cast<uint64_t>(rv_core->float_reg_file[rv_core->rs1]);
-    return getTick() + rv_core->pSOC->get_period();
+    return FLT_CVT_TO_ULONG_CYCLE_COUNT;
 }
 
 static uint64_t instr_FFROMSINT(Core *rv_core) {
 
     rv_core->float_reg_file[rv_core->rd] = static_cast<float>(static_cast<rv_sword_t>(rv_core->reg_file[rv_core->rs1]));
-    return getTick() + rv_core->pSOC->get_period();
+    return FLT_CVT_FROM_SINT_CYCLE_COUNT;
 }
 
 static uint64_t instr_FFROMUINT(Core *rv_core) {
     rv_core->float_reg_file[rv_core->rd] = static_cast<float>(rv_core->reg_file[rv_core->rs1]);
-    return getTick() + rv_core->pSOC->get_period();
+    return FLT_CVT_FROM_UINT_CYCLE_COUNT;
 }
 
 static uint64_t instr_FMVTOINT(Core *rv_core) {
     memcpy(rv_core->reg_file + rv_core->rs1, rv_core->float_reg_file + rv_core->rd, sizeof(float));
     printf("executing float move to int on %f and %f for result %f\n",  rv_core->float_reg_file[rv_core->rs1], rv_core->float_reg_file[rv_core->rs2], rv_core->float_reg_file[rv_core->rd]);
-    return getTick() + rv_core->pSOC->get_period();
+    return FLT_MV_TO_INT_CYCLE_COUNT;
 }
 
 static uint64_t instr_FMVFROMINT(Core *rv_core) {
     memcpy(rv_core->float_reg_file + rv_core->rd, rv_core->reg_file + rv_core->rs1, sizeof(int));
     printf("executing float from int on %f and %f for result %f\n",  rv_core->float_reg_file[rv_core->rs1], rv_core->float_reg_file[rv_core->rs2], rv_core->float_reg_file[rv_core->rd]);
-    return getTick() + rv_core->pSOC->get_period();
+    return FLT_MV_FROM_INT_CYCLE_COUNT;
 }
 
 static uint64_t instr_FMADD(Core *rv_core) {
     rv_core->float_reg_file[rv_core->rd] = rv_core->float_reg_file[rv_core->rs1]*rv_core->float_reg_file[rv_core->rs2] + rv_core->float_reg_file[rv_core->rs3];
-    return getTick() + rv_core->pSOC->get_period();
+    return FMADD_CYCLE_COUNT;
 }
 
 static uint64_t instr_FMSUB(Core *rv_core) {
     rv_core->float_reg_file[rv_core->rd] = rv_core->float_reg_file[rv_core->rs1]*rv_core->float_reg_file[rv_core->rs2] - rv_core->float_reg_file[rv_core->rs3];
-    return getTick() + rv_core->pSOC->get_period();
+    return FMSUB_CYCLE_COUNT;
 }
 
 static uint64_t instr_FMNADD(Core *rv_core) {
     rv_core->float_reg_file[rv_core->rd] = -(rv_core->float_reg_file[rv_core->rs1]*rv_core->float_reg_file[rv_core->rs2] + rv_core->float_reg_file[rv_core->rs3]);
-    return getTick() + rv_core->pSOC->get_period();
+    return FMNADD_CYCLE_COUNT;
 }
 
 static uint64_t instr_FMNSUB(Core *rv_core) {
     rv_core->float_reg_file[rv_core->rd] = -(rv_core->float_reg_file[rv_core->rs1]*rv_core->float_reg_file[rv_core->rs2] - rv_core->float_reg_file[rv_core->rs3]);
-    return getTick() + rv_core->pSOC->get_period();
+    return FMNSUB_CYCLE_COUNT;
 }
 
 #ifdef ATOMIC_SUPPORT
@@ -2251,28 +2278,32 @@ static inline rv_word_t rv_core_decode(Core *rv_core)
 
 static uint64_t rv_core_execute(Core *rv_core)
 {
-    uint64_t next_tick = rv_core->execute_cb(rv_core);
+    uint64_t next_cycle = rv_core->execute_cb(rv_core);
 
     /* clear x0 if any instruction has written into it */
     rv_core->reg_file[0] = 0;
 
-    return next_tick;
+    return next_cycle;
 }
 
 /******************* Public functions *******************************/
 uint64_t Core::rv_core_run()
 {
     next_pc = 0;
-    uint64_t next_tick = getTick() + pSOC->get_period();
+    uint64_t next_cycle = 1;
     if(rv_core_fetch(this))
     {
         rv_core_decode(this);
-        next_tick = rv_core_execute(this);
+        next_cycle = rv_core_execute(this);
     }
 
     /* increase program counter here */
+    if (getTick() > 0) {
+        printf("next cycle is: %llu for instruction: %llu and pc: %llu\n", next_cycle, instruction, pc);
+    }
     pc = next_pc ? next_pc : pc + 4;
-    curr_cycle++;
+    curr_cycle += next_cycle;
+    
     /**
     csr_regs[CSR_ADDR_MCYCLE].value = curr_cycle;
     csr_regs[CSR_ADDR_MINSTRET].value = curr_cycle;
@@ -2285,7 +2316,7 @@ uint64_t Core::rv_core_run()
         csr_regs[CSR_ADDR_CYCLEH].value = curr_cycle >> 32;
         csr_regs[CSR_ADDR_TIMEH].value = curr_cycle >> 32;
     #endif*/
-    return next_tick;
+    return next_cycle;
 }
 
 void Core::rv_core_process_interrupts(uint8_t mei, uint8_t mti, uint8_t msi)

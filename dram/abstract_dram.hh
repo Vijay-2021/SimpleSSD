@@ -59,7 +59,7 @@ class AbstractDRAM : public StatObject {
 
   virtual void read(void *, uint64_t, uint64_t &) = 0;
   virtual void write(void *, uint64_t, uint64_t &) = 0;
-
+  virtual uint64_t access(uint64_t addr, uint64_t size) = 0;  //!< Access a memory address with better timing model
   // TEMP: Should be removed on v2.2
   virtual void setScheduling(bool) {}
   virtual bool isScheduling() { return true; }

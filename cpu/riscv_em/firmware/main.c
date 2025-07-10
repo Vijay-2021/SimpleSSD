@@ -15,7 +15,13 @@ int main(void)
     volatile float b = 4.5;
     volatile float c = a + b;
     volatile float d = c*a;
+    if (a < b) {
+        printf("a < b\n");
+    } else {
+        printf("a >= b\n");
+    }
     printf("finished firmware\n");
+    stop_sim();
 	//ext2_mount(0, block_get_volume_size(), 0, &context);
 	// struct ext2context *context;
 	// ext2_mount(63, block_get_volume_size(), 0, &context);

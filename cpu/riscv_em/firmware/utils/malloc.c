@@ -634,3 +634,7 @@ realloc(void *ptr, size_t size)
 void print_heap_top() {
     printf("heap_top: %u and addr heap_begin %p\n", heap_begin, &heap_begin);
 }
+
+uint64_t get_heap_top() {
+    return heap_begin; // top of the heap is technically the beginning
+}

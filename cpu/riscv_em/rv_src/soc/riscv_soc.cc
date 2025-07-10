@@ -1,16 +1,18 @@
+#include "riscv_soc.hh"
+
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stddef.h>
 #include <limits>
-
+#include <inttypes.h>
 #include "rv_src/core/riscv_helper.hh"
-#include "riscv_example_soc.hh"
 #include "rv_src/helpers/file_helper.hh"
-
+#include "rv_src/core/instruction_timings.hh"
 #include "cpu/cpu.hh"
 #include "dram/abstract_dram.hh"
+#include "dram/sram.hh"
 
 namespace SimpleSSD {
 
@@ -40,6 +42,7 @@ static rv_ret memory_bus_access(void *priv, privilege_level priv_level, bus_acce
     return rv_ok;
 }
 
+
 void SOC::rv_soc_init_mem_access_cbs()
 {
     int count = 0;
@@ -56,30 +59,28 @@ static uint64_t rv_soc_bus_access(void *priv, privilege_level priv_level, bus_ac
     SOC *rv_soc = (SOC *)priv;
     rv_word_t tmp_addr = 0;
     size_t i = 0;
-    uint64_t ret_time = getTick() + rv_soc->clock_period;
+    uint64_t ret_cycles = 1;
     for(i=0;i<(sizeof(rv_soc->mem_access_cbs)/sizeof(rv_soc->mem_access_cbs[0]));i++)
     {
         if(ADDR_WITHIN_LEN(address, len, rv_soc->mem_access_cbs[i].addr_start, rv_soc->mem_access_cbs[i].mem_size))
         {
             tmp_addr = address - rv_soc->mem_access_cbs[i].addr_start;
-            /**if (rv_soc->mem_access_cbs[i].addr_start == RAM_BASE_ADDR) {
+            if (rv_soc->mem_access_cbs[i].addr_start == RAM_BASE_ADDR) {
                 if (access_type == bus_write_access) {
-                    rv_soc->pDRAM->write((void*)tmp_addr, len, ret_time);
-                } else {
-                    rv_soc->pDRAM->read((void*)tmp_addr, len, ret_time);
+                    ret_cycles = rv_soc->write((uint64_t)tmp_addr, (uint64_t)len);
+                } else if (access_type == bus_read_access) {
+                    ret_cycles = rv_soc->read((uint64_t)tmp_addr, (uint64_t)len);
                 }
-            } else {
-                ret_time += rv_soc->clock_period; // assume 1 cycle access time, for now
-            }*/
+            } 
             rv_soc->mem_access_cbs[i].bus_access(rv_soc->mem_access_cbs[i].priv, priv_level, access_type, tmp_addr, value, len);
-            return ret_time;
+            return ret_cycles;
         }
     }
     printf("address is: %p\n", (void*)address);
     printf("pc is: %p\n", (void*)rv_soc->rv_cores[0].pc);
     printf("instruction is: %x\n", rv_soc->rv_cores[0].instruction);
     die_msg("Invalid Addresses, or no valid write pointer found, write not executed!");
-    return ret_time + rv_soc->clock_period;
+    return 0; // 0 to indicate error
 }
 
 SOC::SOC(char *fw_file_name, char *dtb_file_name, char *initrd_file_name, CPU *cpu, uint32_t num_cores, DRAM::AbstractDRAM *dram) : pDRAM(dram), pCPU(cpu)
@@ -103,7 +104,9 @@ SOC::SOC(char *fw_file_name, char *dtb_file_name, char *initrd_file_name, CPU *c
     from = (uint8_t*) calloc(FROM_SIZE_BYTES, sizeof(uint8_t));
     mrom = (uint8_t*) calloc(MROM_SIZE_BYTES, sizeof(uint8_t));
     ram = (uint8_t*) calloc(RAM_SIZE_BYTES, sizeof(uint8_t));
-
+    pCache = new SRAM::SRAM(SRAM_SIZE, SRAM_BLOCK_SIZE, SRAM_NUM_WAYS);
+    ICL_HIGH = 0;
+    ICL_LOW = 0;
     /* Copy dtb and firmware */
     if(dtb_file_name != NULL)
     {
@@ -154,6 +157,7 @@ SOC::SOC(char *fw_file_name, char *dtb_file_name, char *initrd_file_name, CPU *c
     }
     for (uint32_t core_id = 0; core_id < num_cores; core_id++) {
         rv_cores.push_back(Core(this, rv_soc_bus_access, core_id));
+        next_core_ticks.push_back(0);
     }
     /* initialize one core with a csr table */
     simple_uart_init(&uart);
@@ -166,6 +170,7 @@ SOC::~SOC() {
     free(mrom);
     free(from);
     free(ram);
+    delete pCache;
 }
 
 void SOC::rv_soc_dump_mem()
@@ -215,8 +220,10 @@ uint64_t SOC::rv_soc_tick(uint64_t num_cycles)
     for (uint64_t current_cycle = 0; current_cycle < num_cycles && soc_run_mode_ != PAUSED_MODE && soc_run_mode_ != FAILED_MODE; current_cycle++) {
         next_tick = std::numeric_limits<uint64_t>::max(); // reset next tick to max value for each cycle
         for (uint32_t core_id = 0; core_id < rv_cores.size(); core_id++) {
-            uint64_t requested_tick = rv_cores[core_id].rv_core_run();
-            next_tick = std::min(next_tick, requested_tick);
+            if (getTick() >= next_core_ticks[core_id]) {
+                next_core_ticks[core_id] = getTick() + clock_period*rv_cores[core_id].rv_core_run();
+            }
+            next_tick = std::min(next_tick, next_core_ticks[core_id]); // for scheduling purposes, we need to find the next tick across all cores
         }
 
         // uart_irq_pending = simple_uart_update(&uart);
@@ -320,6 +327,42 @@ void SOC::setFTLStats(FTLStats *ftl_stats) {
 }
 void SOC::setICLStats(ICLStats *icl_stats) {
     stats.icl_stats = icl_stats;
+}
+
+void SOC::setICLLow(uint64_t *icl_low) {
+    ICL_LOW = *icl_low - RAM_BASE_ADDR; // store the low address relative to RAM base address
+}
+
+void SOC::setICLHigh(uint64_t *icl_high) {
+    ICL_HIGH = *icl_high - RAM_BASE_ADDR;
+}
+
+uint64_t SOC::read(uint64_t addr, uint64_t len) {
+    if (((ICL_HIGH == 0 && ICL_LOW == 0) || (addr > ICL_HIGH || addr < ICL_LOW)) && pCache->read(addr)) {
+        return LOAD_CACHE_CYCLE_COUNT;
+    } else {
+        uint64_t dramReadTime = pDRAM->access((void*)addr, len);
+        double cyclesD = std::ceil(dramReadTime / clock_period);
+        uint64_t cycles = static_cast<uint64_t>(cyclesD);
+        if (getTick() > 0) {
+            printf("DRAM read at address: %llu, length: %llu took %llu cycles\n", addr, len, cycles);
+        }
+        return cycles;
+    }
+}
+
+uint64_t SOC::write(uint64_t addr, uint64_t len) {
+    if (((ICL_HIGH == 0 && ICL_LOW == 0) || (addr > ICL_HIGH || addr < ICL_LOW)) && pCache->write(addr)) {
+        return WRITE_CACHE_CYCLE_COUNT;
+    } else {
+        uint64_t dramWriteTime = pDRAM->access((void*)addr, len);
+        double cyclesD = std::ceil(dramWriteTime / clock_period);
+        uint64_t cycles = static_cast<uint64_t>(cyclesD);
+        if (getTick() > 0) {
+            printf("DRAM write at address: %llu, length: %llu took %llu cycles\n", addr, len, cycles);
+        }
+        return cycles;
+    }
 }
 
 } // namespace RISCV
