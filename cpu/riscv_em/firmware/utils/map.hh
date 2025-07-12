@@ -91,7 +91,6 @@ public:
             }
             idx = (idx + 1) % capacity_;
         }
-
         new (&table_[idx].data) Pair<K, V>(key, value);
         table_[idx].occupied = true;
         ++size_;
@@ -158,6 +157,7 @@ public:
     iterator end()   { return iterator(table_ + capacity_, table_ + capacity_); }
 
     size_t size() const { return size_; }
+    size_t capacity() const { return capacity_; }
 
 private:
     Entry* table_;

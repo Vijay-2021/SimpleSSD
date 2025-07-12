@@ -22,6 +22,7 @@
 
 #include "vector.hh"
 #include "ftl.hh"
+#include "mutex.hh"
 
 namespace ICL {
 
@@ -131,7 +132,7 @@ class ICL {
 
 
   icl_params params;
-
+  Mutex* icl_mutex;
  public:
   ICL(icl_params& cparams, FTL::FTL *ftl);
   ~ICL();

@@ -37,6 +37,7 @@ typedef enum {
   CPU_FW_PATH,
   CPU_CORE_RISCV,
   BURST_CYCLES,
+  SOC_TEST_MODE,
 } CPU_CONFIG;
 
 class Config : public BaseConfig {
@@ -47,6 +48,7 @@ class Config : public BaseConfig {
   uint32_t ftlCore;  //!< Default: 1
   uint32_t riscvCore; //!< Default: 1
   uint32_t burst_cycles; 
+  bool soc_test_mode; 
   std::string  fw_path; //!< Default: ""
 
  public:

@@ -38,6 +38,11 @@ FTL::FTL(ftl_params &fparams) : params(fparams), lastFreeBlock(fparams.pageCount
   for (uint32_t i = 0; i < 128; i++) {
     freeBlocks.emplace_back(move(Block(i, params.pagesInBlock, params.ioUnitInPage)));
   }
+  for (auto &block : freeBlocks) {
+    if (!block.isValid()) {
+      panic("Block is not valid during initialization");
+    }
+  }
 
   nFreeBlocks = params.totalPhysicalBlocks;
   printf("free blocks is fine\n");
@@ -161,7 +166,7 @@ uint64_t FTL::write(Request &req) {
     ret_val = writeInternal(req);
   }
   else {
-    print("FTL got empty request\n");
+    printf("FTL got empty request for data addr %u\n", (uint64_t)(&req.ioFlag.data));
     ret_val = getTick();
   }
   ftl_stats.write_req_cycles += getCycle() - start_cycle;
@@ -187,30 +192,25 @@ uint64_t FTL::format(LPNRange &range) {
 
   req.ioFlag.set();
 
-  for (auto iter = table.begin(); iter != table.end();) {
-    if (iter->first >= range.slpn && iter->first < range.slpn + range.nlp) {
-      auto &mappingList = iter->second;
+  for (uint64_t idx = range.slpn; idx < range.slpn + range.nlp; idx++) {
+      auto *mappingList = &table[idx];
 
       // Do trim
       for (uint32_t idx = 0; idx < bitsetSize; idx++) {
-        auto &mapping = mappingList.at(idx);
-        auto block = blocks.find(mapping.first);
+        auto &mapping = mappingList->at(idx);
+        auto *block = &blocks[mapping.first];
 
-        if (block == blocks.end()) {
-          panic("Block is not in use");
+        if (!block->isValid()) {
+          // panic("Block is not in use");
+        } else {
+
+          block->invalidate(mapping.second, idx);
+
+          // Collect block indices
+          list.push_back(mapping.first);
         }
-
-        block->second.invalidate(mapping.second, idx);
-
-        // Collect block indices
-        list.push_back(mapping.first);
       }
-
-      iter = table.erase(iter);
-    }
-    else {
-      ++iter;
-    }
+      table[idx].clear();
   }
 
   // Get blocks to erase
@@ -260,10 +260,10 @@ uint32_t FTL::getFreeBlock(uint32_t idx) {
       blockIndex = iter->getBlockIndex();
     }
     // Insert found block to block list
-    if (blocks.find(blockIndex) != blocks.end()) {
-      panic("Corrupted");
+    if (blocks[blockIndex].isValid()) {
+      panic("Corrupted here");
     }
-    blocks.emplace(blockIndex, move(*iter));
+    blocks[blockIndex] = move(*iter);
     // Remove found block from free block list
     freeBlocks.erase(iter);
     nFreeBlocks--;
@@ -290,15 +290,14 @@ uint32_t FTL::getLastFreeBlock(Bitset &iomap) {
     lastFreeBlockIOMap |= iomap;
   }
 
-  auto freeBlock = blocks.find(lastFreeBlock.at(lastFreeBlockIndex));
-
+  auto* freeBlock = &blocks[lastFreeBlock.at(lastFreeBlockIndex)];
   // Sanity check
-  if (freeBlock == blocks.end()) {
-    panic("Corrupted");
+  if (!freeBlock->isValid()) {
+    panic("Corrupted over here");
   }
 
   // If current free block is full, get next block
-  if (freeBlock->second.getNextWritePageIndex() == params.pagesInBlock) {
+  if (freeBlock->getNextWritePageIndex() == params.pagesInBlock) {
     lastFreeBlock.at(lastFreeBlockIndex) = getFreeBlock(lastFreeBlockIndex);
 
     bReclaimMore = true;
@@ -311,35 +310,31 @@ uint32_t FTL::getLastFreeBlock(Bitset &iomap) {
 void FTL::calculateVictimWeight(
     Vector<Pair<uint32_t, float>> &weight, const EVICT_POLICY policy) {
   float temp;
-  printf("fine here\n");
   weight.reserve(blocks.size());
-  printf("this is okay too\n");
   switch (policy) {
     case POLICY_GREEDY:
     case POLICY_RANDOM:
     case POLICY_DCHOICE:
-      printf("looping through blocks\n");
-      for (auto& iter : blocks) {
-        if (iter.second.getNextWritePageIndex() != params.pagesInBlock) {
+      for (size_t i = 0; i < blocks.size(); i++) {
+
+        //block is not full!
+        if (blocks[i].getNextWritePageIndex() != params.pagesInBlock) {
           continue;
         }
-        printf("adding to weights\n");
-        weight.push_back({iter.first, iter.second.getValidPageCountRaw()});
+        weight.push_back({i, blocks[i].getValidPageCountRaw()});
       }
 
       break;
     case POLICY_COST_BENEFIT:
-      printf("cost benefit policy selected\n");
-      for (auto& iter : blocks) {
-        if (iter.second.getNextWritePageIndex() != params.pagesInBlock) {
+      for (size_t i = 0; i < blocks.size(); i++) {
+        if (blocks[i].getNextWritePageIndex() != params.pagesInBlock) {
           continue;
         }
 
-        temp = (float)(iter.second.getValidPageCountRaw()) / params.pagesInBlock;
-        printf("adding to weights\n");
+        temp = (float)(blocks[i].getValidPageCountRaw()) / params.pagesInBlock;
         weight.push_back(
-            {iter.first,
-             temp / ((1 - temp) * (getTick() - iter.second.getLastAccessedTime()))});
+            {i,
+             temp / ((1 - temp) * (getTick() - blocks[i].getLastAccessedTime()))});
       }
 
       break;
@@ -429,57 +424,59 @@ uint64_t FTL::doGarbageCollection(Vector<uint32_t> &blocksToReclaim) {
   Bitset bit(params.ioUnitInPage);
 
   if (blocksToReclaim.size() == 0) {
-    return getTick();
+    uint64_t tick;
+    read_buffer((uint64_t)&tick, 0, FIRMWARE_TICK);
+    return tick;
   }
 
   // For all blocks to reclaim, collecting request structure only
   for (auto &iter : blocksToReclaim) {
-    auto block = blocks.find(iter);
+    auto *block = &blocks[iter];
 
-    if (block == blocks.end()) {
+    if (!block->isValid()) {
       panic("Invalid block");
     }
 
     // Copy valid pages to free block
     for (uint32_t pageIndex = 0; pageIndex < params.pagesInBlock; pageIndex++) {
       // Valid?
-      if (block->second.getPageInfo(pageIndex, lpns, bit)) {
+      if (block->getPageInfo(pageIndex, lpns, bit)) {
         if (!bRandomTweak) {
           bit.set();
         }
 
-        // Retrive free block
-        auto freeBlock = blocks.find(getLastFreeBlock(bit));
+        // Retrieve free block
+        uint32_t newBlockIdx = getLastFreeBlock(bit);
+        auto *freeBlock = &blocks[newBlockIdx];
 
         // Issue Read
-        req.blockIndex = block->first;
+        req.blockIndex = newBlockIdx;
         req.pageIndex = pageIndex;
         req.ioFlag = bit;
 
         readRequests.push_back(req);
 
         // Update mapping table
-        uint32_t newBlockIdx = freeBlock->first;
 
         for (uint32_t idx = 0; idx < bitsetSize; idx++) {
           if (bit.test(idx)) {
             // Invalidate
-            block->second.invalidate(pageIndex, idx);
+            block->invalidate(pageIndex, idx);
 
-            auto mappingList = table.find(lpns.at(idx));
+            auto *mappingList = &table[lpns.at(idx)];
 
-            if (mappingList == table.end()) {
+            if (mappingList->size() == 0) {
               panic("Invalid mapping table entry");
             }
 
-            auto &mapping = mappingList->second.at(idx);
+            auto &mapping = mappingList->at(idx);
 
-            uint32_t newPageIdx = freeBlock->second.getNextWritePageIndex(idx);
+            uint32_t newPageIdx = freeBlock->getNextWritePageIndex(idx);
 
             mapping.first = newBlockIdx;
             mapping.second = newPageIdx;
 
-            freeBlock->second.write(newPageIdx, lpns.at(idx), idx);
+            freeBlock->write(newPageIdx, lpns.at(idx), idx);
 
             // Issue Write
             req.blockIndex = newBlockIdx;
@@ -504,7 +501,7 @@ uint64_t FTL::doGarbageCollection(Vector<uint32_t> &blocksToReclaim) {
     }
 
     // Erase block
-    req.blockIndex = block->first;
+    req.blockIndex = iter;
     req.pageIndex = 0;
     req.ioFlag.set();
 
@@ -547,20 +544,23 @@ uint64_t FTL::doGarbageCollection(Vector<uint32_t> &blocksToReclaim) {
 }
 
 uint64_t FTL::readInternal(Request &req) {
+  uint64_t start_cycle;
+  read_buffer((uint64_t)&start_cycle, 0, FIRMWARE_CYCLE);
   PAL::Request palRequest(req);
   uint64_t beginAt;
-  uint64_t finishedAt = getTick();
-  auto mappingList = table.find(req.lpn);
-  if (mappingList != table.end()) {
+  uint64_t finishedAt;
+  read_buffer((uint64_t)&finishedAt, 0, FIRMWARE_TICK);
+  auto *mappingList = &table[req.lpn];
+  if (mappingList->size() != 0) {
 
     for (uint32_t idx = 0; idx < bitsetSize; idx++) {
       if (req.ioFlag.test(idx) || !bRandomTweak) {
-        auto &mapping = mappingList->second.at(idx);
+        auto *mapping = &mappingList->at(idx);
 
-        if (mapping.first < params.totalPhysicalBlocks &&
-            mapping.second < params.pagesInBlock) {
-          palRequest.blockIndex = mapping.first;
-          palRequest.pageIndex = mapping.second;
+        if (mapping->first < params.totalPhysicalBlocks &&
+            mapping->second < params.pagesInBlock) {
+          palRequest.blockIndex = mapping->first;
+          palRequest.pageIndex = mapping->second;
 
           if (bRandomTweak) {
             palRequest.ioFlag.reset();
@@ -570,15 +570,14 @@ uint64_t FTL::readInternal(Request &req) {
             palRequest.ioFlag.set();
           }
 
-          auto block = blocks.find(palRequest.blockIndex);
+          auto* block = &blocks[palRequest.blockIndex];
 
-          if (block == blocks.end()) {
+          if (!block->isValid()) {
             panic("Block is not in use");
           }
+          read_buffer((uint64_t)&beginAt, 0, FIRMWARE_TICK);
 
-          beginAt = getTick();
-
-          block->second.read(palRequest.pageIndex, idx);
+          block->read(palRequest.pageIndex, idx);
           pread((uint64_t) &palRequest, (uint64_t)&beginAt);
           // pPAL->read(palRequest, beginAt);
 
@@ -589,52 +588,47 @@ uint64_t FTL::readInternal(Request &req) {
 
     return finishedAt;
   }
-  return getTick(); // No mapping found, return current tick
+  // If no mapping found, read
+  uint64_t tick;
+  read_buffer((uint64_t)&tick, 0, FIRMWARE_TICK);
+  return tick; // No mapping found, return current tick
 }
 
 uint64_t FTL::writeInternal(Request &req, bool sendToPAL) {
-  printf("calling write interal!\n");
   PAL::Request palRequest(req);
-  printf("original pal request address: %u\n", (uint64_t)&palRequest);
-  HashMap<uint32_t, Block>::iterator block;
-  auto mappingList = table.find(req.lpn);
+  Block *block;
+  auto *mappingList = &table[req.lpn];
   uint64_t beginAt;
-  uint64_t finishedAt = getTick();
+  uint64_t finishedAt;
+  read_buffer((uint64_t)&finishedAt, 0, FIRMWARE_TICK);
   bool readBeforeWrite = false;
 
-  if (mappingList != table.end()) {
+  if (mappingList->size() > 0) {
     for (uint32_t idx = 0; idx < bitsetSize; idx++) {
       if (req.ioFlag.test(idx) || !bRandomTweak) {
-        auto &mapping = mappingList->second.at(idx);
+        auto *mapping = &mappingList->at(idx);
 
-        if (mapping.first < params.totalPhysicalBlocks &&
-            mapping.second < params.pagesInBlock) {
-          block = blocks.find(mapping.first);
+        if (mapping->first < params.totalPhysicalBlocks &&
+            mapping->second < params.pagesInBlock) {
+          block = &blocks[mapping->first];
 
           // Invalidate current page
-          block->second.invalidate(mapping.second, idx);
+          block->invalidate(mapping->second, idx);
         }
       }
     }
   }
   else {
     // Create empty mapping
-    auto ret = table.emplace(
-        req.lpn,
-        Vector<Pair<uint32_t, uint32_t>>(
-            bitsetSize, {params.totalPhysicalBlocks, params.pagesInBlock}));
-
-    if (!ret.second) {
-      panic("Failed to insert new mapping");
-    }
-
-    mappingList = ret.first;
+    table[req.lpn] = Vector<Pair<uint32_t, uint32_t>>(
+            bitsetSize, {params.totalPhysicalBlocks, params.pagesInBlock});
   }
 
   // Write data to free block
-  block = blocks.find(getLastFreeBlock(req.ioFlag));
+  uint32_t blockIdx = getLastFreeBlock(req.ioFlag);
+  block = &blocks[blockIdx];
 
-  if (block == blocks.end()) {
+  if (!block->isValid()) {
     panic("No such block");
   }
 
@@ -645,34 +639,34 @@ uint64_t FTL::writeInternal(Request &req, bool sendToPAL) {
 
   for (uint32_t idx = 0; idx < bitsetSize; idx++) {
     if (req.ioFlag.test(idx) || !bRandomTweak) {
-      uint32_t pageIndex = block->second.getNextWritePageIndex(idx);
-      auto &mapping = mappingList->second.at(idx);
+      uint32_t pageIndex = block->getNextWritePageIndex(idx);
+      auto *mapping = &mappingList->at(idx);
 
-      beginAt = getTick();
+      read_buffer((uint64_t)&beginAt, 0, FIRMWARE_TICK);
 
-      block->second.write(pageIndex, req.lpn, idx);
+      block->write(pageIndex, req.lpn, idx);
 
       // Read old data if needed (Only executed when bRandomTweak = false)
       // Maybe some other init procedures want to perform 'partial-write'
       // So check sendToPAL variable
       if (readBeforeWrite && sendToPAL) {
-        palRequest.blockIndex = mapping.first;
-        palRequest.pageIndex = mapping.second;
+        palRequest.blockIndex = mapping->first;
+        palRequest.pageIndex = mapping->second;
 
         // We don't need to read old data
         palRequest.ioFlag = req.ioFlag;
         palRequest.ioFlag.flip();
-        beginAt = getTick();
+        read_buffer((uint64_t)&beginAt, 0, FIRMWARE_TICK);
         pread((uint64_t) &palRequest, (uint64_t)&beginAt);
         //pPAL->read(palRequest, beginAt);
       }
 
       // update mapping to table
-      mapping.first = block->first;
-      mapping.second = pageIndex;
+      mapping->first = blockIdx;
+      mapping->second = pageIndex;
 
       if (sendToPAL) {
-        palRequest.blockIndex = block->first;
+        palRequest.blockIndex = blockIdx;
         palRequest.pageIndex = pageIndex;
 
         if (bRandomTweak) {
@@ -682,7 +676,6 @@ uint64_t FTL::writeInternal(Request &req, bool sendToPAL) {
         else {
           palRequest.ioFlag.set();
         }
-        printf("address of pal write is: %u\n", (uint64_t)&palRequest);
         pwrite((uint64_t) &palRequest, (uint64_t)&beginAt);
         //pPAL->write(palRequest, beginAt);
       }
@@ -698,15 +691,11 @@ uint64_t FTL::writeInternal(Request &req, bool sendToPAL) {
 
   // GC if needed
   // I assumed that init procedure never invokes GC
-  printf("now checking if we need to do GC\n");
   float gcThreshold = params.ftl_gc_threshold_ratio;
-  printf("decided to do gc\n");
   if (freeBlockRatio() < gcThreshold) {
-    printf("send to pal was the issue with free block ratio?\n");
     if (!sendToPAL) {
       panic("ftl: GC triggered while in initialization");
     }
-    printf("doing garbage collection\n");
 
     Vector<uint32_t> list;
     uint64_t beginAt = getTick();
@@ -718,60 +707,58 @@ uint64_t FTL::writeInternal(Request &req, bool sendToPAL) {
     uint64_t ret_time = doGarbageCollection(list);
 
     printf(" GC Done | %u - %u (%u) and finished at is: %u", ret_time, beginAt, ret_time - beginAt, finishedAt);
-    for (size_t i = 0; i < list.size(); i++) {
-      printf("list has element %u\n", list.at(i));
-    }
-    printf("list begin address: %u\n",(uint64_t)list.begin());
+    
   }
   return finishedAt; // ignore gc time in PAL(the cpu time will still be considered as well as the time for writing to PAL for specific request and extra GC requests will affect PAL performance of subsequent requests)
     
 }
 
 uint64_t FTL::trimInternal(Request &req) {
-  printf("calling trim interal!\n");
-  auto mappingList = table.find(req.lpn);
+  auto *mappingList = &table[req.lpn];
 
-  if (mappingList != table.end()) {
+  if (mappingList->size() > 0) {
 
     // Do trim
     for (uint32_t idx = 0; idx < bitsetSize; idx++) {
-      auto &mapping = mappingList->second.at(idx);
-      auto block = blocks.find(mapping.first);
-
-      if (block == blocks.end()) {
-        panic("Block is not in use");
+      auto *mapping = &mappingList->at(idx);
+      if (mapping->first >= params.totalPhysicalBlocks ||
+          mapping->second >= params.pagesInBlock) {
+        panic("Invalid mapping");
       }
-
-      block->second.invalidate(mapping.second, idx);
+      auto block = blocks[mapping->first];
+      block.invalidate(mapping->second, idx);
     }
 
     // Remove mapping
-    table.erase(mappingList);
+    table[req.lpn].clear();
   }
-  return getTick();
+  uint64_t tick;
+  read_buffer((uint64_t)&tick, 0, FIRMWARE_TICK);
+  return tick;
 }
 
 void FTL::eraseInternal(PAL::Request &req, uint64_t &tick) {
-  uint64_t beginAt = getTick();
+  uint64_t beginAt;
+  read_buffer((uint64_t)&beginAt, 0, FIRMWARE_TICK);
   uint64_t threshold = params.bad_block_threshold;
-  auto block = blocks.find(req.blockIndex);
+  Block* block = &blocks[req.blockIndex];
   uint64_t pal_time;
   // Sanity checks
-  if (block == blocks.end()) {
+  if (!block->isValid()) {
     panic("No such block");
   }
 
-  if (block->second.getValidPageCount() != 0) {
+  if (block->getValidPageCount() != 0) {
     panic("There are valid pages in victim block");
   }
 
   // Erase block
-  block->second.erase();
+  block->erase();
   perase((uint64_t) &req, (uint64_t)&tick);
   // pPAL->erase(req, tick);
 
   // Check erase count
-  uint32_t erasedCount = block->second.getEraseCount();
+  uint32_t erasedCount = block->getEraseCount();
 
   if (erasedCount < threshold) {
     // Reverse search
@@ -793,13 +780,14 @@ void FTL::eraseInternal(PAL::Request &req, uint64_t &tick) {
     }
 
     // Insert block to free block list
-    freeBlocks.emplace(iter, move(block->second));
+    freeBlocks.emplace(iter, move(*block));
     nFreeBlocks++;
   }
 
   // Remove block from block list
-  blocks.erase(block);
-  uint64_t endAt = getTick();
+  blocks[req.blockIndex] = Block(); // set to invalid block
+  uint64_t endAt;
+  read_buffer((uint64_t)&endAt, 0, FIRMWARE_TICK);
   tick += endAt - beginAt;
 }
 
@@ -810,7 +798,7 @@ float FTL::calculateWearLeveling() {
   uint64_t eraseCnt;
 
   for (auto& iter : blocks) {
-    eraseCnt = iter.second.getEraseCount();
+    eraseCnt = iter.getEraseCount();
     totalEraseCnt += eraseCnt;
     sumOfSquaredEraseCnt += eraseCnt * eraseCnt;
   }
@@ -841,8 +829,8 @@ void FTL::calculateTotalPages(uint64_t &valid, uint64_t &invalid) {
   invalid = 0;
   int i = 0;
   for (auto &iter : blocks) {
-    valid += iter.second.getValidPageCount();
-    invalid += iter.second.getDirtyPageCount();
+    valid += iter.getValidPageCount();
+    invalid += iter.getDirtyPageCount();
   }
 }
 

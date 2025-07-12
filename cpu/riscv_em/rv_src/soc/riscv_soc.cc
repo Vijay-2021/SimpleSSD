@@ -192,18 +192,22 @@ void SOC::rv_soc_run()
     }
     while(soc_run_mode_ != PAUSED_MODE && soc_run_mode_ != FAILED_MODE) 
     {
-        for (uint32_t core_id = 0; core_id < rv_cores.size(); core_id++) {
-            rv_cores[core_id].rv_core_run();
-        }
-        
-        //uart_irq_pending = simple_uart_update(&uart);
-        //plic_update_pending(&plic, 10, uart_irq_pending);
-        //mei = plic_update(&plic);
-        //clint_update(&clint, &msi, &mti);
+        if (cores_setup) {
+            for (uint32_t core_id = 0; core_id < rv_cores.size(); core_id++) {
+                rv_cores[core_id].rv_core_run();
+            }
+            
+            //uart_irq_pending = simple_uart_update(&uart);
+            //plic_update_pending(&plic, 10, uart_irq_pending);
+            //mei = plic_update(&plic);
+            //clint_update(&clint, &msi, &mti);
 
-        for (uint32_t core_id = 0; core_id < rv_cores.size(); core_id++) {
-            // rv_cores[core_id].rv_core_process_interrupts(mei, mti, msi);
-            // rv_cores[core_id].rv_core_reg_dump();
+            for (uint32_t core_id = 0; core_id < rv_cores.size(); core_id++) {
+                // rv_cores[core_id].rv_core_process_interrupts(mei, mti, msi);
+                // rv_cores[core_id].rv_core_reg_dump();
+            }
+        } else {
+            rv_cores[0].rv_core_run(); // run only the first core until cores are set up
         }
         stats.total_cycles++;
     }
@@ -218,14 +222,20 @@ uint64_t SOC::rv_soc_tick(uint64_t num_cycles)
     uint64_t next_tick = getTick() + clock_period; // default next tick is the next cycle
     // rv_core_reg_dump(&rv_core0);
     for (uint64_t current_cycle = 0; current_cycle < num_cycles && soc_run_mode_ != PAUSED_MODE && soc_run_mode_ != FAILED_MODE; current_cycle++) {
-        next_tick = std::numeric_limits<uint64_t>::max(); // reset next tick to max value for each cycle
-        for (uint32_t core_id = 0; core_id < rv_cores.size(); core_id++) {
-            if (getTick() >= next_core_ticks[core_id]) {
-                next_core_ticks[core_id] = getTick() + clock_period*rv_cores[core_id].rv_core_run();
+        if (cores_setup) {
+            next_tick = std::numeric_limits<uint64_t>::max(); // reset next tick to max value for each cycle
+            for (uint32_t core_id = 0; core_id < rv_cores.size(); core_id++) {
+                if (getTick() >= next_core_ticks[core_id]) {
+                    next_core_ticks[core_id] = getTick() + clock_period*rv_cores[core_id].rv_core_run();
+                }
+                next_tick = std::min(next_tick, next_core_ticks[core_id]); // for scheduling purposes, we need to find the next tick across all cores
             }
-            next_tick = std::min(next_tick, next_core_ticks[core_id]); // for scheduling purposes, we need to find the next tick across all cores
+        } else {
+            if (getTick() >= next_core_ticks[0]) {
+                next_core_ticks[0] = getTick() + clock_period*rv_cores[0].rv_core_run();
+            }
+            next_tick = next_core_ticks[0]; // for the first core, just use its next tick
         }
-
         // uart_irq_pending = simple_uart_update(&uart);
 
         // /* update interrupt controllers */
@@ -278,6 +288,60 @@ void SOC::perase(uint8_t* request, uint64_t* tick) {
 
 void SOC::read_buffer(uint8_t *buffer, uint64_t req_info, uint64_t req_type) {
     pCPU->read_buffer(buffer, req_info, req_type);
+}
+
+void SOC::coreSetup(uint64_t function_addr, uint64_t function_arg_ptr) {
+    if (cores_setup) {
+        printf("Core setup already completed, skipping\n");
+        return;
+    }
+    for (size_t core_id =  1; core_id < rv_cores.size(); core_id++) {
+        rv_cores[core_id].curr_priv_mode = rv_cores[0].curr_priv_mode;
+        
+        for (size_t i = 0; i < NR_RVI_REGS; i++) {
+            rv_cores[core_id].reg_file[i] = 0;
+        }
+        for (size_t i = 0; i < NR_RVF_REGS; i++) {
+            rv_cores[core_id].float_reg_file[i] = 0;
+        }
+        rv_cores[core_id].reg_file[10] = function_arg_ptr; // a0
+        if (current_stack_bottom == 0) {
+            current_stack_bottom = rv_cores[0].reg_file[2] - STACK_SIZE;
+            rv_cores[core_id].stack_bottom_min = current_stack_bottom; // set the minimum stack bottom for the core
+        }
+        rv_cores[core_id].reg_file[2] = current_stack_bottom;
+        current_stack_bottom -= STACK_SIZE; // allocate a new stack for the core
+        rv_cores[core_id].stack_bottom_min = current_stack_bottom; // set the minimum stack bottom for the core
+        rv_cores[core_id].pc = function_addr;
+        rv_cores[core_id].next_pc = 0;
+        rv_cores[core_id].instruction = 0;
+        rv_cores[core_id].opcode = 0;
+        rv_cores[core_id].rd = 0;
+        rv_cores[core_id].rs1 = 0;
+        rv_cores[core_id].rs2 = 0;
+        rv_cores[core_id].rs3 = 0;
+        rv_cores[core_id].func3 = 0;
+        rv_cores[core_id].func7 = 0;
+        rv_cores[core_id].func6 = 0;
+        rv_cores[core_id].func5 = 0;
+        rv_cores[core_id].func12 = 0;
+        rv_cores[core_id].rm = 0;
+        rv_cores[core_id].immediate = 0;
+        rv_cores[core_id].jump_offset = 0;
+        rv_cores[core_id].sync_trap_pending = 0;
+        rv_cores[core_id].sync_trap_cause = 0;
+        rv_cores[core_id].sync_trap_tval = 0;
+        rv_cores[core_id].execute_cb = nullptr;
+
+        for (size_t i = 0; i < CSR_ADDR_MAX; i++) {
+            rv_cores[core_id].csr_regs[i].internal_reg = 0;
+        }
+
+        rv_cores[core_id].lr_valid = 0;
+        rv_cores[core_id].lr_address = 0;
+        rv_cores[core_id].curr_cycle = 0;
+    }
+    cores_setup = true; // signal that the cores are setup
 }
 
 void SOC::write_buffer(uint8_t* buffer, uint64_t req_info, uint64_t req_type) {
@@ -344,9 +408,6 @@ uint64_t SOC::read(uint64_t addr, uint64_t len) {
         uint64_t dramReadTime = pDRAM->access((void*)addr, len);
         double cyclesD = std::ceil(dramReadTime / clock_period);
         uint64_t cycles = static_cast<uint64_t>(cyclesD);
-        if (getTick() > 0) {
-            printf("DRAM read at address: %llu, length: %llu took %llu cycles\n", addr, len, cycles);
-        }
         return cycles;
     }
 }
@@ -358,11 +419,12 @@ uint64_t SOC::write(uint64_t addr, uint64_t len) {
         uint64_t dramWriteTime = pDRAM->access((void*)addr, len);
         double cyclesD = std::ceil(dramWriteTime / clock_period);
         uint64_t cycles = static_cast<uint64_t>(cyclesD);
-        if (getTick() > 0) {
-            printf("DRAM write at address: %llu, length: %llu took %llu cycles\n", addr, len, cycles);
-        }
         return cycles;
     }
+}
+
+bool SOC::getTestMode() {
+    return test_mode;
 }
 
 } // namespace RISCV

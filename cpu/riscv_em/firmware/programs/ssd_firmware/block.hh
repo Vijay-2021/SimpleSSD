@@ -44,10 +44,10 @@ class Block {
 
   uint64_t lastAccessed;
   uint32_t eraseCount;
-
+  bool is_valid; 
  public:
   Vector<Bitset> validBits;
-  Block() = default;  // Default constructor
+  Block();  // Default constructor
   Block(uint32_t, uint32_t, uint32_t);
   Block(const Block &);      // Copy constructor
   Block(Block &&) noexcept;  // Move constructor
@@ -69,6 +69,7 @@ class Block {
   bool write(uint32_t, uint64_t, uint32_t);
   void erase();
   void invalidate(uint32_t, uint32_t);
+  bool isValid();
 };
 
 #endif

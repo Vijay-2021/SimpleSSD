@@ -84,7 +84,7 @@ class Core {
         int lr_valid;
         rv_word_t lr_address;
         uint64_t core_id;
-
+        rv_word_t stack_bottom_min = 0;
         Core(SOC *soc, bus_access_func bus_acc, uint64_t cid);
 
         uint64_t rv_core_run();

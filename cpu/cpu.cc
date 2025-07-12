@@ -183,6 +183,7 @@ CPU::CPU(ConfigReader &c, ICL::ICL *icl, FTL::FTL *ftl, PAL::PAL *pal, DRAM::Abs
   RISCVCycleEvent = allocate([this](uint64_t) {
     RISCVCycle();
   });
+  printf("Number of RISCV cores: %lu\n", riscv_cores);
   callbacks.resize(riscv_cores);
   page_size = pPAL->getInfo()->pageSize;
   pDisk = new Disk();
@@ -1402,7 +1403,6 @@ void CPU::read_buffer(uint8_t* buffer, uint64_t req_info, uint64_t req_type) {
     req_queue.pop();
   } else if (req_type == RISCV::FIRMWARE_TICK) {
     uint64_t tick = getTick();
-    printf("Current tick: %llu\n", tick);
     memcpy(buffer, &tick, sizeof(uint64_t));
   } else if (req_type == RISCV::FIRMWARE_QUEUE_SIZE) {
     uint64_t size = req_queue.size();
@@ -1425,11 +1425,16 @@ void CPU::write_buffer(uint8_t* buffer, uint64_t req_info, uint64_t req_type) {
 
 void CPU::runDMA(uint64_t finished_at, uint64_t core_id) {
   // for now there isn't a core id
-  DMAFunction func = callbacks[core_id].first;
-  void* context = callbacks[core_id].second;
-  debugprint(LOG_CPU, "Running DMA function at tick %lu for core ID %lu",
-             finished_at, core_id);
-  func(finished_at, context);
+  if (!riscv_soc->getTestMode()) {
+    DMAFunction func = callbacks[core_id].first;
+    void* context = callbacks[core_id].second;
+    debugprint(LOG_CPU, "Running DMA function at tick %lu for core ID %lu",
+              finished_at, core_id);
+    func(finished_at, context);
+  } else {
+    debugprint(LOG_CPU, "Skipping DMA function in test mode but executing callback for core ID %lu at tick %lu",
+              core_id, finished_at);
+  }
 }
 
 uint64_t CPU::getClockPeriod() {

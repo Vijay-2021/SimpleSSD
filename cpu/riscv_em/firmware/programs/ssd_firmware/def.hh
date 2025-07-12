@@ -7,6 +7,7 @@
 #include <limits.h>
 #include "memory.h"
 #include "new.hh"
+#include "cs_instructions.h"
 
 typedef struct _LPNRange {
   uint64_t slpn;
@@ -76,6 +77,7 @@ typedef enum {
   FTL_STAT_LOC = 3,
   ICL_LOW = 4, 
   ICL_HIGH = 5, 
+  CORE_SETUP_COMPLETED = 6,
 } DATA_RESP; 
 
 typedef enum {
@@ -176,7 +178,16 @@ uint8_t popcount(T v) {
 void process_request(uint64_t req_time);
 void process_request_failed();
 uint64_t getTick();
-uint64_t getCycle();
-uint64_t getCoreId();
+static inline uint64_t getCycle() {
+    uint64_t cycle = 0;
+    read_buffer((uint64_t)&cycle, 0, FIRMWARE_CYCLE);
+    return cycle;
+}
+
+static inline uint64_t getCoreId() {
+    uint64_t core_id;
+    read_buffer((uint64_t)&core_id, 0, FIRMWARE_CORE_ID);
+    return core_id;
+}
 uint64_t getReqQueueSize();
 #endif

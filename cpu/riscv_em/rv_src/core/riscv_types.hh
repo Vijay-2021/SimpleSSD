@@ -79,6 +79,7 @@ typedef enum {
   FTL_STAT_LOC = 3,
   ICL_LOW = 4, 
   ICL_HIGH = 5, 
+  CORE_SETUP_COMPLETED = 6,
 } DATA_RESP; 
 
 

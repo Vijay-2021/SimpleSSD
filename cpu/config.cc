@@ -33,6 +33,7 @@ const char NAME_CORE_FTL[] = "FTLCoreCount";
 const char NAME_FW_PATH[] = "FirmwarePath";
 const char NAME_CORE_RISCV[] = "RISCVCoreCount";
 const char NAME_BURST_CYCLES[] = "BurstCycles";
+const char NAME_SOC_TEST_MODE[] = "SOCTestMode";
 
 Config::Config() {
   clock = 400000000;
@@ -42,6 +43,7 @@ Config::Config() {
   riscvCore = 1;
   burst_cycles = 1000;
   fw_path = "";
+  soc_test_mode = false;
 }
 
 bool Config::setConfig(const char *name, const char *value) {
@@ -65,6 +67,8 @@ bool Config::setConfig(const char *name, const char *value) {
     fw_path = value;
   } else if(MATCH_NAME(NAME_BURST_CYCLES)) {
     burst_cycles = (uint32_t)strtoul(value, nullptr, 10);
+  } else if (MATCH_NAME(NAME_SOC_TEST_MODE)) {
+    soc_test_mode = (bool)strtoul(value, nullptr, 10);
   }
   else {
     ret = false;
@@ -115,6 +119,15 @@ std::string Config::readString(uint32_t idx) {
     }
     return ret;
 }
+
+bool Config::readBoolean(uint32_t idx) {
+  bool ret = false;
+
+  if (idx == SOC_TEST_MODE) {
+    ret = soc_test_mode;
+  }
+
+  return ret;
 
 }  // namespace CPU
 

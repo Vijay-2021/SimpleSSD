@@ -173,6 +173,35 @@ void write_buffer(uint64_t rd, uint64_t rs1, uint64_t rs2) {
   EMIT_CUSTOM_INSTR(CUSTOM_OPCODE, FUNC3_SOC_INTERFACE, FUNC7_WRITEBUFF, 5, 6, 7);
   COMPILER_BARRIER();
 }
+
+void dram_read(uint64_t rd, uint64_t rs1) {
+  COMPILER_BARRIER();
+  __asm__ volatile (
+      "mv t0, %0\n\t"
+      "mv t1, %1\n\t"
+      "mv t2, %2\n\t"
+      :
+      : "r"(rd), "r"(rs1), "r"(0)
+      : "t0", "t1", "t2"
+  ); 
+  EMIT_CUSTOM_INSTR(CUSTOM_OPCODE, FUNC3_SOC_INTERFACE, FUNC7_DRAM_READ, 5, 6, 7);
+  COMPILER_BARRIER();
+}
+
+void dram_write(uint64_t rd, uint64_t rs1) {
+  COMPILER_BARRIER();
+  __asm__ volatile (
+      "mv t0, %0\n\t"
+      "mv t1, %1\n\t"
+      "mv t2, %2\n\t"
+      :
+      : "r"(rd), "r"(rs1), "r"(0)
+      : "t0", "t1", "t2"
+  ); 
+  EMIT_CUSTOM_INSTR(CUSTOM_OPCODE, FUNC3_SOC_INTERFACE, FUNC7_DRAM_WRITE, 5, 6, 7);
+  COMPILER_BARRIER();
+}
+
 // we want to write programs that do this kind of thing
 
 // should add some support for open/close/read/write

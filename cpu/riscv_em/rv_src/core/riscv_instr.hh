@@ -208,5 +208,7 @@
         #define FUNC7_NEXTSIMTICK 0x03 // sets the next tick
         #define FUNC7_PUTC 0x04
         #define FUNC7_WRITEBUFF 0x05
+        #define FUNC7_DRAM_READ 0x06
+        #define FUNC7_DRAM_WRITE 0x07
         
 #endif /* RISCV_INSTR_H */

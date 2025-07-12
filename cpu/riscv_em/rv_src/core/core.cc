@@ -1419,15 +1419,18 @@ static uint64_t instr_SW(Core *rv_core)
 #endif
 
 static uint64_t instr_LREAD(Core *rv_core) {
-    return rv_core->pSOC->lread(rv_core->pSOC->get_ram() + ((rv_core->reg_file[rv_core->rd] - RAM_BASE_ADDR)), rv_core->reg_file[rv_core->rs1], rv_core->reg_file[rv_core->rs2]);
+    rv_core->pSOC->lread(rv_core->pSOC->get_ram() + ((rv_core->reg_file[rv_core->rd] - RAM_BASE_ADDR)), rv_core->reg_file[rv_core->rs1], rv_core->reg_file[rv_core->rs2]);
+    return 1;
 }
 
 static uint64_t instr_LWRITE(Core *rv_core) {
-    return rv_core->pSOC->lwrite(rv_core->pSOC->get_ram() + ((rv_core->reg_file[rv_core->rd] - RAM_BASE_ADDR)), rv_core->reg_file[rv_core->rs1], rv_core->reg_file[rv_core->rs2]);
+    rv_core->pSOC->lwrite(rv_core->pSOC->get_ram() + ((rv_core->reg_file[rv_core->rd] - RAM_BASE_ADDR)), rv_core->reg_file[rv_core->rs1], rv_core->reg_file[rv_core->rs2]);
+    return 1;
 }
 
 static uint64_t instr_LTRIM(Core * rv_core) {
-    return rv_core->pSOC->ltrim(rv_core->pSOC->get_ram() + ((rv_core->reg_file[rv_core->rd] - RAM_BASE_ADDR)), rv_core->reg_file[rv_core->rs1], rv_core->reg_file[rv_core->rs2]);
+    rv_core->pSOC->ltrim(rv_core->pSOC->get_ram() + ((rv_core->reg_file[rv_core->rd] - RAM_BASE_ADDR)), rv_core->reg_file[rv_core->rs1], rv_core->reg_file[rv_core->rs2]);
+    return 1;
 }
 
 static uint64_t instr_PREAD(Core * rv_core) {
@@ -1460,6 +1463,19 @@ static uint64_t instr_PERASE(Core * rv_core) {
 static uint64_t instr_READBUFF(Core *rv_core) {
     if (rv_core->reg_file[rv_core->rs2] == FIRMWARE_CYCLE) {
         memcpy(rv_core->pSOC->get_ram() + ((rv_core->reg_file[rv_core->rd] - RAM_BASE_ADDR)), &rv_core->curr_cycle, sizeof(rv_core->curr_cycle));
+        if (rv_core->curr_cycle < 10) {
+            rv_core->curr_cycle = 0;
+        } else {
+            rv_core->curr_cycle -= 10; // since get cycle is supposed to be purely for statistics, we subtract 10 cycles for overhead(based on firmware binary)
+        }
+    } else if (rv_core->reg_file[rv_core->rs2] == FIRMWARE_TICK) {
+        uint64_t tick = getTick();
+        memcpy(rv_core->pSOC->get_ram() + ((rv_core->reg_file[rv_core->rd] - RAM_BASE_ADDR)), &tick, sizeof(tick));
+        if (rv_core->curr_cycle < 10) {
+            rv_core->curr_cycle = 0;
+        } else {
+            rv_core->curr_cycle -= 10; // since get tick is supposed to be purely for statistics, we subtract 10 cycles for overhead(based on firmware binary)
+        }
     } else if (rv_core->reg_file[rv_core->rs2] == FIRMWARE_CORE_ID) {
         memcpy(rv_core->pSOC->get_ram() + ((rv_core->reg_file[rv_core->rd] - RAM_BASE_ADDR)), &rv_core->core_id, sizeof(rv_core->core_id));
     } else {
@@ -1477,9 +1493,21 @@ static uint64_t instr_WRITEBUFF(Core *rv_core) {
         rv_core->pSOC->setICLLow((uint64_t *) (rv_core->pSOC->get_ram() + (rv_core->reg_file[rv_core->rd] - RAM_BASE_ADDR)));
     } else if (rv_core->reg_file[rv_core->rs2] == ICL_HIGH) {
         rv_core->pSOC->setICLHigh((uint64_t *) (rv_core->pSOC->get_ram() + (rv_core->reg_file[rv_core->rd] - RAM_BASE_ADDR)));
-    } 
-    rv_core->pSOC->write_buffer(rv_core->pSOC->get_ram() + ((rv_core->reg_file[rv_core->rd] - RAM_BASE_ADDR)), rv_core->reg_file[rv_core->rs1], rv_core->reg_file[rv_core->rs2] );
+    }  else if (rv_core->reg_file[rv_core->rs2] == CORE_SETUP_COMPLETED) {
+        rv_core->pSOC->coreSetup(rv_core->reg_file[rv_core->rd], rv_core->reg_file[rv_core->rs1]);
+    } else {
+        rv_core->pSOC->write_buffer(rv_core->pSOC->get_ram() + ((rv_core->reg_file[rv_core->rd] - RAM_BASE_ADDR)), rv_core->reg_file[rv_core->rs1], rv_core->reg_file[rv_core->rs2] );
+    }
     return 1;
+}
+
+static uint64_t instr_DRAMREAD(Core *rv_core) {
+    return rv_core->pSOC->read(rv_core->pSOC->get_ram() + ((rv_core->reg_file[rv_core->rd] - RAM_BASE_ADDR)), rv_core->reg_file[rv_core->rs1]);
+    
+}
+
+static uint64_t instr_DRAMWRITE(Core *rv_core) {
+    return rv_core->pSOC->write(rv_core->pSOC->get_ram() + ((rv_core->reg_file[rv_core->rd] - RAM_BASE_ADDR)), rv_core->reg_file[rv_core->rs1]);
 }
 
 static uint64_t instr_STARTSIM(Core *rv_core) {
@@ -1534,7 +1562,7 @@ static uint64_t instr_FSQRT(Core *rv_core) {
 
 static uint64_t instr_FSGNJ(Core *rv_core) {
     rv_core->float_reg_file[rv_core->rd] = std::copysign(rv_core->float_reg_file[rv_core->rs1], rv_core->float_reg_file[rv_core->rs2]);
-    printf("executing float sign injunction on %f and %f for result %f\n",  rv_core->float_reg_file[rv_core->rs1], rv_core->float_reg_file[rv_core->rs2], rv_core->float_reg_file[rv_core->rd]);
+    printf("executing float sign injunction on %f and %f for result %f\n at pc %lx",  rv_core->float_reg_file[rv_core->rs1], rv_core->float_reg_file[rv_core->rs2], rv_core->float_reg_file[rv_core->rd], rv_core->pc);
     return FLT_SGNJ_CYCLE_COUNT;
 }
 
@@ -1562,19 +1590,19 @@ static uint64_t instr_FMAX(Core *rv_core) {
 }
 
 static uint64_t instr_FEQ(Core *rv_core) {
-    rv_core->float_reg_file[rv_core->rd] = (rv_core->float_reg_file[rv_core->rs1] == rv_core->float_reg_file[rv_core->rs2]);
+    rv_core->reg_file[rv_core->rd] = (rv_core->float_reg_file[rv_core->rs1] == rv_core->float_reg_file[rv_core->rs2]);
     printf("executing float equal on %f and %f for result %f\n",  rv_core->float_reg_file[rv_core->rs1], rv_core->float_reg_file[rv_core->rs2], rv_core->float_reg_file[rv_core->rd]);
     return FLT_CMPEQ_CYCLE_COUNT;
 }
 
 static uint64_t instr_FLT(Core *rv_core) {
-    rv_core->float_reg_file[rv_core->rd] = (rv_core->float_reg_file[rv_core->rs1] < rv_core->float_reg_file[rv_core->rs2]);
+    rv_core->reg_file[rv_core->rd] = (rv_core->float_reg_file[rv_core->rs1] < rv_core->float_reg_file[rv_core->rs2]);
     printf("executing float less than on %f and %f for result %f\n",  rv_core->float_reg_file[rv_core->rs1], rv_core->float_reg_file[rv_core->rs2], rv_core->float_reg_file[rv_core->rd]);
     return FLT_CMPLT_CYCLE_COUNT;
 }
 
 static uint64_t instr_FLE(Core *rv_core) {
-    rv_core->float_reg_file[rv_core->rd] = (rv_core->float_reg_file[rv_core->rs1] <= rv_core->float_reg_file[rv_core->rs2]);
+    rv_core->reg_file[rv_core->rd] = (rv_core->float_reg_file[rv_core->rs1] <= rv_core->float_reg_file[rv_core->rs2]);
     printf("executing float equal on %f and %f for result %f\n",  rv_core->float_reg_file[rv_core->rs1], rv_core->float_reg_file[rv_core->rs2], rv_core->float_reg_file[rv_core->rd]);
     return FLT_CMPLE_CYCLE_COUNT;
 }
@@ -1815,6 +1843,22 @@ static void R_float_type_preparation(Core *rv_core, int32_t *next_subcode) {
             }
             break;
         case FLT_MAX_MIN:
+            if (rv_core->func3 == FLT_MIN) {
+                rv_core->execute_cb = instr_FMIN;
+            } else if (rv_core->func3 == FLT_MAX) {
+                rv_core->execute_cb = instr_FMAX;
+            }
+            break;
+        case FLT_CMP:
+            printf("executing float compare with func3 %d and func7 %d\n", rv_core->func3, rv_core->func7);
+            if (rv_core->func3 == FLT_CMPEQ) {
+                rv_core->execute_cb = instr_FEQ;
+            } else if (rv_core->func3 == FLT_CMPLT) {
+                rv_core->execute_cb = instr_FLT;
+            } else if (rv_core->func3 == FLT_CMPLE) {
+                rv_core->execute_cb = instr_FLE;
+            }
+            break;
         default:
             set_instr = 0;
             break;
@@ -1844,6 +1888,7 @@ static void R_float_type_preparation(Core *rv_core, int32_t *next_subcode) {
                 rv_core->execute_cb = instr_FMVFROMINT;
             }
         } else {
+            printf("no callback found for instruction %x with func3 %d and func7 %d\n", rv_core->instruction, rv_core->func3, rv_core->func7);
             set_instr = 0;
         }
     }
@@ -2114,6 +2159,8 @@ static void init_instruction_hooks() {
     CUSTOM_soc_interface_func7_subcode_list[FUNC7_NEXTSIMTICK] = {NULL, instr_NEXTSIMTICK, NULL};
     CUSTOM_soc_interface_func7_subcode_list[FUNC7_PUTC] = {NULL, instr_PUTC, NULL};
     CUSTOM_soc_interface_func7_subcode_list[FUNC7_WRITEBUFF] = {NULL, instr_WRITEBUFF, NULL};
+    CUSTOM_soc_interface_func7_subcode_list[FUNC7_DRAM_READ] = {NULL, instr_DRAMREAD, NULL};
+    CUSTOM_soc_interface_func7_subcode_list[FUNC7_DRAM_WRITE] = {NULL, instr_DRAMWRITE, NULL};
     INIT_INSTRUCTION_LIST_DESC(CUSTOM_soc_interface_func7_subcode_list);
 
     static instruction_hook_td CUSTOM_func3_subcode_list[MAX_FUNC3_VALUE] = {};
@@ -2298,12 +2345,13 @@ uint64_t Core::rv_core_run()
     }
 
     /* increase program counter here */
-    if (getTick() > 0) {
-        printf("next cycle is: %llu for instruction: %llu and pc: %llu\n", next_cycle, instruction, pc);
-    }
+    
     pc = next_pc ? next_pc : pc + 4;
     curr_cycle += next_cycle;
-    
+    if (reg_file[2] < stack_bottom_min) {
+        die_msg("Stack overflow detected! Stack pointer: " PRINTF_FMT " Stack bottom: " PRINTF_FMT "\n",
+                reg_file[2], stack_bottom_min);
+    }
     /**
     csr_regs[CSR_ADDR_MCYCLE].value = curr_cycle;
     csr_regs[CSR_ADDR_MINSTRET].value = curr_cycle;

@@ -51,6 +51,7 @@ ICL::ICL(icl_params& cparams, FTL::FTL *ftl) :
   uint64_t heap_top = get_heap_top();
   write_buffer((uint64_t)&heap_top, 0, ICL_LOW);
   cache_buffer = (uint8_t*)malloc(cacheSize);
+  icl_mutex = new Mutex();
   if (cache_buffer == NULL) {
     printf("ICL: Failed to allocate cache memory of size %u bytes.\n", cacheSize);
     return;
@@ -69,13 +70,7 @@ ICL::ICL(icl_params& cparams, FTL::FTL *ftl) :
     lineCountInSuperPage = 1;
     lineCountInMaxIO = parallelIO;
   }
-  copy_buffer = (uint8_t*)malloc(lineSize); // use this to simulate reading cache data out to a buffer for HIL processing
-  if (!useReadCaching && !useWriteCaching) {
-    printf("Read and write caching are disabled, not creating cache.\n");
-    printf("useReadCaching: %u useWriteCaching: %u useReadPrefetch: %u\n",
-         (uint32_t)useReadCaching, (uint32_t)useWriteCaching, (uint32_t)useReadPrefetch);
-    return;
-  }
+  copy_buffer = (uint8_t*)malloc(lineSize); // use this to simulate reading cache data out to a buffer for HIL processing 
 
   // Fully-associated?
   if (waySize == 0) {
@@ -204,9 +199,9 @@ void ICL::checkSequential(Request &req, SequentialDetect &data) {
 
 void ICL::evictCache(bool flush) {
   FTL::Request reqInternal(lineCountInSuperPage);
-
+  uint64_t tick;
   for (uint32_t row = 0; row < lineCountInSuperPage; row++) {
-    uint64_t tick = getTick();
+    read_buffer((uint64_t)&tick, 0, FIRMWARE_TICK);
     for (uint32_t col = 0; col < parallelIO; col++) {
       uint64_t beginAt = tick; // all parallel requests start at the same time
 
@@ -238,9 +233,9 @@ void ICL::evictCache(bool flush) {
 // True when hit
 bool ICL::read(Request &req) {
   bool ret = false;
-  icl_stats.read_requests++;
-  uint64_t start_cycle = getCycle();
-
+  uint64_t start_cycle;
+  uint64_t end_cycle;
+  read_buffer((uint64_t)&start_cycle, 0, FIRMWARE_CYCLE);
   // debugprint(LOG_ICL_GENERIC_CACHE,
   //           "READ  | REQ %7u-%-4u | LCA %" PRIu64 " | SIZE %" PRIu64,
   //           req.reqID, req.reqSubID, req.range.slpn, req.length);
@@ -249,59 +244,44 @@ bool ICL::read(Request &req) {
     uint32_t setIdx = calcSetIndex(req.range.slpn);
     uint32_t wayIdx;
     // uint64_t arrived = getTick();
+    icl_mutex->lock();
+    icl_stats.read_requests++;
     if (useReadPrefetch) {
       checkSequential(req, readDetect);
     }
     wayIdx = getValidWay(req.range.slpn);
     // Do we have valid data?
     if (wayIdx != waySize) {
-
-      // Wait cache to be valid(this shouldn't happen?)
-      // if (tick < cacheData[setIdx][wayIdx].insertedAt) {
-      //   tick = cacheData[setIdx][wayIdx].insertedAt;
-      // }
-
-      // Update last accessed time
-      icl_stats.read_cache_hits++;
-      icl_stats.read_req_cycles += getCycle() - start_cycle;
-      cacheData[setIdx][wayIdx].lastAccessed = getTick();
-
-      if (req.length < lineSize) {
-        memcpy(copy_buffer, cache_buffer + (setIdx * waySize + wayIdx) * lineSize, req.length);
-      } else {
-        uint64_t length = req.length;
-        while (length > 0) {
-          uint64_t read_length = MIN(length, lineSize);
-          memcpy(copy_buffer, cache_buffer + (setIdx * waySize + wayIdx) * lineSize, read_length);
-          length -= read_length;
-        }
-      }
-      // debugprint(LOG_ICL_GENERIC_CACHE,
-      //           "READ  | Cache hit at (%u, %u) | %" PRIu64 " - %" PRIu64
-      //           " (%" PRIu64 ")",
-      //           setIdx, wayIdx, arrived, tick, tick - arrived);
-
+      icl_mutex->unlock();
+      icl_stats.read_cache_hits++; // calc misses from requests - hits (since prefetching makes this more complicated)
+      dram_read((uint64_t)(cache_buffer + (setIdx * waySize + wayIdx) * lineSize), req.length);
+      uint64_t tick;
+      read_buffer((uint64_t)&tick, 0, FIRMWARE_TICK);
+      cacheData[setIdx][wayIdx].lastAccessed = tick;
       ret = true;
 
       // Do we need to prefetch data?
       if (useReadPrefetch && req.range.slpn == prefetchTrigger) {
         // debugprint(LOG_ICL_GENERIC_CACHE, "READ  | Prefetch triggered");
         req.range.slpn = lastPrefetched;
-
+        icl_mutex->lock(); // lock mutex to prevent other threads from reading cache while we are prefetching
         goto ICL_GENERIC_CACHE_READ;
       } else {
-        process_request(getTick());
+        uint64_t tick;
+        read_buffer((uint64_t)&tick, 0, FIRMWARE_TICK);
+        process_request(tick);
       }
     }
     // We should read data from NVM
     else {
     ICL_GENERIC_CACHE_READ:
+      uint64_t startCycle;
+      read_buffer((uint64_t)&startCycle, 0, FIRMWARE_CYCLE); // get start cycle for FTL read
       FTL::Request reqInternal(lineCountInSuperPage, req);
       Vector<Pair<uint64_t, uint64_t>> readList;
       uint32_t row, col;  // Variable for I/O position (IOFlag)
       uint64_t dramAt;
       uint64_t beginLCA, endLCA;
-      
 
       if (readDetect.enabled) {
 
@@ -348,19 +328,23 @@ bool ICL::read(Request &req) {
             evictData[row][col] = cacheData[setIdx] + wayIdx;
           }
         }
-
-        cacheData[setIdx][wayIdx].insertedAt = getTick();
-        cacheData[setIdx][wayIdx].lastAccessed = getTick();
+        uint64_t tick;
+        read_buffer((uint64_t)&tick, 0, FIRMWARE_TICK);
+        cacheData[setIdx][wayIdx].insertedAt = tick;
+        cacheData[setIdx][wayIdx].lastAccessed = tick;
         cacheData[setIdx][wayIdx].valid = true;
         cacheData[setIdx][wayIdx].dirty = false;
 
         readList.push_back({lca, ((uint64_t)setIdx << 32) | wayIdx});
       }
-
+      read_buffer((uint64_t)&end_cycle, 0, FIRMWARE_CYCLE);
+      icl_stats.read_req_cycles += end_cycle - start_cycle;
       evictCache();
+      read_buffer((uint64_t)&start_cycle, 0, FIRMWARE_CYCLE); // reset start cycle after FTL finishes(eviction can cause FTL reads so we skip)
 
-      uint64_t beginAt, finishedAt = getTick();
-
+      uint64_t beginAt, finishedAt;
+      read_buffer((uint64_t)&finishedAt, 0, FIRMWARE_TICK);
+      beginAt = finishedAt;
       for (auto &iter : readList) {
         Line *pLine = &cacheData[iter.second >> 32][iter.second & 0xFFFFFFFF];
 
@@ -369,15 +353,16 @@ bool ICL::read(Request &req) {
         reqInternal.ioFlag.reset();
         reqInternal.ioFlag.set(iter.first % lineCountInSuperPage);
 
-        beginAt = getTick();  // Ignore cache metadata access
+        read_buffer((uint64_t)&beginAt, 0, FIRMWARE_TICK);  // Ignore cache metadata access
 
         // If superPageSizeData is true, read first LPN only
+        read_buffer((uint64_t)&end_cycle, 0, FIRMWARE_CYCLE);
+        icl_stats.read_req_cycles += end_cycle - start_cycle;
         uint64_t read_time = pFTL->read(reqInternal);
-
+        read_buffer((uint64_t)&start_cycle, 0, FIRMWARE_CYCLE); // reset start cycle after FTL finishes
         // DRAM delay
         // dramAt = pLine->insertedAt;
-        memcpy(cache_buffer + (iter.second >> 32) * waySize * lineSize + (iter.second & 0xFFFFFFFF) * lineSize, copy_buffer, lineSize);
-
+        dram_write((uint64_t)copy_buffer, lineSize); // 
         // Set cache data
         beginAt = MAX(beginAt, read_time);
 
@@ -387,7 +372,7 @@ bool ICL::read(Request &req) {
 
         if (pLine->tag == req.range.slpn) {
           finishedAt = beginAt;
-        }
+        } 
 
         // debugprint(LOG_ICL_GENERIC_CACHE,
         //           "READ  | Cache miss at (%u, %u) | %" PRIu64 " - %" PRIu64
@@ -395,59 +380,48 @@ bool ICL::read(Request &req) {
         //           iter.second >> 32, iter.second & 0xFFFFFFFF, tick, beginAt,
         //           beginAt - tick);
       }
-
+      icl_mutex->unlock();
       process_request(finishedAt);
     }
   }
   else {
+    icl_mutex->lock();
+    icl_stats.read_requests++;
     FTL::Request reqInternal(lineCountInSuperPage, req);
-
     //simulates writing data to dram after retrieving it from NVM, however we do in opposite order for timing correctness
-    if (req.length <= lineSize) {
-      memcpy(cache_buffer, copy_buffer, req.length);
-    }
-    else {
-      uint64_t length = req.length;
-      while (length > 0) {
-        uint64_t read_length = MIN(length, lineSize);
-        memcpy(cache_buffer, copy_buffer, read_length); // the exact location of copy doesn't matter, we just need to simulate writing data
-        length -= read_length;
-      }
-    }
+    dram_write((uint64_t)copy_buffer, req.length);
+    icl_mutex->unlock();
     process_request(pFTL->read(reqInternal));
   }
 
-  stat.request[0]++;
-
-  if (ret) {
-    stat.cache[0]++;
-  }
-
+  read_buffer((uint64_t)&end_cycle, 0, FIRMWARE_CYCLE);
+  icl_stats.read_req_cycles += end_cycle - start_cycle;
   return ret;
 }
 
 // True when cold-miss/hit
 bool ICL::write(Request &req) {
-  printf("icl write called!\n");
+  uint64_t tick;
+  uint64_t start_cycle;
+  uint64_t end_cycle;
   bool ret = false;
-  uint64_t tick = getTick();
-  uint64_t flash = tick;
   bool dirty = false;
-  icl_stats.write_requests++;
-  uint64_t start_cycle = getCycle();
 
-  // debugprint(LOG_ICL_GENERIC_CACHE,
-  //           "WRITE | REQ %7u-%-4u | LCA %" PRIu64 " | SIZE %" PRIu64,
-  //           req.reqID, req.reqSubID, req.range.slpn, req.length);
-
+  read_buffer((uint64_t)&tick, 0, FIRMWARE_TICK);
+  uint64_t flash = tick;
+  read_buffer((uint64_t)&start_cycle, 0, FIRMWARE_CYCLE);
   FTL::Request reqInternal(lineCountInSuperPage, req);
-
+  icl_mutex->lock();
+  icl_stats.write_requests++;
+  printf("entering critical section with req data addr: %u\n", (uint64_t)(reqInternal.ioFlag.data));
   if (req.length < lineSize) {
-    dirty = true;
+    dirty = true; // if our request is smaller than line size, we will write it to cache and mark it dirty
   }
   else {
-    printf("immediately calling ftl for write\n");
-    flash = pFTL->write(reqInternal);
+    read_buffer((uint64_t)&end_cycle, 0, FIRMWARE_CYCLE);
+    icl_stats.write_req_cycles += end_cycle - start_cycle;
+    flash = pFTL->write(reqInternal); // write to NVM first, then write to cache
+    read_buffer((uint64_t)&start_cycle, 0, FIRMWARE_CYCLE); // reset start cycle after FTL finishes
     process_request(flash);
   }
 
@@ -459,6 +433,7 @@ bool ICL::write(Request &req) {
 
     // Can we update old data?
     if (wayIdx != waySize) {
+      icl_stats.write_cache_hits++; // calc misses from requests - hits
       uint64_t arrived = tick;
 
       // Wait cache to be valid
@@ -482,16 +457,7 @@ bool ICL::write(Request &req) {
       cacheData[setIdx][wayIdx].dirty = dirty; 
 
       // DRAM access
-      if (req.length < lineSize) {
-        memcpy(cache_buffer + (setIdx * waySize + wayIdx) * lineSize, copy_buffer, req.length);
-      } else {
-        uint64_t length = req.length;
-        while (length > 0) {
-          uint64_t write_length = MIN(length, lineSize);
-          memcpy(cache_buffer + (setIdx * waySize + wayIdx) * lineSize, copy_buffer, write_length);
-          length -= write_length;
-        }
-      }
+      dram_write((uint64_t)copy_buffer, req.length);
 
       // debugprint(LOG_ICL_GENERIC_CACHE,
       //           "WRITE | Cache hit at (%u, %u) | %" PRIu64 " - %" PRIu64
@@ -500,27 +466,22 @@ bool ICL::write(Request &req) {
 
       ret = true;
       if (dirty) {
-        process_request(getTick());
+        read_buffer((uint64_t)&tick, 0, FIRMWARE_TICK);
+        process_request(tick);
       }
     }
     else {
       uint64_t arrived = tick;
-
       wayIdx = getEmptyWay(setIdx);
 
       // Do we have place to write data?
       if (wayIdx != waySize) {
-        // Wait cache to be valid
-        if (tick < cacheData[setIdx][wayIdx].insertedAt) {
-          tick = cacheData[setIdx][wayIdx].insertedAt;
-        }
 
-        // TODO: TEMPORAL CODE
-        // We should only show DRAM latency when cache become dirty
         if (dirty) {
           // Update last accessed time
-          cacheData[setIdx][wayIdx].insertedAt = getTick();
-          cacheData[setIdx][wayIdx].lastAccessed = getTick();
+          read_buffer((uint64_t)&tick, 0, FIRMWARE_TICK);
+          cacheData[setIdx][wayIdx].insertedAt = tick;
+          cacheData[setIdx][wayIdx].lastAccessed = tick;
         }
         else {
           cacheData[setIdx][wayIdx].insertedAt = flash;
@@ -533,18 +494,11 @@ bool ICL::write(Request &req) {
         cacheData[setIdx][wayIdx].tag = req.range.slpn;
 
         // DRAM access
-        if (req.length < lineSize) {
-          memcpy(cache_buffer + (setIdx * waySize + wayIdx) * lineSize, copy_buffer, req.length);
-        } else {
-          uint64_t length = req.length;
-          while (length > 0) {
-            uint64_t write_length = MIN(length, lineSize);
-            memcpy(cache_buffer + (setIdx * waySize + wayIdx) * lineSize, copy_buffer, write_length);
-            length -= write_length;
-          }
-        }
+        dram_write((uint64_t)copy_buffer, req.length);
         if (dirty) {
-          process_request(getTick());
+          uint64_t tick;
+          read_buffer((uint64_t)&tick, 0, FIRMWARE_TICK);
+          process_request(tick);
         }
         ret = true;
       }
@@ -606,8 +560,10 @@ bool ICL::write(Request &req) {
           }
         }
 
-
+        read_buffer((uint64_t)&end_cycle, 0, FIRMWARE_CYCLE);
+        icl_stats.write_req_cycles += end_cycle - start_cycle;
         evictCache(true);
+        read_buffer((uint64_t)&start_cycle, 0, FIRMWARE_CYCLE); // reset start cycle after FTL finishes(eviction can cause FTL writes so we skip)
 
         // Update cacheline of current request
         setIdx = setToFlush;
@@ -618,72 +574,54 @@ bool ICL::write(Request &req) {
         }
 
         // DRAM latency
-        if (req.length < lineSize) {
-          memcpy(cache_buffer + (setIdx * waySize + wayIdx) * lineSize, copy_buffer, req.length);
-        } else {
-          uint64_t length = req.length;
-          while (length > 0) {
-            uint64_t write_length = MIN(length, lineSize);
-            memcpy(cache_buffer + (setIdx * waySize + wayIdx) * lineSize, copy_buffer, write_length);
-            length -= write_length;
-          }
-        }
+        dram_write((uint64_t)copy_buffer, req.length);
 
         // Update cache data
-        cacheData[setIdx][wayIdx].insertedAt = getTick();
-        cacheData[setIdx][wayIdx].lastAccessed = getTick();
+        uint64_t tick;
+        read_buffer((uint64_t)&tick, 0, FIRMWARE_TICK);
+        cacheData[setIdx][wayIdx].insertedAt = tick;
+        cacheData[setIdx][wayIdx].lastAccessed = tick;
         cacheData[setIdx][wayIdx].valid = true;
         cacheData[setIdx][wayIdx].dirty = true;
         cacheData[setIdx][wayIdx].tag = req.range.slpn;
         if (dirty) {
-          process_request(getTick());
+          read_buffer((uint64_t)&tick, 0, FIRMWARE_TICK);
+          process_request(tick);
         }
       }
-
-      // debugprint(LOG_ICL_GENERIC_CACHE,
-      //           "WRITE | Cache miss at (%u, %u) | %" PRIu64 " - %" PRIu64
-      //           " (%" PRIu64 ")",
-      //           setIdx, wayIdx, arrived, tick, tick - arrived);
     }
 
   }
   else {
     if (dirty) {
+      read_buffer((uint64_t)&end_cycle, 0, FIRMWARE_CYCLE);
+      icl_stats.write_req_cycles += end_cycle - start_cycle;
       process_request(pFTL->write(reqInternal));
+      read_buffer((uint64_t)&start_cycle, 0, FIRMWARE_CYCLE); 
     }
 
     // TEMP: Disable DRAM calculation for prevent conflict
-
-    if (req.length < lineSize) {
-      memcpy(copy_buffer, cache_buffer + req.range.slpn * lineSize, req.length);
-    } else {
-      uint64_t length = req.length;
-      while (length > 0) {
-        uint64_t read_length = MIN(length, lineSize);
-        memcpy(copy_buffer, cache_buffer + req.range.slpn * lineSize, read_length);
-        length -= read_length;
-      }
-    }
+    dram_read((uint64_t)copy_buffer, req.length);
   }
-
-  stat.request[1]++;
-
-  if (ret) {
-    stat.cache[1]++;
-  }
+  printf("exiting critical section\n");
+  icl_mutex->unlock();
+  read_buffer((uint64_t)&end_cycle, 0, FIRMWARE_CYCLE);
+  icl_stats.write_req_cycles += end_cycle - start_cycle;
 
   return ret;
 }
 
 // True when flushed
 void ICL::flush(LPNRange &range) {
-  printf("Icl flush called!\n");
   icl_stats.flush_requests++;
-  uint64_t start_cycle = getCycle();
+  uint64_t start_cycle;
+  uint64_t end_cycle;
+  read_buffer((uint64_t)&start_cycle, 0, FIRMWARE_CYCLE);
   if (useReadCaching || useWriteCaching) {
-    uint64_t finishedAt = getTick();
+    uint64_t finishedAt;
+    read_buffer((uint64_t)&finishedAt, 0, FIRMWARE_TICK);
     FTL::Request reqInternal(lineCountInSuperPage);
-
+    icl_mutex->lock();
     for (uint32_t setIdx = 0; setIdx < setSize; setIdx++) {
       for (uint32_t wayIdx = 0; wayIdx < waySize; wayIdx++) {
         Line &line = cacheData[setIdx][wayIdx];
@@ -692,7 +630,10 @@ void ICL::flush(LPNRange &range) {
           if (line.dirty) {
             reqInternal.lpn = line.tag / lineCountInSuperPage;
             reqInternal.ioFlag.set(line.tag % lineCountInSuperPage);
+            read_buffer((uint64_t)&end_cycle, 0, FIRMWARE_CYCLE);
+            icl_stats.flush_req_cycles += end_cycle - start_cycle;
             uint64_t ftlTick = pFTL->write(reqInternal);
+            read_buffer((uint64_t)&start_cycle, 0, FIRMWARE_CYCLE); // reset start cycle after FTL finishes
             finishedAt = MAX(finishedAt, ftlTick);
           }
 
@@ -700,21 +641,28 @@ void ICL::flush(LPNRange &range) {
         }
       }
     }
-
+    icl_mutex->unlock();
     process_request(finishedAt);
+    read_buffer((uint64_t)&end_cycle, 0, FIRMWARE_CYCLE);
+    icl_stats.flush_req_cycles += end_cycle - start_cycle;
+  } else {
+    process_request_failed();
+    read_buffer((uint64_t)&end_cycle, 0, FIRMWARE_CYCLE);
+    icl_stats.flush_req_cycles += end_cycle - start_cycle;
   }
-  process_request_failed();
 }
 
 // True when hit
 void ICL::trim(LPNRange &range) {
-  printf("Icl trim called!\n");
   icl_stats.trim_requests++;
-  uint64_t start_cycle = getCycle();
+  uint64_t start_cycle;
+  uint64_t end_cycle;
+  read_buffer((uint64_t)&start_cycle, 0, FIRMWARE_CYCLE);
   if (useReadCaching || useWriteCaching) {
-    uint64_t finishedAt = getTick();
+    uint64_t finishedAt;
+    read_buffer((uint64_t)&finishedAt, 0, FIRMWARE_TICK);
     FTL::Request reqInternal(lineCountInSuperPage);
-
+    icl_mutex->lock();
     for (uint32_t setIdx = 0; setIdx < setSize; setIdx++) {
       for (uint32_t wayIdx = 0; wayIdx < waySize; wayIdx++) {
         Line &line = cacheData[setIdx][wayIdx];
@@ -722,22 +670,29 @@ void ICL::trim(LPNRange &range) {
         if (line.tag >= range.slpn && line.tag < range.slpn + range.nlp) {
           reqInternal.lpn = line.tag / lineCountInSuperPage;
           reqInternal.ioFlag.set(line.tag % lineCountInSuperPage);
+          read_buffer((uint64_t)&end_cycle, 0, FIRMWARE_CYCLE);
+          icl_stats.trim_req_cycles += end_cycle - start_cycle;
           uint64_t trim_tick = pFTL->trim(reqInternal);
+          read_buffer((uint64_t)&start_cycle, 0, FIRMWARE_CYCLE); // reset start cycle after FTL finishes
           finishedAt = MAX(finishedAt, trim_tick);
 
           line.valid = false;
         }
       }
     }
+    icl_mutex->unlock();
     process_request(finishedAt);
   }
   process_request_failed();
+  read_buffer((uint64_t)&end_cycle, 0, FIRMWARE_CYCLE);
+  icl_stats.trim_req_cycles += end_cycle - start_cycle;
 }
 
 void ICL::format(LPNRange &range) {
-  printf("Icl format called!\n");
   icl_stats.format_requests++;
-  uint64_t start_cycle = getCycle();
+  uint64_t start_cycle;
+  uint64_t end_cycle;
+  read_buffer((uint64_t)&start_cycle, 0, FIRMWARE_CYCLE);
   if (useReadCaching || useWriteCaching) {
     uint64_t lpn;
     uint32_t setIdx;
@@ -746,8 +701,9 @@ void ICL::format(LPNRange &range) {
     for (uint64_t i = 0; i < range.nlp; i++) {
       lpn = range.slpn + i;
       setIdx = calcSetIndex(lpn);
+      icl_mutex->lock();
       wayIdx = getValidWay(lpn);
-
+      icl_mutex->unlock();
       if (wayIdx != waySize) {
         // Invalidate
         cacheData[setIdx][wayIdx].valid = false;
@@ -758,8 +714,12 @@ void ICL::format(LPNRange &range) {
   // Convert unit
   range.slpn /= lineCountInSuperPage;
   range.nlp = (range.nlp - 1) / lineCountInSuperPage + 1;
-
-  process_request(pFTL->format(range));
+  icl_mutex->lock();
+  read_buffer((uint64_t)&end_cycle, 0, FIRMWARE_CYCLE);
+  icl_stats.format_req_cycles += end_cycle - start_cycle;
+  process_request(pFTL->format(range)); // 2 ~1 cycle operations, not worth timing
+  icl_mutex->unlock();
+  
 }
 
 

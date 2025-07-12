@@ -59,6 +59,8 @@ class SOC {
         void stop_simulation();
         void next_simulation_tick(uint64_t next_tick);
         void resetStatValues();
+        void coreSetup(uint64_t function_addr, uint64_t function_arg_ptr);
+
         typedef struct rv_soc_mem_access_cb_struct
         {
             bus_access_func bus_access;
@@ -84,7 +86,10 @@ class SOC {
         uint64_t read(uint64_t addr, uint64_t len);
         uint64_t write(uint64_t addr, uint64_t len);
         bool instruction_access(rv_word_t address, void *value, uint8_t len);
-
+        bool getTestMode();
+        bool test_mode = false; 
+        bool cores_setup = false;
+        uint64_t current_stack_bottom = 0;
     private: 
         CPU *pCPU; 
         RISCVStats stats;

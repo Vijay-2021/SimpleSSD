@@ -54,9 +54,9 @@ struct __attribute__((packed, aligned(4))) ftl_params {
 class FTL {
   
   private:
-    HashMap<uint64_t, Vector<Pair<uint32_t, uint32_t>>>
-        table;
-    HashMap<uint32_t, Block> blocks;
+    Vector<Vector<Pair<uint32_t, uint32_t>>>
+        table; // maps lba to physical block/page(for each io unit in page)
+    Vector<Block> blocks;
     List<Block> freeBlocks;
     uint32_t nFreeBlocks;  // For some libraries which List::size() is O(n)
     Vector<uint32_t> lastFreeBlock;

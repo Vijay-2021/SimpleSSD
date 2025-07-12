@@ -23,6 +23,20 @@
 #include "cs_instructions.h"
 #include "def.hh"
 
+Block::Block() {
+  idx = 0;
+  pageCount = 0;
+  ioUnitInPage = 0;
+  pNextWritePageIndex = nullptr;
+  pValidBits = nullptr;
+  pErasedBits = nullptr;
+  pLPNs = nullptr;
+  ppLPNs = nullptr;
+  lastAccessed = 0;
+  eraseCount = 0;
+  is_valid = false;
+}
+
 Block::Block(uint32_t blockIdx, uint32_t count, uint32_t ioUnit)
     : idx(blockIdx),
       pageCount(count),
@@ -63,6 +77,7 @@ Block::Block(uint32_t blockIdx, uint32_t count, uint32_t ioUnit)
     }
   }
   eraseCount = 0;
+  is_valid = true; // Mark the block as valid
 }
 
 Block::Block(const Block &old)
@@ -83,6 +98,7 @@ Block::Block(const Block &old)
          ioUnitInPage * sizeof(uint32_t));
 
   eraseCount = old.eraseCount;
+  is_valid = old.is_valid; // Copy validity status
 }
 
 Block::Block(Block &&old) noexcept
@@ -97,7 +113,8 @@ Block::Block(Block &&old) noexcept
       erasedBits(move(old.erasedBits)),
       ppLPNs(move(old.ppLPNs)),
       lastAccessed(move(old.lastAccessed)),
-      eraseCount(move(old.eraseCount)) {
+      eraseCount(move(old.eraseCount)),
+      is_valid(move(old.is_valid)) {
   // TODO Use std::exchange to set old value to null (C++14)
   old.idx = 0;
   old.pageCount = 0;
@@ -109,6 +126,7 @@ Block::Block(Block &&old) noexcept
   old.ppLPNs = nullptr;
   old.lastAccessed = 0;
   old.eraseCount = 0;
+  old.is_valid = false;
 }
 
 Block::~Block() {
@@ -158,7 +176,7 @@ Block &Block::operator=(Block &&rhs) {
     ppLPNs = move(rhs.ppLPNs);
     lastAccessed = move(rhs.lastAccessed);
     eraseCount = move(rhs.eraseCount);
-
+    is_valid = move(rhs.is_valid);
     rhs.pNextWritePageIndex = nullptr;
     rhs.pValidBits = nullptr;
     rhs.pErasedBits = nullptr;
@@ -353,4 +371,8 @@ void Block::invalidate(uint32_t pageIndex, uint32_t idx) {
   else {
     validBits.at(pageIndex).reset(idx);
   }
+}
+
+bool Block::isValid() {
+  return is_valid;
 }
