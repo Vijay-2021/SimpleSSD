@@ -77,6 +77,7 @@ void Subsystem::init() {
   ftl->setCPU(pCPU);
   pHIL->setCPU(pCPU);
   pCPU->initRISCV();
+  pCPU->initTests();
   uint16_t nNamespaces =
       (uint16_t)conf.readUint(CONFIG_NVME, NVME_ENABLE_DEFAULT_NAMESPACE);
 

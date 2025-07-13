@@ -219,6 +219,12 @@ CPU::CPU(ConfigReader &c, ICL::ICL *icl, FTL::FTL *ftl, PAL::PAL *pal, DRAM::Abs
   iparams.cacheSize = conf.readUint(CONFIG_ICL, ICL::ICL_CACHE_SIZE);
   iparams.iclEvictGranularity = (ICL::EVICT_MODE)conf.readInt(CONFIG_ICL, ICL::ICL_EVICT_GRANULARITY);
   iparams.iclPrefetchGranularity = (ICL::PREFETCH_MODE)conf.readInt(CONFIG_ICL, ICL::ICL_PREFETCH_GRANULARITY);
+
+  test_mode = conf.readBoolean(CONFIG_CPU, SOC_TEST_MODE);
+  test_type = (TEST_TYPE)conf.readUint(CONFIG_CPU, SOC_TEST_TYPE);
+  test_count = conf.readUint(CONFIG_CPU, SOC_TEST_COUNT);
+  test_size_min = conf.readUint(CONFIG_CPU, SOC_TEST_SIZE_MIN);
+  test_size_max = conf.readUint(CONFIG_CPU, SOC_TEST_SIZE_MAX);
   // unsigned char buffer[256];
   // read_flash(buffer, 4096, 4096);
   // schedule(RISCVCycleEvent, getTick()); // start the riscv core(s) as soon as possible
@@ -400,6 +406,43 @@ void CPU::stopRISCV() {
     deschedule(RISCVCycleEvent);
   }
   RISCV::soc_run_mode_ = RISCV::SOC_RUN_MODE::PAUSED_MODE;
+}
+
+void CPU::initTests() {
+  if (test_mode) {
+    switch(test_type) {
+      case TEST_TYPE::SEQ_READ_TEST:
+        generateSequentialRead(test_count, test_size_min, test_size_max);
+        break;
+      case TEST_TYPE::SEQ_WRITE_TEST:
+        generateSequentialWrite(test_count, test_size_min, test_size_max);
+        break;
+      case TEST_TYPE::RAND_READ_TEST:
+        generateRandomRead(test_count, test_size_min, test_size_max);
+        break;
+      case TEST_TYPE::RAND_WRITE_TEST:
+        generateRandomWrite(test_count, test_size_min, test_size_max);
+        break;
+      case TEST_TYPE::SEQ_IO_TEST:
+        generateSequentialIO(test_count, test_size_min, test_size_max);
+        break;
+      case TEST_TYPE::RAND_IO_TEST:
+        generateRandomIO(test_count, test_size_min, test_size_max);
+        break;
+      case TEST_TYPE::SEQ_FORMAT_TEST:
+        generateSequentialFormat(test_count, test_size_min, test_size_max);
+        break;
+      case TEST_TYPE::SEQ_TRIM_TEST:
+        generateSequentialTrim(test_count, test_size_min, test_size_max);
+        break;
+      case TEST_TYPE::SEQ_FLUSH_TEST:
+        generateSequentialFlush(test_count, test_size_min, test_size_max);
+        break;
+      default:
+        panic("Invalid test type");
+        break;
+    }
+  }
 }
 
 void CPU::calculatePower(Power &power) {
@@ -1425,7 +1468,7 @@ void CPU::write_buffer(uint8_t* buffer, uint64_t req_info, uint64_t req_type) {
 
 void CPU::runDMA(uint64_t finished_at, uint64_t core_id) {
   // for now there isn't a core id
-  if (!riscv_soc->getTestMode()) {
+  if (!test_mode) {
     DMAFunction func = callbacks[core_id].first;
     void* context = callbacks[core_id].second;
     debugprint(LOG_CPU, "Running DMA function at tick %lu for core ID %lu",
@@ -1437,6 +1480,196 @@ void CPU::runDMA(uint64_t finished_at, uint64_t core_id) {
   }
 }
 
+void CPU::generateSequentialRead(uint64_t count, uint64_t min_size, uint64_t max_size) {
+  for (size_t i = 0; i < count; i++) {
+    ICL::Request req;
+    uint64_t size = min_size + (rand() % (max_size - min_size + 1));
+    req.reqType = ICL_REQ_READ;
+    req.range.slpn = i; // Example sequential LPN
+    req.range.nlp = size / 512; // Read 1 page
+    req.offset = 0;
+    req.length = size; // Random length
+    req.reqID = global_req_id++;
+    req.reqSubID = 0;
+    DMAFunction dummy_cb = nullptr;
+    req_queue.push({req, dummy_cb, (void*)&req});
+    if (socIsPaused()) {
+      startRISCV();
+    }
+    debugprint(LOG_CPU, "Generated sequential read request ID %u", req.reqID);
+  }
+}
+
+void CPU::generateSequentialWrite(uint64_t count, uint64_t min_size, uint64_t max_size) {
+  for (size_t i = 0; i < count; i++) {
+    ICL::Request req;
+    uint64_t size = min_size + (rand() % (max_size - min_size + 1));
+    req.reqType = ICL_REQ_WRITE;
+    req.range.slpn = i;
+    req.range.nlp = size / 512;
+    req.offset = 0;
+    req.length = size;
+    req.reqID = global_req_id++;
+    req.reqSubID = 0;
+    DMAFunction dummy_cb = nullptr;
+    req_queue.push({req, dummy_cb, (void*)&req});
+    if (socIsPaused()) {
+      startRISCV();
+    }
+    debugprint(LOG_CPU, "Generated sequential write request ID %u", req.reqID);
+  }
+}
+
+void CPU::generateSequentialIO(uint64_t count, uint64_t min_size, uint64_t max_size) {
+  for (size_t i = 0; i < count; i++) {
+    ICL::Request req;
+    if (rand() % 2 == 0) {
+      req.reqType = ICL_REQ_READ;
+    } else {
+      req.reqType = ICL_REQ_WRITE;
+    }
+    uint64_t size = min_size + (rand() % (max_size - min_size + 1));
+    req.range.slpn = i; // Sequential LPN
+    req.range.nlp = size / 512; // Read/Write 1 page
+    req.offset = 0;
+    req.length = size; // Random length
+    req.reqID = global_req_id++;
+    req.reqSubID = 0;
+    DMAFunction dummy_cb = nullptr;
+    req_queue.push({req, dummy_cb, (void*)&req});
+    if (socIsPaused()) {
+      startRISCV();
+    }
+    debugprint(LOG_CPU, "Generated sequential IO request ID %u", req.reqID);
+  }
+}
+
+void CPU::generateRandomRead(uint64_t count, uint64_t min_size, uint64_t max_size) {
+  for (size_t i = 0; i < count; i++) {
+    ICL::Request req;
+    uint64_t size = min_size + (rand() % (max_size - min_size + 1));
+    req.reqType = ICL_REQ_READ;
+    req.range.slpn = rand() % 1000; // Random LPN
+    req.range.nlp = size / 512; // Read 1 page
+    req.offset = 0;
+    req.length = size; // Example length
+    req.reqID = global_req_id++;
+    req.reqSubID = 0;
+    DMAFunction dummy_cb = nullptr;
+    req_queue.push({req, dummy_cb, (void*)&req});
+    if (socIsPaused()) {
+      startRISCV();
+    }
+    debugprint(LOG_CPU, "Generated random read request ID %u", req.reqID);
+  }
+}
+
+void CPU::generateRandomWrite(uint64_t count, uint64_t min_size, uint64_t max_size) {
+  for (size_t i = 0; i < count; i++) {
+    ICL::Request req;
+    uint64_t size = min_size + (rand() % (max_size - min_size + 1));
+    req.reqType = ICL_REQ_WRITE;
+    req.range.slpn = rand() % 1000; // Random LPN
+    req.range.nlp = size / 512; // Write 1 page
+    req.offset = 0;
+    req.length = size; // Example length
+    req.reqID = global_req_id++;
+    req.reqSubID = 0;
+    DMAFunction dummy_cb = nullptr;
+    req_queue.push({req, dummy_cb, (void*)&req});
+    if (socIsPaused()) {
+      startRISCV();
+    }
+    debugprint(LOG_CPU, "Generated random write request ID %u", req.reqID);
+  }
+}
+
+void CPU::generateRandomIO(uint64_t count, uint64_t min_size, uint64_t max_size) {
+  for (size_t i = 0; i < count; i++) {
+    ICL::Request req;
+    uint64_t size = min_size + (rand() % (max_size - min_size + 1));
+    if (rand() % 2 == 0) {
+      req.reqType = ICL_REQ_READ;
+      req.range.slpn = rand() % 1000; // Random LPN
+      req.range.nlp = size / 512; // Read 1 page
+    } else {
+      req.reqType = ICL_REQ_WRITE;
+      req.range.slpn = rand() % 1000; // Random LPN
+      req.range.nlp = size / 512; // Write 1 page
+    }
+    req.offset = 0;
+    req.length = size; // Example length
+    req.reqID = global_req_id++;
+    req.reqSubID = 0;
+    DMAFunction dummy_cb = nullptr;
+    req_queue.push({req, dummy_cb, (void*)&req});
+    if (socIsPaused()) {
+      startRISCV();
+    }
+    debugprint(LOG_CPU, "Generated random IO request ID %u", req.reqID);
+  }
+}
+
+void CPU::generateSequentialTrim(uint64_t count, uint64_t min_size, uint64_t max_size) {
+  for (size_t i = 0; i < count; i++) {
+    ICL::Request req;
+    uint64_t size = min_size + (rand() % (max_size - min_size + 1));
+    req.reqType = ICL_REQ_TRIM;
+    req.range.slpn = i; // Example sequential LPN
+    req.range.nlp = size / 512; // Trim 1 page
+    req.offset = 0;
+    req.length = size; // Example length
+    req.reqID = global_req_id++;
+    req.reqSubID = 0;
+    DMAFunction dummy_cb = nullptr;
+    req_queue.push({req, dummy_cb, (void*)&req});
+    if (socIsPaused()) {
+      startRISCV();
+    }
+    debugprint(LOG_CPU, "Generated sequential trim request ID %u", req.reqID);
+  }
+}
+
+void CPU::generateSequentialFormat(uint64_t count, uint64_t min_size, uint64_t max_size) {
+  for (size_t i = 0; i < count; i++) {
+    ICL::Request req;
+    uint64_t size = min_size + (rand() % (max_size - min_size + 1));
+    req.reqType = ICL_REQ_FORMAT;
+    req.range.slpn = i; // Example sequential LPN
+    req.range.nlp = size / 512; // Format 1 page
+    req.offset = 0;
+    req.length = size; // Example length
+    req.reqID = global_req_id++;
+    req.reqSubID = 0;
+    DMAFunction dummy_cb = nullptr;
+    req_queue.push({req, dummy_cb, (void*)&req});
+    if (socIsPaused()) {
+      startRISCV();
+    }
+    debugprint(LOG_CPU, "Generated sequential format request ID %u", req.reqID);
+  }
+}
+
+void CPU::generateSequentialFlush(uint64_t count, uint64_t min_size, uint64_t max_size) {
+  for (size_t i = 0; i < count; i++) {
+    ICL::Request req;
+    uint64_t size = min_size + (rand() % (max_size - min_size + 1));
+    req.reqType = ICL_REQ_FLUSH;
+    req.range.slpn = i; // Example sequential LPN
+    req.range.nlp = size / 512; // Flush 1 page
+    req.offset = 0;
+    req.length = size; // Example length
+    req.reqID = global_req_id++;
+    req.reqSubID = 0;
+    DMAFunction dummy_cb = nullptr;
+    req_queue.push({req, dummy_cb, (void*)&req});
+    if (socIsPaused()) {
+      startRISCV();
+    }
+    debugprint(LOG_CPU, "Generated sequential flush request ID %u", req.reqID);
+  } 
+}
+
 uint64_t CPU::getClockPeriod() {
   return clockPeriod;
 }
@@ -1446,56 +1679,76 @@ bool CPU::socIsPaused() {
 }
 
 uint64_t CPU::submitRead(HIL::Request *req, DMAFunction &callback) {
-  debugprint(LOG_CPU, "Submitting read request with ID %u", req->reqID);
-  ICL::Request request(*req);
-  request.reqType = ICL_REQ_READ;
-  req_queue.push({request, callback, (void*)req});
-  if (socIsPaused()) {
-    startRISCV();
+  if (!test_mode) {
+    debugprint(LOG_CPU, "Submitting read request with ID %u", req->reqID);
+    ICL::Request request(*req);
+    request.reqType = ICL_REQ_READ;
+    req_queue.push({request, callback, (void*)req});
+    if (socIsPaused()) {
+      startRISCV();
+    }
+  } else {
+    debugprint(LOG_CPU, "In test mode, Skipping read request in test mode with ID %u", req->reqID);
   }
   return getTick() + clockPeriod;
 }
 
 uint64_t CPU::submitWrite(HIL::Request *req, DMAFunction &callback) {
-  debugprint(LOG_CPU, "Submitting write request with ID %u", req->reqID);
-  ICL::Request request(*req);
-  request.reqType = ICL_REQ_WRITE;
-  req_queue.push({request, callback, (void*)req});
-  if (socIsPaused()) {
-    startRISCV();
+  if (!test_mode) {
+    debugprint(LOG_CPU, "Submitting write request with ID %u", req->reqID);
+    ICL::Request request(*req);
+    request.reqType = ICL_REQ_WRITE;
+    req_queue.push({request, callback, (void*)req});
+    if (socIsPaused()) {
+      startRISCV();
+    }
+  } else {
+    debugprint(LOG_CPU, "In test mode, Skipping write request in test mode with ID %u", req->reqID);
   }
   return getTick() + clockPeriod;
 }
 
 uint64_t CPU::submitTrim(HIL::Request *req, DMAFunction &callback) {
-  debugprint(LOG_CPU, "Submitting trim request with ID %u", req->reqID);
-  ICL::Request request(*req);
-  request.reqType = ICL_REQ_TRIM;
-  req_queue.push({request, callback, (void*)req});
-  if (socIsPaused()) {
-    startRISCV();
+  if (!test_mode) {
+    debugprint(LOG_CPU, "Submitting trim request with ID %u", req->reqID);
+    ICL::Request request(*req);
+    request.reqType = ICL_REQ_TRIM;
+    req_queue.push({request, callback, (void*)req});
+    if (socIsPaused()) {
+      startRISCV();
+    }
+  } else {
+    debugprint(LOG_CPU, "In test mode, Skipping trim request in test mode with ID %u", req->reqID);
   }
   return getTick() + clockPeriod;
 }  
 
 uint64_t CPU::submitFormat(HIL::Request *req, DMAFunction &callback) {
-  debugprint(LOG_CPU, "Submitting format request with ID %u", req->reqID);
-  ICL::Request request(*req);
-  request.reqType = ICL_REQ_FORMAT;
-  req_queue.push({request, callback, (void*)req});
-  if (socIsPaused()) {
-    startRISCV();
+  if (!test_mode) {
+    debugprint(LOG_CPU, "Submitting format request with ID %u", req->reqID);
+    ICL::Request request(*req);
+    request.reqType = ICL_REQ_FORMAT;
+    req_queue.push({request, callback, (void*)req});
+    if (socIsPaused()) {
+      startRISCV();
+    }
+  } else {
+    debugprint(LOG_CPU, "In test mode, Skipping format request in test mode with ID %u", req->reqID);
   }
   return getTick() + clockPeriod;
 }
 
 uint64_t CPU::submitFlush(HIL::Request *req, DMAFunction &callback) {
-  debugprint(LOG_CPU, "Submitting flush request with ID %u", req->reqID);
-  ICL::Request request(*req);
-  request.reqType = ICL_REQ_FLUSH;
-  req_queue.push({request, callback, (void*)req});
-  if (socIsPaused()) {
-    startRISCV();
+  if (!test_mode) {
+    debugprint(LOG_CPU, "Submitting flush request with ID %u", req->reqID);
+    ICL::Request request(*req);
+    request.reqType = ICL_REQ_FLUSH;
+    req_queue.push({request, callback, (void*)req});
+    if (socIsPaused()) {
+      startRISCV();
+    }
+  } else {
+    debugprint(LOG_CPU, "In test mode, Skipping flush request in test mode with ID %u", req->reqID);
   }
   return getTick() + clockPeriod;
 

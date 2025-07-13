@@ -34,7 +34,10 @@ const char NAME_FW_PATH[] = "FirmwarePath";
 const char NAME_CORE_RISCV[] = "RISCVCoreCount";
 const char NAME_BURST_CYCLES[] = "BurstCycles";
 const char NAME_SOC_TEST_MODE[] = "SOCTestMode";
-
+const char NAME_SOC_TEST_TYPE[] = "SOCTestType";
+const char NAME_SOC_TEST_COUNT[] = "SOCTestCount";
+const char NAME_SOC_TEST_SIZE_MIN[] = "SOCTestSizeMin";
+const char NAME_SOC_TEST_SIZE_MAX[] = "SOCTestSizeMax";
 Config::Config() {
   clock = 400000000;
   hilCore = 1;
@@ -44,6 +47,10 @@ Config::Config() {
   burst_cycles = 1000;
   fw_path = "";
   soc_test_mode = false;
+  soc_test_type = (int) TEST_TYPE::SEQ_READ_TEST;
+  soc_test_count = 1000;
+  soc_test_size_min = 512; // Default minimum size for test requests
+  soc_test_size_max = 4096; // Default maximum size for test requests
 }
 
 bool Config::setConfig(const char *name, const char *value) {
@@ -60,16 +67,31 @@ bool Config::setConfig(const char *name, const char *value) {
   }
   else if (MATCH_NAME(NAME_CORE_FTL)) {
     ftlCore = (uint32_t)strtoul(value, nullptr, 10);
-  } else if (MATCH_NAME(NAME_CORE_RISCV)) {
+  } 
+  else if (MATCH_NAME(NAME_CORE_RISCV)) {
     riscvCore = (uint32_t)strtoul(value, nullptr, 10);
   }
   else if (MATCH_NAME(NAME_FW_PATH)) {
     fw_path = value;
-  } else if(MATCH_NAME(NAME_BURST_CYCLES)) {
+  } 
+  else if(MATCH_NAME(NAME_BURST_CYCLES)) {
     burst_cycles = (uint32_t)strtoul(value, nullptr, 10);
-  } else if (MATCH_NAME(NAME_SOC_TEST_MODE)) {
+  } 
+  else if (MATCH_NAME(NAME_SOC_TEST_MODE)) {
     soc_test_mode = (bool)strtoul(value, nullptr, 10);
-  }
+  } 
+  else if (MATCH_NAME(NAME_SOC_TEST_TYPE)) {
+    soc_test_type = (TEST_TYPE)strtol(value, nullptr, 10);
+  } 
+  else if (MATCH_NAME(NAME_SOC_TEST_COUNT)) {
+    soc_test_count = (uint32_t)strtol(value, nullptr, 10);
+  } 
+  else if (MATCH_NAME(NAME_SOC_TEST_SIZE_MIN)) {
+    soc_test_size_min = (uint32_t)strtol(value, nullptr, 10);
+  } 
+  else if (MATCH_NAME(NAME_SOC_TEST_SIZE_MAX)) {
+    soc_test_size_max = (uint32_t)strtol(value, nullptr, 10);
+  } 
   else {
     ret = false;
   }
@@ -105,6 +127,18 @@ uint64_t Config::readUint(uint32_t idx) {
     case BURST_CYCLES:
       ret = burst_cycles;
       break;
+    case SOC_TEST_COUNT:
+      ret = soc_test_count;
+      break;
+    case SOC_TEST_SIZE_MIN:
+      ret = soc_test_size_min;
+      break;
+    case SOC_TEST_SIZE_MAX:
+      ret = soc_test_size_max;
+      break;
+    case SOC_TEST_TYPE:
+      ret = (uint64_t)soc_test_type; 
+      break;
   }
 
   return ret;
@@ -128,6 +162,7 @@ bool Config::readBoolean(uint32_t idx) {
   }
 
   return ret;
+}
 
 }  // namespace CPU
 

@@ -208,6 +208,11 @@ class CPU : public StatObject {
     std::queue<RISCVJob> req_queue;
     std::vector<std::pair<DMAFunction, void *>> callbacks;
     
+    bool test_mode;
+    TEST_TYPE test_type;
+    uint32_t test_count;
+    uint32_t test_size_min;
+    uint32_t test_size_max;
   public:
     CPU(ConfigReader &, ICL::ICL *, FTL::FTL *, PAL::PAL *pal, DRAM::AbstractDRAM *dram);
     ~CPU();
@@ -225,6 +230,7 @@ class CPU : public StatObject {
     bool socIsPaused();
     void stopRISCV();
     void initRISCV();
+    void initTests();
     void printLastStat();
     uint64_t read_flash_icl(uint8_t* buffer, uint64_t offset , uint64_t len); // for the flash functions
     uint64_t write_flash_icl(uint8_t* buffer, uint64_t offset , uint64_t len);
@@ -243,6 +249,16 @@ class CPU : public StatObject {
     uint64_t submitTrim(HIL::Request *req, DMAFunction &func);
     uint64_t submitFormat(HIL::Request *req, DMAFunction &func);
     uint64_t submitFlush(HIL::Request *req, DMAFunction &func);
+
+    void generateSequentialRead(uint64_t count, uint64_t min_size, uint64_t max_size);
+    void generateSequentialWrite(uint64_t count, uint64_t min_size, uint64_t max_size);
+    void generateSequentialIO(uint64_t count, uint64_t min_size, uint64_t max_size);
+    void generateRandomRead(uint64_t count, uint64_t min_size, uint64_t max_size);
+    void generateRandomWrite(uint64_t count, uint64_t min_size, uint64_t max_size);
+    void generateRandomIO(uint64_t count, uint64_t min_size, uint64_t max_size);
+    void generateSequentialTrim(uint64_t count, uint64_t min_size, uint64_t max_size);
+    void generateSequentialFormat(uint64_t count, uint64_t min_size, uint64_t max_size);
+    void generateSequentialFlush(uint64_t count, uint64_t min_size, uint64_t max_size);
 };
 
 }  // namespace CPU

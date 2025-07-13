@@ -11,28 +11,29 @@ struct FirmwareData {
     ICL::ICL *icl;
 };
 
-Mutex queue_mutex;
+Mutex* queue_mutex;
 int num_active_cores = 0;
 void process_requests(FirmwareData *data) {
     ICL::ICL *cache = data->icl;
     FTL::FTL *ftl = data->ftl;
     ICL::Request req;
     while(1) {
-        queue_mutex.lock();
-        getReqQueueSize();
+        queue_mutex->lock();
         if(getReqQueueSize() == 0) {
             if (num_active_cores == 0) {
                 req.reqType == ICL_REQ_EMPTY;
                 stop_sim();
+                queue_mutex->unlock();
+                continue;
             } else {
-                queue_mutex.unlock();
+                queue_mutex->unlock();
                 continue; // wait for active cores to finish
             }
         }
 
         read_buffer((uint64_t)&req, getCoreId(), FIRMWARE_QUEUE_TOP);
         num_active_cores++;
-        queue_mutex.unlock();
+        queue_mutex->unlock();
         if (req.reqType == ICL_REQ_READ) {
             cache->read(req);
             req.reqType == ICL_REQ_EMPTY; // reset the request type
@@ -53,9 +54,9 @@ void process_requests(FirmwareData *data) {
         } else {
             panic("Unknown request type: %d\n", req.reqType);
         }
-        queue_mutex.lock();
+        queue_mutex->lock();
         num_active_cores--;
-        queue_mutex.unlock();
+        queue_mutex->unlock();
     }
 }
 
@@ -73,7 +74,9 @@ int main(int argc, char** argv) {
     FirmwareData data;
     data.ftl = &ftl;
     data.icl = &cache;
+    queue_mutex = new Mutex();
     write_buffer((uint64_t)&process_requests, (uint64_t)&data, CORE_SETUP_COMPLETED); // signal that core setup is done
+    
     process_requests(&data);
     // stop_sim();
     

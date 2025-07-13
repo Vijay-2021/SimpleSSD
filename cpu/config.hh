@@ -30,6 +30,18 @@ namespace SimpleSSD {
 namespace CPU {
 
 typedef enum {
+  SEQ_READ_TEST = 0,
+  SEQ_WRITE_TEST = 1,
+  SEQ_IO_TEST = 2,
+  RAND_READ_TEST = 3,
+  RAND_WRITE_TEST = 4,
+  RAND_IO_TEST = 5,
+  SEQ_TRIM_TEST = 6,
+  SEQ_FORMAT_TEST = 7,
+  SEQ_FLUSH_TEST = 8,
+} TEST_TYPE;
+
+typedef enum {
   CPU_CLOCK,
   CPU_CORE_HIL,
   CPU_CORE_ICL,
@@ -38,6 +50,10 @@ typedef enum {
   CPU_CORE_RISCV,
   BURST_CYCLES,
   SOC_TEST_MODE,
+  SOC_TEST_TYPE,
+  SOC_TEST_COUNT,
+  SOC_TEST_SIZE_MIN,
+  SOC_TEST_SIZE_MAX,
 } CPU_CONFIG;
 
 class Config : public BaseConfig {
@@ -49,7 +65,11 @@ class Config : public BaseConfig {
   uint32_t riscvCore; //!< Default: 1
   uint32_t burst_cycles; 
   bool soc_test_mode; 
-  std::string  fw_path; //!< Default: ""
+  TEST_TYPE soc_test_type;
+  uint32_t soc_test_count;
+  uint32_t soc_test_size_min;
+  uint32_t soc_test_size_max;
+  std::string fw_path; //!< Default: ""
 
  public:
   Config();
@@ -59,6 +79,7 @@ class Config : public BaseConfig {
 
   uint64_t readUint(uint32_t) override;
   std::string readString(uint32_t) override;
+  bool readBoolean(uint32_t) override;
   char getch();
   void *uart_rx_thread(void* p);
   void start_uart_rx_thread(void *p);
