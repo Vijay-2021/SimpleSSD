@@ -393,19 +393,27 @@ void CPU::initRISCV() {
 }
 
 void CPU::startRISCV() {
-  debugprint(LOG_CPU, "start riscv called\n");
+  last_start_tick = getTick();
+  active_periods++;
   RISCV::soc_run_mode_ = RISCV::SOC_RUN_MODE::TIMING_MODE;
   schedule(RISCVCycleEvent, getTick());
 }
 
 void CPU::stopRISCV() {
-  debugprint(LOG_CPU, "stop riscv called\n");
-  uint64_t RISCVCycleTick = 0;
-  scheduled(RISCVCycleEvent, &RISCVCycleTick);
-  if (RISCVCycleTick >= getTick()) {
-    deschedule(RISCVCycleEvent);
+  if (test_mode && RISCV::soc_run_mode_ == RISCV::SOC_RUN_MODE::FAST_FORWARD_MODE) {
+    RISCV::soc_run_mode_ = RISCV::SOC_RUN_MODE::TIMING_MODE;
+    schedule(RISCVCycleEvent, getTick() + clockPeriod);
+  } else {
+    if (RISCV::soc_run_mode_ == RISCV::SOC_RUN_MODE::TIMING_MODE) {
+      active_duration = getTick() - last_start_tick;
+    }
+    uint64_t RISCVCycleTick = 0;
+    scheduled(RISCVCycleEvent, &RISCVCycleTick);
+    if (RISCVCycleTick >= getTick()) {
+      deschedule(RISCVCycleEvent);
+    }
+    RISCV::soc_run_mode_ = RISCV::SOC_RUN_MODE::PAUSED_MODE;
   }
-  RISCV::soc_run_mode_ = RISCV::SOC_RUN_MODE::PAUSED_MODE;
 }
 
 void CPU::initTests() {
@@ -442,6 +450,7 @@ void CPU::initTests() {
         panic("Invalid test type");
         break;
     }
+
   }
 }
 
@@ -1043,120 +1052,8 @@ void CPU::getStatList(std::vector<Stats> &list, std::string prefix) {
     temp.desc = "CPU for FTL core " + number + " executed other instructions";
     list.push_back(temp);
   }
-  // for (uint32_t i = 0; i < riscv_soc.rv_cores.size(); i++) {
-  //   number = std::to_string(i);
-    
-  //   temp.name = prefix + ".riscv" + number + ".busy";
-  //   temp.desc = "CPU for RISCV core " + number + " busy ticks";
-  //   list.push_back(temp);
 
-  //   temp.name = prefix + ".riscv" + number + ".insts.branch";
-  //   temp.desc = "CPU for RISCV core " + number + " executed branch instructions";
-  //   list.push_back(temp);
-
-  //   temp.name = prefix + ".riscv" + number + ".insts.load";
-  //   temp.desc = "CPU for RISCV core " + number + " executed load instructions";
-  //   list.push_back(temp);
-
-  //   temp.name = prefix + ".riscv" + number + ".insts.store";
-  //   temp.desc = "CPU for RISCV core " + number + " executed store instructions";
-  //   list.push_back(temp);
-
-  //   temp.name = prefix + ".riscv" + number + ".insts.arithmetic";
-  //   temp.desc =
-  //       "CPU for RISCV core " + number + " executed arithmetic instructions";
-  //   list.push_back(temp);
-
-  //   temp.name = prefix + ".riscv" + number + ".insts.fp";
-  //   temp.desc =
-  //       "CPU for RISCV core " + number + " executed floating point instructions";
-  //   list.push_back(temp);
-
-  //   temp.name = prefix + ".riscv" + number + ".insts.others";
-  //   temp.desc = "CPU for RISCV core " + number +
-  //               " executed other instructions (e.g. system calls)";
-  //   list.push_back(temp);
-  // }
-
-  temp.name = prefix + ".riscv" + ".icl_read_requests";
-  temp.desc = "Total ICL read requests";
-  list.push_back(temp);
-  temp.name = prefix + ".riscv" + ".icl_write_requests";
-  temp.desc = "Total ICL write requests";
-  list.push_back(temp);
-  temp.name = prefix + ".riscv" + ".icl_trim_requests";
-  temp.desc = "Total ICL trim requests";
-  list.push_back(temp);
-  temp.name = prefix + ".riscv" + ".icl_format_requests";
-  temp.desc = "Total ICL format requests";
-  list.push_back(temp);
-  temp.name = prefix + ".riscv" + ".icl_flush_requests";
-  temp.desc = "Total ICL flush requests";
-  list.push_back(temp);
-  temp.name = prefix + ".riscv" + ".read_cache_hits";
-  temp.desc = "Total read cache hits";
-  list.push_back(temp);
-  temp.name = prefix + ".riscv" + ".read_cache_misses";
-  temp.desc = "Total read cache misses";
-  list.push_back(temp);
-  temp.name = prefix + ".riscv" + ".write_cache_hits";
-  temp.desc = "Total write cache hits";
-  list.push_back(temp);
-  temp.name = prefix + ".riscv" + ".write_cache_misses";
-  temp.desc = "Total write cache misses";
-  list.push_back(temp);
-  temp.name = prefix + ".riscv" + ".read_cache_evictions";
-  temp.desc = "Total read cache evictions";
-  list.push_back(temp);
-  temp.name = prefix + ".riscv" + ".write_cache_evictions";
-  temp.desc = "Total write cache evictions";
-  list.push_back(temp);
-  temp.name = prefix + ".riscv" + ".icl_read_cycles";
-  temp.desc = "Total ICL read cycles";
-  list.push_back(temp);
-  temp.name = prefix + ".riscv" + ".icl_write_cycles";
-  temp.desc = "Total ICL write cycles";
-  list.push_back(temp);
-  temp.name = prefix + ".riscv" + ".icl_trim_cycles";
-  temp.desc = "Total ICL trim cycles";
-  list.push_back(temp);
-  temp.name = prefix + ".riscv" + ".icl_format_cycles";
-  temp.desc = "Total ICL format cycles";
-  list.push_back(temp);
-  temp.name = prefix + ".riscv" + ".icl_flush_cycles";
-  temp.desc = "Total ICL flush cycles";
-  list.push_back(temp);
-
-  temp.name = prefix + ".riscv" + ".ftl_read_requests";
-  temp.desc = "Total FTL read requests";
-  list.push_back(temp);
-  temp.name = prefix + ".riscv" + ".ftl_write_requests";
-  temp.desc = "Total FTL write requests";
-  list.push_back(temp);
-  temp.name = prefix + ".riscv" + ".ftl_trim_requests";
-  temp.desc = "Total FTL trim requests";
-  list.push_back(temp);
-  temp.name = prefix + ".riscv" + ".ftl_format_requests";
-  temp.desc = "Total FTL format requests";
-  list.push_back(temp);
-  temp.name = prefix + ".riscv" + ".ftl_garbage_collection_requests";
-  temp.desc = "Total FTL garbage collection requests";
-  list.push_back(temp);
-  temp.name = prefix + ".riscv" + ".ftl_read_cycles";
-  temp.desc = "Total FTL read cycles";
-  list.push_back(temp);
-  temp.name = prefix + ".riscv" + ".ftl_write_cycles";
-  temp.desc = "Total FTL write cycles";
-  list.push_back(temp);
-  temp.name = prefix + ".riscv" + ".ftl_trim_cycles";
-  temp.desc = "Total FTL trim cycles";
-  list.push_back(temp);
-  temp.name = prefix + ".riscv" + ".ftl_format_cycles";
-  temp.desc = "Total FTL format cycles";
-  list.push_back(temp);
-  temp.name = prefix + ".riscv" + ".ftl_garbage_collection_cycles";
-  temp.desc = "Total FTL garbage collection cycles";
-  list.push_back(temp);  
+  getStatList(riscv_soc, prefix + ".riscv");
 
 
 }
@@ -1329,48 +1226,19 @@ void CPU::printLastStat() {
 uint64_t CPU::read_flash_icl(uint8_t* buffer, uint64_t offset , uint64_t len) {
   debugprint(LOG_CPU, "Read flash ICL from RISCV Core at offset %u, length %u",
              offset, len);
-  ICL::Request req;
-  LPNRange lpnRange;
-  lpnRange.slpn = offset / (page_size / lba_size);
-  lpnRange.nlp = (len / (page_size / lba_size)) + 1;
-  req.range = lpnRange;
-  req.offset = 0;
-  req.length = len;
-  req.reqID = global_req_id++;
-  req.reqSubID = 0;
-  uint64_t reqTick = getTick();
-  debugprint(LOG_CPU, "Request ID %u at tick %llu", req.reqID, reqTick);
-  pICL->read(req, reqTick);
-  debugprint(LOG_CPU, "Request ID %u finished at tick %llu",
-             req.reqID, reqTick);
   uint64_t slba = offset;
   uint32_t nlblk = len;
   pDisk->read(slba, nlblk, buffer);
-  return reqTick;
+  return getTick();
 }
 
 uint64_t CPU::write_flash_icl(uint8_t* buffer, uint64_t offset , uint64_t len) {
-  debugprint(SimpleSSD::LOG_CPU, "Write flash ICL from RISCV Core at offset %u, length %u",
-      offset, len);
-  ICL::Request req;
-  LPNRange lpnRange;
-  uint32_t page_per_lba = page_size / lba_size;
-  lpnRange.slpn = offset / page_per_lba;
-  lpnRange.nlp = (len + page_per_lba - 1) / page_per_lba;
-  req.range = lpnRange;
-  req.offset = 0;
-  req.length = len;
-  req.reqID = global_req_id++;
-  req.reqSubID = 0;
-  uint64_t reqTick = getTick();
-  debugprint(LOG_CPU, "Request ID %u at tick %llu", req.reqID, reqTick);
-  pICL->write(req, reqTick);
-  debugprint(LOG_CPU, "Request ID %u completed at tick %llu",
-              req.reqID, reqTick);
+  debugprint(LOG_CPU, "Write flash ICL from RISCV Core at offset %u, length %u",
+             offset, len);
   uint64_t slba = offset;
   uint32_t nlblk = len;
   pDisk->write(slba, nlblk, buffer);
-  return reqTick;
+  return getTick();
 }
 
 uint64_t CPU::trim_flash_icl(uint8_t* buffer, uint64_t offset , uint64_t len) {
@@ -1384,6 +1252,7 @@ uint64_t CPU::trim_flash_icl(uint8_t* buffer, uint64_t offset , uint64_t len) {
   pICL->trim(lpnRange, reqTick);
   return reqTick;
 }
+
 
 // TO-DO: implement!
 void CPU::read_flash_pal(uint8_t* request, uint64_t* tick) {
@@ -1425,6 +1294,9 @@ void CPU::closeDisk() {
 
 void CPU::addRISCVTask(char* input_command) {
   riscv_soc->rv_soc_add_task(input_command);
+  if (socIsPaused()) {
+      startRISCV();
+    }
 }
 
 void CPU::read_buffer(uint8_t* buffer, uint64_t req_info, uint64_t req_type) {
@@ -1473,10 +1345,15 @@ void CPU::runDMA(uint64_t finished_at, uint64_t core_id) {
     void* context = callbacks[core_id].second;
     debugprint(LOG_CPU, "Running DMA function at tick %lu for core ID %lu",
               finished_at, core_id);
-    func(finished_at, context);
+    if (func != nullptr) {
+      func(finished_at, context);
+    }
   } else {
     debugprint(LOG_CPU, "Skipping DMA function in test mode but executing callback for core ID %lu at tick %lu",
               core_id, finished_at);
+    if (RISCV::soc_run_mode_ == RISCV::SOC_RUN_MODE::TIMING_MODE) {
+      debugprint(LOG_CPU, "Fast forwarding to tick %lu", finished_at);
+    }
   }
 }
 
@@ -1485,9 +1362,9 @@ void CPU::generateSequentialRead(uint64_t count, uint64_t min_size, uint64_t max
     ICL::Request req;
     uint64_t size = min_size + (rand() % (max_size - min_size + 1));
     req.reqType = ICL_REQ_READ;
-    req.range.slpn = i; // Example sequential LPN
-    req.range.nlp = size / 512; // Read 1 page
-    req.offset = 0;
+    req.range.slpn = (i * lba_size) / page_size; // Example sequential LPN
+    req.range.nlp = size / page_size; // Read 1 page
+    req.offset = (i * lba_size) % page_size; // Example offset within the page
     req.length = size; // Random length
     req.reqID = global_req_id++;
     req.reqSubID = 0;
@@ -1505,10 +1382,10 @@ void CPU::generateSequentialWrite(uint64_t count, uint64_t min_size, uint64_t ma
     ICL::Request req;
     uint64_t size = min_size + (rand() % (max_size - min_size + 1));
     req.reqType = ICL_REQ_WRITE;
-    req.range.slpn = i;
-    req.range.nlp = size / 512;
-    req.offset = 0;
-    req.length = size;
+    req.range.slpn = (i * lba_size) / page_size; // Example sequential LPN
+    req.range.nlp = size / page_size; // Read 1 page
+    req.offset = (i * lba_size) % page_size; // Example offset within the page
+    req.length = size; // Random length
     req.reqID = global_req_id++;
     req.reqSubID = 0;
     DMAFunction dummy_cb = nullptr;
@@ -1529,9 +1406,9 @@ void CPU::generateSequentialIO(uint64_t count, uint64_t min_size, uint64_t max_s
       req.reqType = ICL_REQ_WRITE;
     }
     uint64_t size = min_size + (rand() % (max_size - min_size + 1));
-    req.range.slpn = i; // Sequential LPN
-    req.range.nlp = size / 512; // Read/Write 1 page
-    req.offset = 0;
+    req.range.slpn = (i * lba_size) / page_size; // Example sequential LPN
+    req.range.nlp = size / page_size; // Read 1 page
+    req.offset = (i * lba_size) % page_size; // Example offset within the page
     req.length = size; // Random length
     req.reqID = global_req_id++;
     req.reqSubID = 0;
@@ -1549,7 +1426,7 @@ void CPU::generateRandomRead(uint64_t count, uint64_t min_size, uint64_t max_siz
     ICL::Request req;
     uint64_t size = min_size + (rand() % (max_size - min_size + 1));
     req.reqType = ICL_REQ_READ;
-    req.range.slpn = rand() % 1000; // Random LPN
+    req.range.slpn = rand() % (512*4096); // Random LPN
     req.range.nlp = size / 512; // Read 1 page
     req.offset = 0;
     req.length = size; // Example length
@@ -1569,7 +1446,7 @@ void CPU::generateRandomWrite(uint64_t count, uint64_t min_size, uint64_t max_si
     ICL::Request req;
     uint64_t size = min_size + (rand() % (max_size - min_size + 1));
     req.reqType = ICL_REQ_WRITE;
-    req.range.slpn = rand() % 1000; // Random LPN
+    req.range.slpn = rand() % (512*4096); // Random LPN
     req.range.nlp = size / 512; // Write 1 page
     req.offset = 0;
     req.length = size; // Example length
@@ -1590,11 +1467,11 @@ void CPU::generateRandomIO(uint64_t count, uint64_t min_size, uint64_t max_size)
     uint64_t size = min_size + (rand() % (max_size - min_size + 1));
     if (rand() % 2 == 0) {
       req.reqType = ICL_REQ_READ;
-      req.range.slpn = rand() % 1000; // Random LPN
+      req.range.slpn = rand() % (512*4096); // Random LPN
       req.range.nlp = size / 512; // Read 1 page
     } else {
       req.reqType = ICL_REQ_WRITE;
-      req.range.slpn = rand() % 1000; // Random LPN
+      req.range.slpn = rand() % (512*4096); // Random LPN
       req.range.nlp = size / 512; // Write 1 page
     }
     req.offset = 0;

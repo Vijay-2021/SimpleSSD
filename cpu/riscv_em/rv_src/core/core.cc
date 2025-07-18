@@ -1476,7 +1476,12 @@ static uint64_t instr_READBUFF(Core *rv_core) {
         } else {
             rv_core->curr_cycle -= 10; // since get tick is supposed to be purely for statistics, we subtract 10 cycles for overhead(based on firmware binary)
         }
-    } else if (rv_core->reg_file[rv_core->rs2] == FIRMWARE_CORE_ID) {
+    } else if (rv_core->reg_file[rv_core->rs2] == FIRMWARE_CSD_JOB_LOADED) {
+        memcpy(rv_core->pSOC->get_ram() + ((rv_core->reg_file[rv_core->rd] - RAM_BASE_ADDR)), &rv_core->csd_job_loaded, sizeof(rv_core->csd_job_loaded));
+    } else if (rv_core->reg_file[rv_core->rs2] == FIRMWARE_CSD_JOB_FINISHED) {
+        memcpy(rv_core->pSOC->get_ram() + ((rv_core->reg_file[rv_core->rd] - RAM_BASE_ADDR)), &rv_core->csd_job_finished, sizeof(rv_core->csd_job_finished));
+    }
+    else if (rv_core->reg_file[rv_core->rs2] == FIRMWARE_CORE_ID) {
         memcpy(rv_core->pSOC->get_ram() + ((rv_core->reg_file[rv_core->rd] - RAM_BASE_ADDR)), &rv_core->core_id, sizeof(rv_core->core_id));
     } else {
         rv_core->pSOC->read_buffer(rv_core->pSOC->get_ram() + ((rv_core->reg_file[rv_core->rd] - RAM_BASE_ADDR)), rv_core->reg_file[rv_core->rs1], rv_core->reg_file[rv_core->rs2]);
@@ -1495,6 +1500,27 @@ static uint64_t instr_WRITEBUFF(Core *rv_core) {
         rv_core->pSOC->setICLHigh((uint64_t *) (rv_core->pSOC->get_ram() + (rv_core->reg_file[rv_core->rd] - RAM_BASE_ADDR)));
     }  else if (rv_core->reg_file[rv_core->rs2] == CORE_SETUP_COMPLETED) {
         rv_core->pSOC->coreSetup(rv_core->reg_file[rv_core->rd], rv_core->reg_file[rv_core->rs1]);
+    } else if (rv_core->reg_file[rv_core->rs2] == START_CSD_JOB) {
+        CSDData tmp;
+        printf("Calling start csd job!!!\n");
+        memcpy(&tmp, rv_core->pSOC->get_ram() + ((rv_core->reg_file[rv_core->rd] - RAM_BASE_ADDR)), sizeof(CSDData));
+        printf("CSD start pc: %lu and alloc ptr: %lu and mem ptr %lu\n", tmp.start_pc, (uint64_t)tmp.allocator, (uint64_t)tmp.ext2);
+        rv_core->init_csd_job(&tmp);
+    } else if (rv_core->reg_file[rv_core->rs2] == CSD_JOB_FINISHED) {
+        printf("CSD job finished!!!\n");
+        uint32_t* pos = (uint32_t*)(rv_core->pSOC->get_ram() + ((rv_core->reg_file[rv_core->rd] - RAM_BASE_ADDR)));
+        int *chars_compared = (int *)(rv_core->pSOC->get_ram() + ((rv_core->reg_file[rv_core->rs1] - RAM_BASE_ADDR)));
+        printf("pos %u and chars compared %d\n", *pos, *chars_compared);
+        rv_core->csd_job_finished = true;
+    } else if (rv_core->reg_file[rv_core->rs2] == CLEANED_CSD_JOB) {
+        rv_core->clean_csd_job();
+    } else if (rv_core->reg_file[rv_core->rs2] == FIRMWARE_REQ_DONE && rv_core->in_csd_mode) { 
+        // do nothing
+    } else if (rv_core->reg_file[rev_core->rs2] == ACQUIRE_MUTEX_LOCK) {
+        rv_core->mutex_lock_acquire_start = rv_core->curr_cycle;
+        rv_core->mutex_lock_acquires += 1;
+    } else if (rv_core->reg_file[rv_core->rs2] == ACQUIRED_MUTEX_LOCK) {
+        rv_core->mutex_lock_acquire_cycles += (rv_core->curr_cycle - rv_core->mutex_lock_acquire_start);  
     } else {
         rv_core->pSOC->write_buffer(rv_core->pSOC->get_ram() + ((rv_core->reg_file[rv_core->rd] - RAM_BASE_ADDR)), rv_core->reg_file[rv_core->rs1], rv_core->reg_file[rv_core->rs2] );
     }
@@ -2334,6 +2360,66 @@ static uint64_t rv_core_execute(Core *rv_core)
 }
 
 /******************* Public functions *******************************/
+
+void Core::hardware_context_switch() {
+    uint64_t temp_pc = next_pc;
+    next_pc = context_switch_next_pc;
+    context_switch_next_pc = next_pc ? next_pc : pc + 4;
+    rv_word_t temp_regs[NR_RVI_REGS];
+    for (int i = 0; i < NR_RVI_REGS; i++)
+    {
+        temp_regs[i] = reg_file[i];
+        reg_file[i] = context_switch_regs[i];
+        context_switch_regs[i] = temp_regs[i];
+    }
+    double temp_fregs[NR_RVF_REGS];
+    for (int i = 0; i < NR_RVF_REGS; i++)
+    {
+        temp_fregs[i] = float_reg_file[i];
+        float_reg_file[i] = context_switch_fregs[i];
+        context_switch_fregs[i] = temp_fregs[i];
+    }
+    in_csd_mode = !in_csd_mode;
+    csd_cycles = 0;
+}
+
+void Core::init_csd_job(CSDData *job_info) {
+    csd_cycles = 0;
+    for (int i = 0; i < NR_RVI_REGS; i++)
+    {
+        context_switch_regs[i] = 0;
+    }
+    for (int i = 0; i < NR_RVF_REGS; i++)
+    {
+        context_switch_fregs[i] = 0.0;
+    }
+    in_csd_mode = false; // gets switched on hardware context switch
+    context_switch_next_pc = job_info->start_pc;
+    context_switch_regs[10] = job_info->ext2;
+    context_switch_regs[11] = job_info->allocator;
+    context_switch_regs[2] = reg_file[2]; // save stack pointer
+    csd_start_pc = job_info->start_pc;
+    csd_job_loaded = true;
+    csd_job_finished = false;
+    hardware_context_switch();
+}
+
+void Core::clean_csd_job() {
+    in_csd_mode = false;
+    csd_job_loaded = false;
+    context_switch_next_pc = 0;
+    for (int i = 0; i < NR_RVI_REGS; i++)
+    {
+        context_switch_regs[i] = 0;
+    }
+    for (int i = 0; i < NR_RVF_REGS; i++)
+    {
+        context_switch_fregs[i] = 0.0;
+    }
+    csd_cycles = 0;
+    csd_job_finished = false;
+}
+
 uint64_t Core::rv_core_run()
 {
     next_pc = 0;
@@ -2345,11 +2431,19 @@ uint64_t Core::rv_core_run()
     }
 
     /* increase program counter here */
-    
-    pc = next_pc ? next_pc : pc + 4;
+    if (!should_stall) {
+        pc = next_pc ? next_pc : pc + 4;
+    }
     curr_cycle += next_cycle;
+    if (in_csd_mode) {
+        printf("running csd mode for pc: %lx and csd cycles: %lu and start pc: %lx and instruction: %x\n", pc, csd_cycles, csd_start_pc, instruction);
+        csd_cycles += next_cycle;
+        if (csd_cycles >= CSD_CYCLES_LIMIT) {
+            hardware_context_switch();
+        }
+    }
     if (reg_file[2] < stack_bottom_min) {
-        die_msg("Stack overflow detected! Stack pointer: " PRINTF_FMT " Stack bottom: " PRINTF_FMT "\n",
+        die_msg("Stack overflow detected! Stack pointer: %lu Stack bottom: %lu\n",
                 reg_file[2], stack_bottom_min);
     }
     /**

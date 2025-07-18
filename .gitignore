@@ -18,6 +18,7 @@ cpu/riscv_em/riscv_em
 cpu/riscv_em/firmware/fs/build/
 *.bin
 *.elf
+*.a
 
 # CMake Specific
 CMakeCache.txt

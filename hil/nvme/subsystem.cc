@@ -1348,10 +1348,12 @@ bool Subsystem::csdAddTask(SQEntryWrapper &req, RequestFunction &func) {
   // debugprint(LOG_HIL_NVME, "ADMIN   | CSD Add Task | NSID %d",
   //           req.entry.namespaceID);  
   uint32_t req_size = req.entry.dword10;
+  printf("~~~~~~~CSD Add Task with req_size ~~~~~~~~~~~%u\n", req_size);
   char* buffer = (char*)calloc(256, sizeof(char));
   static DMAFunction dmaDone = [this](uint64_t, void *context) {
     RequestContext *pContext = (RequestContext *)context;
     pContext->function(pContext->resp);
+    printf("~~~~~~~CSD Add Task with buffer %s and ptr %p\n", pContext->buffer, pContext->buffer);
     pCPU->addRISCVTask((char*)pContext->buffer);
     delete pContext->dma;
     delete pContext;

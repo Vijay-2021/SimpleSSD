@@ -5,6 +5,7 @@
 #include "rv_src/core/core.hh"
 #include "rv_src/peripherals/plic/plic.hh"
 #include "rv_src/peripherals/uart/simple_uart.hh"
+#include "sim/statistics.hh"
 
 #include <vector>
 #include <queue>
@@ -32,7 +33,7 @@ struct RISCVStats {
     uint64_t total_cycles;
 };
 
-class SOC {
+class SOC : StatObject{
     public: 
         SOC(char *fw_file_name, char *dtb_file_name, char *initrd_file_name, CPU *cpu, uint32_t num_cores, DRAM::AbstractDRAM *dram);
         ~SOC();
@@ -90,6 +91,14 @@ class SOC {
         bool test_mode = false; 
         bool cores_setup = false;
         uint64_t current_stack_bottom = 0;
+        uint32_t current_core = 0;
+        std::queue<char*> csd_queue; // CSD jobs queue
+        uint64_t current_job_id = 0;
+        
+        void getStatList(std::vector<Stats> &list, std::string prefix) override;
+        void getStatValues(std::vector<double> &values) override;
+        void resetStatValues() override;
+
     private: 
         CPU *pCPU; 
         RISCVStats stats;

@@ -36,6 +36,12 @@ struct ProcessStat {
     char* process_name;
 };
 
+struct CSDData {
+    void *allocator;
+    void *ext2;
+    uint64_t start_pc;
+};
+
 
 class Core {
     public: 
@@ -47,6 +53,10 @@ class Core {
         double float_reg_file[NR_RVF_REGS];
         rv_word_t pc;
         rv_word_t next_pc;
+
+        rv_word_t context_switch_next_pc; // the pc to switch to when context switching(we store next pc so we don't trigger hardware context switch again)
+        rv_word_t context_switch_regs[NR_RVI_REGS]; // save the register file for context switching
+        double context_switch_fregs[NR_RVF_REGS]; // save the float register file for context switching
 
         uint32_t instruction;
         uint8_t opcode;
@@ -91,6 +101,19 @@ class Core {
         void rv_core_process_interrupts(uint8_t mei, uint8_t mti, uint8_t msi);
         void rv_core_reg_dump();
         void rv_core_reg_dump_more_regs();
+        void hardware_context_switch();
+        void init_csd_job(CSDData *job_info);
+        void clean_csd_job(); 
+        bool in_csd_mode = false;
+        uint64_t csd_cycles = 0;
+        bool csd_job_loaded = false;
+        bool csd_job_finished = false;
+        uint64_t csd_start_pc = 0;
+        uint64_t mutex_lock_acquires = 0;
+        uint64_t mutex_lock_acquire_cycles = 0;
+        uint64_t mutex_lock_acquire_start = 0;
+
+        bool should_stal = false;
 
 };
 

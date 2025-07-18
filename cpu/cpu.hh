@@ -78,6 +78,7 @@ typedef struct _RISCVJob {
     : request(req), func(f), context(c) {}
 } RISCVJob;
 
+
 struct __attribute__((packed, aligned(4))) ftl_params {
   uint64_t totalPhysicalBlocks;
   uint64_t totalLogicalBlocks;
@@ -213,6 +214,9 @@ class CPU : public StatObject {
     uint32_t test_count;
     uint32_t test_size_min;
     uint32_t test_size_max;
+    uint64_t last_start_tick = 0;
+    uint64_t active_periods = 0;
+    uint64_t active_duration = 0;
   public:
     CPU(ConfigReader &, ICL::ICL *, FTL::FTL *, PAL::PAL *pal, DRAM::AbstractDRAM *dram);
     ~CPU();
@@ -259,7 +263,8 @@ class CPU : public StatObject {
     void generateSequentialTrim(uint64_t count, uint64_t min_size, uint64_t max_size);
     void generateSequentialFormat(uint64_t count, uint64_t min_size, uint64_t max_size);
     void generateSequentialFlush(uint64_t count, uint64_t min_size, uint64_t max_size);
-};
+    
+};  
 
 }  // namespace CPU
 

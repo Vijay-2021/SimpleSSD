@@ -77,8 +77,8 @@ static uint64_t rv_soc_bus_access(void *priv, privilege_level priv_level, bus_ac
         }
     }
     printf("address is: %p\n", (void*)address);
-    printf("pc is: %p\n", (void*)rv_soc->rv_cores[0].pc);
-    printf("instruction is: %x\n", rv_soc->rv_cores[0].instruction);
+    printf("pc is: %p\n", (void*)rv_soc->rv_cores[rv_soc->current_core].pc);
+    printf("instruction is: %x\n", rv_soc->rv_cores[rv_soc->current_core].instruction);
     die_msg("Invalid Addresses, or no valid write pointer found, write not executed!");
     return 0; // 0 to indicate error
 }
@@ -190,10 +190,12 @@ void SOC::rv_soc_run()
     for (uint32_t core_id = 0; core_id < rv_cores.size(); core_id++) {
         rv_cores[core_id].rv_core_reg_dump();
     }
-    while(soc_run_mode_ != PAUSED_MODE && soc_run_mode_ != FAILED_MODE) 
+    uint64_t time = 0;
+    while(soc_run_mode_ == FAST_FORWARD_MODE) 
     {
         if (cores_setup) {
             for (uint32_t core_id = 0; core_id < rv_cores.size(); core_id++) {
+                current_core = core_id; // set the current core for the callbacks
                 rv_cores[core_id].rv_core_run();
             }
             
@@ -226,6 +228,7 @@ uint64_t SOC::rv_soc_tick(uint64_t num_cycles)
             next_tick = std::numeric_limits<uint64_t>::max(); // reset next tick to max value for each cycle
             for (uint32_t core_id = 0; core_id < rv_cores.size(); core_id++) {
                 if (getTick() >= next_core_ticks[core_id]) {
+                    current_core = core_id; // set the current core for the callbacks
                     next_core_ticks[core_id] = getTick() + clock_period*rv_cores[core_id].rv_core_run();
                 }
                 next_tick = std::min(next_tick, next_core_ticks[core_id]); // for scheduling purposes, we need to find the next tick across all cores
@@ -256,20 +259,15 @@ uint64_t SOC::rv_soc_tick(uint64_t num_cycles)
 
 void SOC::rv_soc_add_task(char *input_cmd)
 {
-    // This function is not implemented yet, but it should add a task to the CSD
-    // For now, we just print the input command
-    printf("Adding CSD task from soc: %s\n", input_cmd);
-    strtok(input_cmd, " "); // Tokenize the input command if needed
-    
-    // You can implement the actual task addition logic here
+    csd_queue.push(input_cmd);
 }
-
 
 uint64_t SOC::lread(uint8_t* buffer, uint64_t offset , uint64_t len) {
-    return pCPU->read_flash_icl(buffer, offset, len);
+    return pCPU->read_flash_icl(buffer, offset, len); // add the read request to the queue
 }
+
 uint64_t SOC::lwrite(uint8_t *buffer, uint64_t offset, uint64_t len) {
-    return pCPU->write_flash_icl(buffer, offset, len);
+    return pCPU->write_flash_icl(buffer, offset, len); // add the write request to the queue
 }
 
 uint64_t SOC::ltrim(uint8_t *buffer, uint64_t offset, uint64_t len) {
@@ -287,7 +285,18 @@ void SOC::perase(uint8_t* request, uint64_t* tick) {
 }
 
 void SOC::read_buffer(uint8_t *buffer, uint64_t req_info, uint64_t req_type) {
-    pCPU->read_buffer(buffer, req_info, req_type);
+    if (req_type == FIRMWARE_CSD_QUEUE_TOP) {
+        char* csd_job = csd_queue.front();
+        printf("Calling CSD queue top with job: %s\n", csd_job);
+        memcpy(buffer, csd_queue.front(), strlen(csd_job) + 1); // copy the job to the buffer
+        csd_queue.pop(); // remove the job from the queue after reading
+
+    } else if (req_type == FIRMWARE_CSD_QUEUE_SIZE) {
+        uint64_t size = csd_queue.size();
+        memcpy(buffer, &size, sizeof(uint64_t));
+    } else {
+        pCPU->read_buffer(buffer, req_info, req_type);
+    }
 }
 
 void SOC::coreSetup(uint64_t function_addr, uint64_t function_arg_ptr) {
@@ -349,7 +358,7 @@ void SOC::write_buffer(uint8_t* buffer, uint64_t req_info, uint64_t req_type) {
 }
 uint64_t SOC::get_period() {
     return clock_period;
-}
+} 
 
 uint8_t* SOC::get_ram() {
     return ram;
@@ -425,6 +434,148 @@ uint64_t SOC::write(uint64_t addr, uint64_t len) {
 
 bool SOC::getTestMode() {
     return test_mode;
+}
+
+void getStatList(std::vector<Stats> &stats, std::string prefix) {
+    Stats temp;
+    
+    for (auto & core : rv_cores) {
+        cores.getStatList(stats, prefix + std::to_string(core.core_id));    
+    }
+
+    temp.name = prefix + ".icl_read_requests";
+    temp.desc = "Total ICL read requests";
+    list.push_back(temp);
+    temp.name = prefix + ".icl_write_requests";
+    temp.desc = "Total ICL write requests";
+    list.push_back(temp);
+    temp.name = prefix + ".icl_trim_requests";
+    temp.desc = "Total ICL trim requests";
+    list.push_back(temp);
+    temp.name = prefix + ".icl_format_requests";
+    temp.desc = "Total ICL format requests";
+    list.push_back(temp);
+    temp.name = prefix + ".icl_flush_requests";
+    temp.desc = "Total ICL flush requests";
+    list.push_back(temp);
+    temp.name = prefix + ".read_cache_hits";
+    temp.desc = "Total read cache hits";
+    list.push_back(temp);
+    temp.name = prefix + ".read_cache_misses";
+    temp.desc = "Total read cache misses";
+    list.push_back(temp);
+    temp.name = prefix + ".write_cache_hits";
+    temp.desc = "Total write cache hits";
+    list.push_back(temp);
+    temp.name = prefix + ".write_cache_misses";
+    temp.desc = "Total write cache misses";
+    list.push_back(temp);
+    temp.name = prefix + ".read_cache_evictions";
+    temp.desc = "Total read cache evictions";
+    list.push_back(temp);
+    temp.name = prefix + ".write_cache_evictions";
+    temp.desc = "Total write cache evictions";
+    list.push_back(temp);
+    temp.name = prefix + ".icl_read_cycles";
+    temp.desc = "Total ICL read cycles";
+    list.push_back(temp);
+    temp.name = prefix + ".icl_write_cycles";
+    temp.desc = "Total ICL write cycles";
+    list.push_back(temp);
+    temp.name = prefix + ".icl_trim_cycles";
+    temp.desc = "Total ICL trim cycles";
+    list.push_back(temp);
+    temp.name = prefix + ".icl_format_cycles";
+    temp.desc = "Total ICL format cycles";
+    list.push_back(temp);
+    temp.name = prefix + ".icl_flush_cycles";
+    temp.desc = "Total ICL flush cycles";
+    list.push_back(temp);
+
+    temp.name = prefix + ".ftl_read_requests";
+    temp.desc = "Total FTL read requests";
+    list.push_back(temp);
+    temp.name = prefix + ".ftl_write_requests";
+    temp.desc = "Total FTL write requests";
+    list.push_back(temp);
+    temp.name = prefix + ".ftl_trim_requests";
+    temp.desc = "Total FTL trim requests";
+    list.push_back(temp);
+    temp.name = prefix + ".ftl_format_requests";
+    temp.desc = "Total FTL format requests";
+    list.push_back(temp);
+    temp.name = prefix + ".ftl_garbage_collection_requests";
+    temp.desc = "Total FTL garbage collection requests";
+    list.push_back(temp);
+    temp.name = prefix + ".ftl_read_cycles";
+    temp.desc = "Total FTL read cycles";
+    list.push_back(temp);
+    temp.name = prefix + ".ftl_write_cycles";
+    temp.desc = "Total FTL write cycles";
+    list.push_back(temp);
+    temp.name = prefix + ".ftl_trim_cycles";
+    temp.desc = "Total FTL trim cycles";
+    list.push_back(temp);
+    temp.name = prefix + ".ftl_format_cycles";
+    temp.desc = "Total FTL format cycles";
+    list.push_back(temp);
+    temp.name = prefix + ".ftl_garbage_collection_cycles";
+    temp.desc = "Total FTL garbage collection cycles";
+    list.push_back(temp);  
+
+    temp.name = prefix + ".total_simulated_cycles";
+    temp.desc = "Total simulated cycles";
+    list.push_back(temp);
+    temp.name = prefix + ".total_fast_forward_cycles";
+    temp.desc = "Total fast forward cycles";
+    list.push_back(temp);
+
+    temp.name = prefix + ".total_dram_read_accesses";
+    temp.desc = "Total DRAM read accesses";
+    list.push_back(temp);
+    temp.name = prefix + ".total_dram_read_stalled_cycles";
+    temp.desc = "Total DRAM Read latency";
+    list.push_back(temp);
+    temp.name = prefix + ".total_dram_write_accesses";
+    temp.desc = "Total DRAM write accesses";
+    list.push_back(temp);
+    temp.name = prefix + ".total_dram_write_stalled_cycles";
+    temp.desc = "Total DRAM Write latency";
+    list.push_back(temp);
+    temp.name = prefix + ".total_dram_read_bytes_transferred"; // ICL requests are modelled similar to OpenSSD by requesting a large amount of data from DRAM
+    temp.desc = "Total DRAM read bytes transferred";
+    list.push_back(temp);
+    temp.name = prefix + ".total_dram_write_bytes_transferred";
+    temp.desc = "Total DRAM write bytes transferred";
+    list.push_back(temp);
+
+ 
+    temp.name = prefix + ".total_cache_read_accesses";
+    temp.desc = "Total Cache read accesses";
+    list.push_back(temp);
+    temp.name = prefix + ".total_cache_read_hits";
+    temp.desc = "Total Cache read hits";
+    list.push_back(temp);
+    temp.name = prefix + ".total_cache_read_misses";
+    temp.desc = "Total Cache read misses";
+    list.push_back(temp);
+    temp.name = prefix + ".total_cache_write_accesses";
+    temp.desc = "Total Cache write accesses";
+    list.push_back(temp);
+    temp.name = prefix + ".total_cache_write_hits";
+    temp.desc = "Total Cache write hits";
+    list.push_back(temp);
+    temp.name = prefix + ".total_cache_write_misses";
+    temp.desc = "Total Cache write misses";
+    list.push_back(temp);
+    temp.name = prefix + ".total_cache_read_evictions";
+    temp.desc = "Total Cache read evictions";
+    list.push_back(temp);
+    temp.name = prefix + ".total_cache_write_evictions";
+    temp.desc = "Total Cache write evictions";
+    list.push_back(temp);
+
+
 }
 
 } // namespace RISCV

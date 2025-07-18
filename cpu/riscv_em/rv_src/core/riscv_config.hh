@@ -39,6 +39,6 @@
 #define SRAM_SIZE 0x10000UL /* 64KB */
 #define SRAM_BLOCK_SIZE 0x40UL /* 64B */
 #define SRAM_NUM_WAYS 8 /* 8-way set associative */
-#define STACK_SIZE 0x100000 /* 1MB stack size per core */
-
+#define STACK_SIZE 0x10000000 /* 16MB stack size per core */
+#define CSD_CYCLES_LIMIT 10000 
 #endif /* RISCV_CONFIG_H */
