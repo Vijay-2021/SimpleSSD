@@ -219,15 +219,15 @@ int ConfigReader::parserHandler(void *context, const char *section,
   return 1;
 }
 
-DRAM::Config::DRAMStructure *ConfigReader::getDRAMStructure() {
+Memory::Config::DRAMStructure *ConfigReader::getDRAMStructure() {
   return dramConfig.getDRAMStructure();
 }
 
-DRAM::Config::DRAMTiming *ConfigReader::getDRAMTiming() {
+Memory::Config::DRAMTiming *ConfigReader::getDRAMTiming() {
   return dramConfig.getDRAMTiming();
 }
 
-DRAM::Config::DRAMPower *ConfigReader::getDRAMPower() {
+Memory::Config::DRAMPower *ConfigReader::getDRAMPower() {
   return dramConfig.getDRAMPower();
 }
 

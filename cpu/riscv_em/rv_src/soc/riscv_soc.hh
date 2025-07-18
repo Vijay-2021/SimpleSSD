@@ -12,11 +12,8 @@
 
 namespace SimpleSSD {
 
-namespace DRAM {
-    class AbstractDRAM; 
-}
-
-namespace SRAM {
+namespace Memory {
+    class SimpleDRAM;
     class SRAM; 
 }
 
@@ -26,16 +23,10 @@ class CPU;
 
 namespace RISCV {
 
-struct RISCVStats {
-    FTLStats* ftl_stats; // these  don't have definite addreses at init
-    ICLStats* icl_stats; 
-    // CoreStats* core_stats; // Pointer to an array of CoreStats, one for each core
-    uint64_t total_cycles;
-};
 
-class SOC : StatObject{
+class SOC : public StatObject {
     public: 
-        SOC(char *fw_file_name, char *dtb_file_name, char *initrd_file_name, CPU *cpu, uint32_t num_cores, DRAM::AbstractDRAM *dram);
+        SOC(char *fw_file_name, char *dtb_file_name, char *initrd_file_name, CPU *cpu, uint32_t num_cores, Memory::SimpleDRAM *dram);
         ~SOC();
         void rv_soc_dump_mem();
         void rv_soc_run(); // run the SOC until either success is reached or a stop signal is sent
@@ -59,7 +50,6 @@ class SOC : StatObject{
         void start_simulation();
         void stop_simulation();
         void next_simulation_tick(uint64_t next_tick);
-        void resetStatValues();
         void coreSetup(uint64_t function_addr, uint64_t function_arg_ptr);
 
         typedef struct rv_soc_mem_access_cb_struct
@@ -98,10 +88,13 @@ class SOC : StatObject{
         void getStatList(std::vector<Stats> &list, std::string prefix) override;
         void getStatValues(std::vector<double> &values) override;
         void resetStatValues() override;
+        uint64_t total_cycles = 0;
+        uint64_t total_fast_forward_cycles = 0;
+        FTLStats *ftl_stats;
+        ICLStats *icl_stats;
 
     private: 
         CPU *pCPU; 
-        RISCVStats stats;
         uint8_t *mrom; /* Contains reset vector and device-tree? */
         uint8_t *ram;
         uint8_t *from; /* Contains filesystem */

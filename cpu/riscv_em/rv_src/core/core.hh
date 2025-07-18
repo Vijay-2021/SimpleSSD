@@ -9,6 +9,7 @@
 #include "rv_src/peripherals/clint/clint.hh"
 #include "rv_src/core/csr/csr.hh"
 #include "rv_src/core/mmu/mmu.hh"
+#include "sim/statistics.hh"
 
 #define NR_RVI_REGS 32
 #define NR_RVF_REGS 32
@@ -43,7 +44,7 @@ struct CSDData {
 };
 
 
-class Core : StatObject{
+class Core : public StatObject {
     public: 
         privilege_level curr_priv_mode;
         uint64_t curr_cycle;
@@ -116,9 +117,9 @@ class Core : StatObject{
 
         bool should_stal = false;
 
-        void getStatList(std::vector<Stats> &stats, std::string prefix) override;
+        void getStatList(std::vector<Stats> &list, std::string prefix) override;
         void getStatValues(std::vector<double> &values) override;
-        void resetValues() override;
+        void resetStatValues() override;
 
 };
 

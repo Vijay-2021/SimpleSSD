@@ -19,7 +19,7 @@
 
 #include "icl/icl.hh"
 
-#include "dram/simple.hh"
+
 #include "icl/generic_cache.hh"
 #include "util/algorithm.hh"
 #include "util/def.hh"
@@ -31,7 +31,7 @@ namespace ICL {
 ICL::ICL(ConfigReader &c) : conf(c) {
   switch (conf.readInt(CONFIG_DRAM, DRAM::DRAM_MODEL)) {
     case DRAM::SIMPLE_MODEL:
-      pDRAM = new DRAM::SimpleDRAM(conf);
+      pDRAM = new Memory::SimpleDRAM(conf);
 
       break;
     default:

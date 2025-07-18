@@ -1,3 +1,15 @@
+#ifndef __ABSTRACT_ICL_HH__
+#define __ABSTRACT_ICL_HH__
+
+#include "vector.hh"
+#include "ftl.hh"
+#include "mutex.h"
+#include "abstract_icl.hh"
+
+namespace FTL {
+    class FTL;
+}
+
 namespace ICL {
 
 typedef struct _Line {
@@ -24,6 +36,15 @@ typedef enum {
 
 typedef PREFETCH_MODE EVICT_MODE;
 
+typedef enum {
+    ICL_CACHE_SIMPLE = 0,                //!< Simple cache
+    ICL_CACHE_PARTITIONED = 1,           //!< Partitioned cache
+    ICL_CACHE_DATASTRUCTURE = 2,         //!< Data structure cache
+    ICL_CACHE_PARTITIONED_DATASTRUCTURE = 3, //!< Partitioned data structure cache
+} ICL_CACHE_TYPE;
+
+
+
 struct __attribute__((packed, aligned(4))) icl_params {
     uint32_t pageSize;
     uint32_t pageCountToMaxPerf;
@@ -38,6 +59,7 @@ struct __attribute__((packed, aligned(4))) icl_params {
     uint64_t cacheSize;
     EVICT_MODE iclEvictGranularity;
     PREFETCH_MODE iclPrefetchGranularity;
+    ICL_CACHE_TYPE cacheType; //!< Type of cache
 };
 
 struct ICLStats {
@@ -83,8 +105,8 @@ class AbstractICL {
         const bool useReadPrefetch;
 
         bool bSuperPage;
-        uint8_t* copy_buffer;
-
+        uint8_t* cache_buffer;
+        uint8_t *copy_buffer;
         struct SequentialDetect {
             bool enabled;
             Request lastRequest;
@@ -105,20 +127,6 @@ class AbstractICL {
         Vector<Line *> cacheData;
         Vector<Line **> evictData;
 
-        uint32_t evictFunction(uint32_t setIdx);
-        Line* compareFunction(Line *a, Line *b);
-
-        uint64_t getCacheLatency();
-
-        uint32_t calcSetIndex(uint64_t);
-        void calcIOPosition(uint64_t, uint32_t &, uint32_t &);
-
-        uint32_t getEmptyWay(uint32_t);
-        uint32_t getValidWay(uint64_t);
-        void checkSequential(Request &, SequentialDetect &);
-
-
-
         // Stats
         struct {
             uint64_t request[2];
@@ -134,20 +142,21 @@ class AbstractICL {
         uint32_t getEmptyWay(uint32_t setIdx);
         uint32_t getValidWay(uint64_t lca);
         void checkSequential(Request &req, SequentialDetect &data);
-        void resetStatValues();
         uint32_t evictFunction(uint32_t setIdx);
         Line* compareFunction(Line *a, Line *b);
-        virtual void evictCache(bool = true);
+        virtual void evictCache(bool = true) = 0;
         Mutex stat_mutex;
     public:
-        virtual bool read(Request &);
-        virtual bool write(Request &);
-        virtual void flush(LPNRange &);
-        virtual void trim(LPNRange &);
-        virtual void format(LPNRange &);
+        virtual bool read(Request &) = 0;
+        virtual bool write(Request &) = 0;
+        virtual void flush(LPNRange &) = 0;
+        virtual void trim(LPNRange &) = 0;
+        virtual void format(LPNRange &) = 0;
         AbstractICL(icl_params& cparams, FTL::FTL *ftl);
-        virtual ~AbstractICL();
+        ~AbstractICL();
         void resetStatValues();
         ICLStats icl_stats;
 };
 }
+
+#endif // __ABSTRACT_ICL_HH__

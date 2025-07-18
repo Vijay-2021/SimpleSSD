@@ -109,7 +109,7 @@ bool SRAM::write(uint64_t address){
 	return false;	
 }
 
-void SRAM::resetStats() {
+void SRAM::resetStatValues() {
 	reads = 0;
 	read_misses = 0;
 	writes = 0;

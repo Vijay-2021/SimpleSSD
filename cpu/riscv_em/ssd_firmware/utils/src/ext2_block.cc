@@ -1,15 +1,15 @@
 #include "cs_instructions.h"
 #include "ext2_block.hh"
-#include "icl.hh"
+#include "abstract_icl.hh"
 #include "def.hh"
 #include "utils.h"
 
-static ICL::ICL* internal_icl = nullptr;
+static ICL::AbstractICL* internal_icl = nullptr;
 static uint32_t page_size = 16384; // 16KB
 static uint32_t lba_size = 512; // 512B
 static uint64_t global_req_id = 0;
 
-void set_ext2_icl(ICL::ICL* icl) {
+void set_ext2_icl(ICL::AbstractICL* icl) {
     internal_icl = icl;
 }
 

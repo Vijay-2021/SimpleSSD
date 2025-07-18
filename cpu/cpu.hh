@@ -64,8 +64,8 @@ namespace PAL {
   class PAL;
 }
 
-namespace DRAM {
-  class AbstractDRAM;
+namespace Memory {
+  class SimpleDRAM;
 }
 
 namespace CPU {
@@ -113,6 +113,7 @@ struct __attribute__((packed, aligned(4))) icl_params {
     uint64_t cacheSize;
     ICL::EVICT_MODE iclEvictGranularity;
     ICL::PREFETCH_MODE iclPrefetchGranularity;
+    ICL::ICL_CACHE_TYPE cacheType; //!< Type of cache
 };
 
 typedef struct _InstStat {
@@ -183,7 +184,7 @@ class CPU : public StatObject {
     ICL::ICL *pICL;
     FTL::FTL *pFTL;
     PAL::PAL *pPAL;
-    DRAM::AbstractDRAM *pDRAM;
+    Memory::SimpleDRAM *pDRAM;
     Disk *pDisk;
 
     uint64_t lastResetStat;
@@ -218,7 +219,7 @@ class CPU : public StatObject {
     uint64_t active_periods = 0;
     uint64_t active_duration = 0;
   public:
-    CPU(ConfigReader &, ICL::ICL *, FTL::FTL *, PAL::PAL *pal, DRAM::AbstractDRAM *dram);
+    CPU(ConfigReader &, ICL::ICL *, FTL::FTL *, PAL::PAL *pal, Memory::SimpleDRAM *dram);
     ~CPU();
 
     void execute(NAMESPACE, FUNCTION, DMAFunction &, void * = nullptr,

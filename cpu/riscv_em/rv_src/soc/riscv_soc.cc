@@ -11,8 +11,8 @@
 #include "rv_src/helpers/file_helper.hh"
 #include "rv_src/core/instruction_timings.hh"
 #include "cpu/cpu.hh"
-#include "dram/abstract_dram.hh"
-#include "dram/sram.hh"
+#include "memory/simple.hh"
+#include "memory/sram.hh"
 
 namespace SimpleSSD {
 
@@ -83,7 +83,7 @@ static uint64_t rv_soc_bus_access(void *priv, privilege_level priv_level, bus_ac
     return 0; // 0 to indicate error
 }
 
-SOC::SOC(char *fw_file_name, char *dtb_file_name, char *initrd_file_name, CPU *cpu, uint32_t num_cores, DRAM::AbstractDRAM *dram) : pDRAM(dram), pCPU(cpu)
+SOC::SOC(char *fw_file_name, char *dtb_file_name, char *initrd_file_name, CPU *cpu, uint32_t num_cores, Memory::SimpleDRAM *dram) : pDRAM(dram), pCPU(cpu)
 {
     #define RESET_VEC_SIZE 10
     #define MiB 0x100000
@@ -95,8 +95,8 @@ SOC::SOC(char *fw_file_name, char *dtb_file_name, char *initrd_file_name, CPU *c
     uint64_t fdt_size = 0;
     uint64_t tmp = 0;
 
-    stats.ftl_stats = nullptr; // set to null until firmware overwrites it
-    stats.icl_stats = nullptr;
+    ftl_stats = nullptr; // set to null until firmware overwrites it
+    icl_stats = nullptr;
 
     clock_period = pCPU->getClockPeriod(); 
     /* Init everything to zero */
@@ -104,7 +104,7 @@ SOC::SOC(char *fw_file_name, char *dtb_file_name, char *initrd_file_name, CPU *c
     from = (uint8_t*) calloc(FROM_SIZE_BYTES, sizeof(uint8_t));
     mrom = (uint8_t*) calloc(MROM_SIZE_BYTES, sizeof(uint8_t));
     ram = (uint8_t*) calloc(RAM_SIZE_BYTES, sizeof(uint8_t));
-    pCache = new SRAM::SRAM(SRAM_SIZE, SRAM_BLOCK_SIZE, SRAM_NUM_WAYS);
+    pCache = new Memory::SRAM(SRAM_SIZE, SRAM_BLOCK_SIZE, SRAM_NUM_WAYS);
     ICL_HIGH = 0;
     ICL_LOW = 0;
     /* Copy dtb and firmware */
@@ -211,7 +211,8 @@ void SOC::rv_soc_run()
         } else {
             rv_cores[0].rv_core_run(); // run only the first core until cores are set up
         }
-        stats.total_cycles++;
+        total_cycles++;
+        total_fast_forward_cycles++;
     }
     
 }
@@ -223,20 +224,26 @@ uint64_t SOC::rv_soc_tick(uint64_t num_cycles)
     uint8_t uart_irq_pending = 0;
     uint64_t next_tick = getTick() + clock_period; // default next tick is the next cycle
     // rv_core_reg_dump(&rv_core0);
+    uint64_t next_cycle = std::numeric_limits<uint64_t>::max(); // reset next cycle to max value for each cycle
     for (uint64_t current_cycle = 0; current_cycle < num_cycles && soc_run_mode_ != PAUSED_MODE && soc_run_mode_ != FAILED_MODE; current_cycle++) {
         if (cores_setup) {
             next_tick = std::numeric_limits<uint64_t>::max(); // reset next tick to max value for each cycle
             for (uint32_t core_id = 0; core_id < rv_cores.size(); core_id++) {
                 if (getTick() >= next_core_ticks[core_id]) {
                     current_core = core_id; // set the current core for the callbacks
-                    next_core_ticks[core_id] = getTick() + clock_period*rv_cores[core_id].rv_core_run();
+                    uint64_t curr_cycle = rv_cores[core_id].rv_core_run();
+                    next_core_ticks[core_id] = getTick() + clock_period*curr_cycle;
+                    next_cycle = std::min(next_cycle, curr_cycle); // find the next cycle across all cores
                 }
+                total_cycles+= next_cycle;
                 next_tick = std::min(next_tick, next_core_ticks[core_id]); // for scheduling purposes, we need to find the next tick across all cores
             }
         } else {
             if (getTick() >= next_core_ticks[0]) {
-                next_core_ticks[0] = getTick() + clock_period*rv_cores[0].rv_core_run();
+                next_cycle = rv_cores[0].rv_core_run();
+                next_core_ticks[0] = getTick() + clock_period*next_cycle;
             }
+            total_cycles += next_cycle;
             next_tick = next_core_ticks[0]; // for the first core, just use its next tick
         }
         // uart_irq_pending = simple_uart_update(&uart);
@@ -252,7 +259,6 @@ uint64_t SOC::rv_soc_tick(uint64_t num_cycles)
         // for (uint32_t core_id = 0; core_id < rv_cores.size(); core_id++) {
         //     rv_cores[core_id].rv_core_process_interrupts(mei, mti, msi);
         // }
-        stats.total_cycles++;
     }
     return next_tick;
 }
@@ -378,31 +384,31 @@ void SOC::next_simulation_tick(uint64_t next_tick) {
 
 void SOC::resetStatValues() {
     for (auto &core : rv_cores) {
-        core.reset_stats();
+        core.resetStatValues();
     }
-    if (stats.ftl_stats) {
-        memset(stats.ftl_stats, 0, sizeof(FTLStats));
+    if (ftl_stats) {
+        memset(ftl_stats, 0, sizeof(FTLStats));
     } 
-    if (stats.icl_stats) {
-        memset(stats.icl_stats, 0, sizeof(ICLStats));
+    if (icl_stats) {
+        memset(icl_stats, 0, sizeof(ICLStats));
     }
-    stats.total_cycles = 0; 
-    stats.fast_forward_cycles = 0;
-    pDRAM->resetStats();
-    pCache->resetStats();
+    total_cycles = 0; 
+    total_fast_forward_cycles = 0;
+    pDRAM->resetStatValues();
+    pCache->resetStatValues();
 }
 
 FTLStats* SOC::getFTLStats() {
-    return stats.ftl_stats;
+    return ftl_stats;
 }
 ICLStats* SOC::getICLStats() {
-    return stats.icl_stats;
+    return icl_stats;
 }
 void SOC::setFTLStats(FTLStats *ftl_stats) {
-    stats.ftl_stats = ftl_stats;
+    ftl_stats = ftl_stats;
 }
 void SOC::setICLStats(ICLStats *icl_stats) {
-    stats.icl_stats = icl_stats;
+    icl_stats = icl_stats;
 }
 
 void SOC::setICLLow(uint64_t *icl_low) {
@@ -417,7 +423,7 @@ uint64_t SOC::read(uint64_t addr, uint64_t len) {
     if (((ICL_HIGH == 0 && ICL_LOW == 0) || (addr > ICL_HIGH || addr < ICL_LOW)) && pCache->read(addr)) {
         return LOAD_CACHE_CYCLE_COUNT;
     } else {
-        uint64_t dramReadTime = pDRAM->access((void*)addr, len);
+        uint64_t dramReadTime = pDRAM->read_dram((void*)addr, len);
         double cyclesD = std::ceil(dramReadTime / clock_period);
         uint64_t cycles = static_cast<uint64_t>(cyclesD);
         return cycles;
@@ -428,7 +434,7 @@ uint64_t SOC::write(uint64_t addr, uint64_t len) {
     if (((ICL_HIGH == 0 && ICL_LOW == 0) || (addr > ICL_HIGH || addr < ICL_LOW)) && pCache->write(addr)) {
         return WRITE_CACHE_CYCLE_COUNT;
     } else {
-        uint64_t dramWriteTime = pDRAM->access((void*)addr, len);
+        uint64_t dramWriteTime = pDRAM->write_dram((void*)addr, len);
         double cyclesD = std::ceil(dramWriteTime / clock_period);
         uint64_t cycles = static_cast<uint64_t>(cyclesD);
         return cycles;
@@ -443,7 +449,7 @@ void SOC::getStatList(std::vector<Stats> &list, std::string prefix) {
     Stats temp;
     
     for (auto & core : rv_cores) {
-        core.getStatList(stats, prefix + ".core " + std::to_string(core.core_id));
+        core.getStatList(list, prefix + ".core " + std::to_string(core.core_id));
     }
 
     temp.name = prefix + ".icl_read_requests";
@@ -505,6 +511,10 @@ void SOC::getStatList(std::vector<Stats> &list, std::string prefix) {
     list.push_back(temp);
     temp.name = prefix + ".icl_flush_bytes_transferred";
     temp.desc = "Total ICL flush bytes transferred";
+    list.push_back(temp);
+
+    temp.name = prefix + ".heap_top";
+    temp.desc = "Heap top address";
     list.push_back(temp);
 
     temp.name = prefix + ".ftl_read_requests";
@@ -599,7 +609,7 @@ void SOC::getStatValues(std::vector<double> &values) {
     for (auto & core : rv_cores) {
         core.getStatValues(values);
     }
-    auto *icl_stats = riscv_soc->getICLStats();
+    auto *icl_stats = getICLStats();
     if (icl_stats != nullptr) {
         values.push_back(icl_stats->read_requests);
         values.push_back(icl_stats->write_requests);
@@ -610,25 +620,25 @@ void SOC::getStatValues(std::vector<double> &values) {
         values.push_back(icl_stats->read_cache_misses);
         values.push_back(icl_stats->write_cache_hits);
         values.push_back(icl_stats->write_cache_misses);
-        values.push_back(icl_stats->read_cache_evictions);
-        values.push_back(icl_stats->write_cache_evictions);
+        values.push_back(icl_stats->cache_evictions);
         values.push_back(icl_stats->read_req_cycles);
         values.push_back(icl_stats->write_req_cycles);
         values.push_back(icl_stats->trim_req_cycles);
         values.push_back(icl_stats->format_req_cycles);
         values.push_back(icl_stats->flush_req_cycles);
-        values.push_back(icl_stats->read_bytes_transferred);
-        values.push_back(icl_stats->write_bytes_transferred);
-        values.push_back(icl_stats->trim_bytes_transferred);
-        values.push_back(icl_stats->format_bytes_transferred);
-        values.push_back(icl_stats->flush_bytes_transferred);
+        values.push_back(icl_stats->read_bytes);
+        values.push_back(icl_stats->write_bytes);
+        values.push_back(icl_stats->trim_bytes);
+        values.push_back(icl_stats->format_bytes);
+        values.push_back(icl_stats->flush_bytes);
+        values.push_back(icl_stats->heap_top);
     } else {
         // If ICL stats are not available, push zeros
-        for (size_t i = 0; i < 20; i++) {
+        for (size_t i = 0; i < 21; i++) {
         values.push_back(0);
         }
     }
-    auto *ftl_stats = riscv_soc->getFTLStats();
+    auto *ftl_stats = getFTLStats();
     if (ftl_stats != nullptr) {
         values.push_back(ftl_stats->read_requests);
         values.push_back(ftl_stats->write_requests);
@@ -643,11 +653,11 @@ void SOC::getStatValues(std::vector<double> &values) {
     } else {
         // If FTL stats are not available, push zeros
         for (size_t i = 0; i < 10; i++) {
-        values.push_back(0);
+            values.push_back(0);
         }
     }
-    values.push_back(riscv_soc->stats.total_cycles);
-    values.push_back(riscv_soc->stats.total_fast_forward_cycles);
+    values.push_back(total_cycles);
+    values.push_back(total_fast_forward_cycles);
     pDRAM->getStatValues(values);
     pCache->getStatValues(values);   
 }

@@ -22,7 +22,7 @@
 
 #include <list>
 #include <vector>
-#include "dram/abstract_dram.hh"
+#include "memory/abstract_dram.hh"
 
 namespace SimpleSSD {
 
@@ -51,27 +51,30 @@ class SimpleDRAM : public AbstractDRAM {
   uint64_t updateDelay(uint64_t, uint64_t &);
   void updateStats(uint64_t);
   std::vector<uint64_t> open_rows;
-
+  std::vector<uint64_t> bank_available;
+  uint64_t total_stall_cycles = 0;
+  uint64_t total_stalls = 0;
  public:
   SimpleDRAM(ConfigReader &p);
   ~SimpleDRAM();
 
   void read(void *, uint64_t, uint64_t &) override;
   void write(void *, uint64_t, uint64_t &) override;
-
+  
   void setScheduling(bool) override;
   bool isScheduling() override;
 
   void getStatList(std::vector<Stats> &, std::string) override;
   void getStatValues(std::vector<double> &) override;
   void resetStatValues() override;
-
+  uint64_t read_dram(uint64_t addr, uint64_t size);
+  uint64_t write_dram(uint64_t addr, uint64_t size);
   uint64_t access(uint64_t addr, uint64_t size);
   uint64_t getBank(uint64_t addr);
   uint64_t getRow(uint64_t addr);
 };
 
-}  // namespace DRAM
+}  // namespace Memory
 
 }  // namespace SimpleSSD
 

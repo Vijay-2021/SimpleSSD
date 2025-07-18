@@ -1,5 +1,9 @@
 #include "ftl.hh"
-#include "icl.hh"
+#include "abstract_icl.hh"
+#include "datastructure_locks_icl.hh"
+#include "simple_icl.hh"
+#include "partitioned_icl.hh"
+#include "partition_datastructure_icl.hh"
 #include "utils.h"
 #include "def.hh"
 #include "cs_instructions.h"
@@ -9,7 +13,7 @@
 #include "print_wrapper.hh"
 struct FirmwareData {
     FTL::FTL *ftl;
-    ICL::ICL *icl;
+    ICL::AbstractICL *icl;
 };
 
 struct CSDJob {
@@ -29,7 +33,7 @@ EmbExt2 *fs_context = nullptr;
 MemoryAllocator* allocator = nullptr;
 PrintWrapper* print_wrapper = nullptr;
 void process_requests(FirmwareData *data) {
-    ICL::ICL *cache = data->icl;
+    ICL::AbstractICL *cache = data->icl;
     FTL::FTL *ftl = data->ftl;
     ICL::Request req;
     bool csd_job_loaded = false; 
@@ -153,38 +157,38 @@ int main(int argc, char** argv) {
     read_buffer((uint64_t)&fparams, 0, FIRMWARE_FTL_PARAMS);
     read_buffer((uint64_t)&cparams, 0, FIRMWARE_ICL_PARAMS);
     printf("read params\n");
-    ICL::ICL* cache; 
+    ICL::AbstractICL* cache; 
+    FTL::FTL ftl(fparams); // just initialize it for now
     switch (cparams.cacheType) {
         case ICL::ICL_CACHE_SIMPLE:
             printf("Using SimpleICL cache\n");
-            cache = new ICL::SimpleICL(cparams, &fparams);
+            cache = new ICL::SimpleICL(cparams, &ftl);
             break;
         case ICL::ICL_CACHE_PARTITIONED: 
             printf("Using PartitionedICL cache\n");
-            cache = new ICL::PartitionedICL(cparams, &fparams);
+            cache = new ICL::PartitionedICL(cparams, &ftl);
         case ICL::ICL_CACHE_DATASTRUCTURE:
             printf("Using DataStructureICL cache\n");
-            cache = new ICL::DataStructureICL(cparams, &fparams);
+            cache = new ICL::DSICL(cparams, &ftl);
         case ICL::ICL_CACHE_PARTITIONED_DATASTRUCTURE:
             printf("Using PartitionedDataStructureICL cache\n");
-            cache = new ICL::PartitionedDataStructureICL(cparams, &fparams);
+            cache = new ICL::PartitionedDSICL(cparams, &ftl);
             break;
         default:
             panic("Unknown cache type: %d\n", cparams.cacheType);
     }
-    FTL::FTL ftl(fparams); // just initialize it for now
     
-    write_buffer((uint64_t)&cache.icl_stats, 0, ICL_STAT_LOC);
+    write_buffer((uint64_t)&cache->icl_stats, 0, ICL_STAT_LOC);
     write_buffer((uint64_t)&ftl.ftl_stats, 0, FTL_STAT_LOC);
     printf("icl and ftl loaded successfully!\n");
-    set_ext2_icl(&cache);
+    set_ext2_icl(cache);
     fs_context = new EmbExt2(2048, block_get_volume_size(), 0);
     allocator = new MemoryAllocator();
     print_wrapper = new PrintWrapper();
     printf("this is fine too\n");
     FirmwareData data;
     data.ftl = &ftl;
-    data.icl = &cache;
+    data.icl = cache;
     mutex_init(&queue_mutex);
     write_buffer((uint64_t)&process_requests, (uint64_t)&data, CORE_SETUP_COMPLETED); // signal that core setup is done
     stop_sim();

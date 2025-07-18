@@ -38,11 +38,11 @@ class AbstractFTL : public StatObject {
  protected:
   Parameter &param;
   PAL::PAL *pPAL;
-  DRAM::AbstractDRAM *pDRAM;
+  Memory::SimpleDRAM *pDRAM;
   Status status;
 
  public:
-  AbstractFTL(Parameter &p, PAL::PAL *l, DRAM::AbstractDRAM *d)
+  AbstractFTL(Parameter &p, PAL::PAL *l, Memory::SimpleDRAM *d)
       : param(p), pPAL(l), pDRAM(d) {}
   virtual ~AbstractFTL() {}
 

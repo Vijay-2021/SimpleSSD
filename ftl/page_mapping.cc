@@ -31,7 +31,7 @@ namespace SimpleSSD {
 namespace FTL {
 
 PageMapping::PageMapping(ConfigReader &c, Parameter &p, PAL::PAL *l,
-                         DRAM::AbstractDRAM *d)
+                         Memory::SimpleDRAM *d)
     : AbstractFTL(p, l, d),
       pPAL(l),
       conf(c),

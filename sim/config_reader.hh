@@ -26,7 +26,7 @@
 #include <string>
 
 #include "cpu/config.hh"
-#include "dram/config.hh"
+#include "memory/config.hh"
 #include "ftl/config.hh"
 #include "hil/nvme/config.hh"
 #include "hil/sata/config.hh"
@@ -51,7 +51,7 @@ typedef enum {
 class ConfigReader {
  private:
   CPU::Config cpuConfig;
-  DRAM::Config dramConfig;
+  Memory::Config dramConfig;
   FTL::Config ftlConfig;
   HIL::NVMe::Config nvmeConfig;
   HIL::SATA::Config sataConfig;
@@ -70,10 +70,10 @@ class ConfigReader {
   std::string readString(CONFIG_SECTION, uint32_t);
   bool readBoolean(CONFIG_SECTION, uint32_t);
 
-  // DRAM::Config
-  DRAM::Config::DRAMStructure *getDRAMStructure();
-  DRAM::Config::DRAMTiming *getDRAMTiming();
-  DRAM::Config::DRAMPower *getDRAMPower();
+  // Memory::Config
+  Memory::Config::DRAMStructure *getDRAMStructure();
+  Memory::Config::DRAMTiming *getDRAMTiming();
+  Memory::Config::DRAMPower *getDRAMPower();
 
   // PAL::Config
   uint8_t getSuperblockConfig();

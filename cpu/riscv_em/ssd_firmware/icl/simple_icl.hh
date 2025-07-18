@@ -27,13 +27,12 @@
 
 namespace ICL {
 
-class SimpleICL : AbstractICL {
+class SimpleICL : public AbstractICL {
  private:
   Mutex cache_mutex;
   void evictCache(bool flush = true) override;
  public:
   SimpleICL(icl_params& cparams, FTL::FTL *ftl);
-  ~SimpleICL();
 
   bool read(Request &) override;
   bool write(Request &) override;

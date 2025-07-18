@@ -172,7 +172,7 @@ void CPU::RISCVCycle() {
   }
 }
 
-CPU::CPU(ConfigReader &c, ICL::ICL *icl, FTL::FTL *ftl, PAL::PAL *pal, DRAM::AbstractDRAM *dram) : conf(c), pICL(icl), pFTL(ftl), pPAL(pal), pDRAM(dram), lastResetStat(0) {
+CPU::CPU(ConfigReader &c, ICL::ICL *icl, FTL::FTL *ftl, PAL::PAL *pal, Memory::AbstractDRAM *dram) : conf(c), pICL(icl), pFTL(ftl), pPAL(pal), pDRAM(dram), lastResetStat(0) {
   clockSpeed = conf.readUint(CONFIG_CPU, CPU_CLOCK);
   clockPeriod = 1000000000000. / clockSpeed;  // in pico-seconds
   hilCore.resize(conf.readUint(CONFIG_CPU, CPU_CORE_HIL));

@@ -27,7 +27,7 @@
 
 namespace ICL {
 
-class DSICL : AbstractICL {
+class DSICL : public AbstractICL {
  private:
   Mutex cache_metadata_mutex;
   Mutex cache_data_mutex;
@@ -35,7 +35,6 @@ class DSICL : AbstractICL {
   void evictCache(bool flush = true) override;
  public:
   DSICL(icl_params& cparams, FTL::FTL *ftl);
-  ~DSICL();
 
   bool read(Request &) override;
   bool write(Request &) override;

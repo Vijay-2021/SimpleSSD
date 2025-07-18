@@ -77,7 +77,7 @@ class PageMapping : public AbstractFTL {
   void eraseInternal(PAL::Request &, uint64_t &);
 
  public:
-  PageMapping(ConfigReader &, Parameter &, PAL::PAL *, DRAM::AbstractDRAM *);
+  PageMapping(ConfigReader &, Parameter &, PAL::PAL *, Memory::SimpleDRAM *);
   ~PageMapping();
 
   bool initialize() override;

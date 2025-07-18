@@ -29,7 +29,7 @@
 #include <stdint.h>
 
 namespace ICL {
-    class ICL;
+    class AbstractICL;
 }
 
 #ifndef BLOCK_H
@@ -138,6 +138,6 @@ int block_get_device_read_only();
  **/
 int block_get_error();
 
-void set_ext2_icl(ICL::ICL* icl);
+void set_ext2_icl(ICL::AbstractICL* icl);
 
 #endif /* ifndef BLOCK_H */

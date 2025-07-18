@@ -37,6 +37,7 @@ const char NAME_PREFETCH_COUNT[] = "ReadPrefetchCount";
 const char NAME_PREFETCH_RATIO[] = "ReadPrefetchRatio";
 const char NAME_PREFETCH_MODE[] = "ReadPrefetchMode";
 const char NAME_CACHE_LATENCY[] = "CacheLatency";
+const char NAME_ICL_CACHE_TYPE[] = "CacheType";
 
 Config::Config() {
   readCaching = false;
@@ -50,6 +51,7 @@ Config::Config() {
   prefetchMode = MODE_ALL;
   evictMode = MODE_ALL;
   cacheLatency = 10;
+  cacheType = ICL_CACHE_SIMPLE;
 }
 
 bool Config::setConfig(const char *name, const char *value) {
@@ -87,6 +89,8 @@ bool Config::setConfig(const char *name, const char *value) {
   }
   else if (MATCH_NAME(NAME_CACHE_LATENCY)) {
     cacheLatency = strtoul(value, nullptr, 10);
+  } else if (MATCH_NAME(NAME_ICL_CACHE_TYPE)) {
+    cacheType = (ICL_CACHE_TYPE)strtoul(value, nullptr, 10);
   }
   else {
     ret = false;
@@ -116,6 +120,9 @@ int64_t Config::readInt(uint32_t idx) {
       break;
     case ICL_EVICT_GRANULARITY:
       ret = evictMode;
+      break;
+    case ICL_CACHE_TYPE:
+      ret = cacheType;
       break;
   }
 

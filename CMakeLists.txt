@@ -97,11 +97,11 @@ set(SRC_CPU
   cpu/config.cc
   cpu/cpu.cc
 )
-set(SRC_DRAM
-  dram/abstract_dram.cc
-  dram/config.cc
-  dram/simple.cc
-  dram/sram.cc
+set(SRC_MEMORY
+  memory/abstract_dram.cc
+  memory/config.cc
+  memory/simple.cc
+  memory/sram.cc
 )
 set(SRC_FTL_COMMON
   ftl/common/block.cc

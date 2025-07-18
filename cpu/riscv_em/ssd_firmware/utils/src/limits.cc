@@ -5,14 +5,17 @@ uint8_t numeric_max<uint8_t>() {
     return 0xFF; // 255
 }
 
+template<>
 uint8_t numeric_min<uint8_t>() {
     return 0; // 0
 }
 
+template<>
 uint16_t numeric_max<uint16_t>() {
     return 0xFFFF; // 65535
 }
 
+template<>
 uint16_t numeric_min<uint16_t>() {
     return 0; // 0
 }

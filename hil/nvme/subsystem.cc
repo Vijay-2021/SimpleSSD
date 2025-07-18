@@ -71,7 +71,7 @@ void Subsystem::init() {
   ICL::ICL *icl = pHIL->getICL();
   FTL::FTL *ftl = icl->getFTL();
   PAL::PAL *pal = ftl->getPAL();
-  DRAM::AbstractDRAM *dram = icl->getDRAM();
+  Memory::SimpleDRAM *dram = icl->getDRAM();
   pCPU = new CPU::CPU(conf, icl, ftl, pal, dram);
   setCPU(pCPU);
   ftl->setCPU(pCPU);

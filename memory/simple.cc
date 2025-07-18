@@ -44,6 +44,7 @@ SimpleDRAM::SimpleDRAM(ConfigReader &p)
   });
   for (size_t i = 0; i < pStructure->bank; i++) {
     open_rows.push_back(0);
+    bank_available.push_back(0);
   }
 
   schedule(autoRefresh, getTick() + REFRESH_PERIOD);
@@ -61,26 +62,50 @@ uint64_t SimpleDRAM::getRow(uint64_t addr) {
   return addr >> (pStructure->colBits + pStructure->bankBits);
 }
 
+uint64_t SimpleDRAM::read_access(uint64_t addr, uint64_t size) {
+  access(addr, size);
+  readStat.count++;
+  readStat.size += size;
+}
+
+uint64_t SimpleDRAM::write_access(uint64_t addr, uint64_t size) {
+  access(addr, size);
+  writeStat.count++;
+  writeStat.size += size; 
+}
+
 uint64_t SimpleDRAM::access(uint64_t addr, uint64_t size) {
-    uint64_t ticks = 0;
     uint64_t offset = 0;
+    uint64_t current_tick = getTick();
+
     while (offset < size) {
         uint64_t a = addr + offset;
         uint64_t bank = getBank(a);
         uint64_t row = getRow(a);
         uint64_t rowOffset = a % pStructure->rowSize;
         uint64_t chunk = std::min(size - offset, pStructure->rowSize - rowOffset);
-        uint64_t bursts = std::ceil(chunk / pStructure->burstLength);
+        uint64_t bursts = std::ceil((double)chunk / pStructure->burstLength);
 
+        // Wait for bank to become available
+        if (bank_available[bank] > current_tick) {
+            current_tick = bank_available[bank];
+            total_stall_cycles += (current_tick - bank_available[bank]);
+            total_stalls++;
+        }
+
+        // Row hit or miss
         if (open_rows[bank] == row) {
-            ticks += pTiming->tCL + bursts * pTiming->tBURST;
+            current_tick += pTiming->tCL + bursts * pTiming->tBURST;
         } else {
-            ticks += pTiming->tRP + pTiming->tRAS + pTiming->tRCD + pTiming->tCL + bursts * pTiming->tBURST;
+            current_tick += pTiming->tRP + pTiming->tRAS + pTiming->tRCD + pTiming->tCL + bursts * pTiming->tBURST;
             open_rows[bank] = row;
         }
+
         offset += chunk;
+        bank_available[bank] = current_tick;
     }
-    return ticks;
+
+    return current_tick - getTick();  // total latency
 }
 
 uint64_t SimpleDRAM::updateDelay(uint64_t latency, uint64_t &tick) {
@@ -206,24 +231,31 @@ void SimpleDRAM::getStatList(std::vector<Stats> &list, std::string prefix) {
   temp.name = prefix + "write.bytes";
   temp.desc = "Write data size in byte";
   list.push_back(temp);
+
+  temp.name = prefix + "total.stall_count";
+  temp.desc = "Total stall count";
+  list.push_back(temp);
+
+  temp.name = prefix + "total.stall_cycles";
+  temp.desc = "Total stall cycles";
+  list.push_back(temp);
 }
 
 void SimpleDRAM::getStatValues(std::vector<double> &values) {
-  AbstractDRAM::getStatValues(values);
 
   values.push_back(readStat.count);
   values.push_back(readStat.size);
   values.push_back(writeStat.count);
   values.push_back(writeStat.size);
-  values.push_back(readStat.count + writeStat.count);
-  values.push_back(readStat.size + writeStat.size);
+  values.push_back(total_stalls);
+  values.push_back(total_stall_cycles);
 }
 
 void SimpleDRAM::resetStatValues() {
-  AbstractDRAM::resetStatValues();
-
   readStat = Stat();
   writeStat = Stat();
+  total_stalls = 0;
+  total_stall_cycles = 0;
 }
 
 }  // namespace DRAM

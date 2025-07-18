@@ -18,7 +18,7 @@
  */
 
 
-#include "icl.hh"
+#include "abstract_icl.hh"
 #include "random.h"
 #include "memory.h"
 #include "def.hh"
@@ -77,6 +77,7 @@ AbstractICL::AbstractICL(icl_params& cparams, FTL::FTL *ftl) :
   else {
     setSize = MAX(cacheSize / lineSize / waySize, 1);
   }
+  copy_buffer = (uint8_t*) malloc(lineSize);
 
   // debugprint(
   //    LOG_ICL_GENERIC_CACHE,
@@ -118,6 +119,7 @@ AbstractICL::~AbstractICL() {
     free(evictData[i]);
   }
   free(cache_buffer);
+  free(copy_buffer);
 }
 
 uint32_t AbstractICL::calcSetIndex(uint64_t lca) {

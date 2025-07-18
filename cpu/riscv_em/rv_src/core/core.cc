@@ -1516,7 +1516,7 @@ static uint64_t instr_WRITEBUFF(Core *rv_core) {
         rv_core->clean_csd_job();
     } else if (rv_core->reg_file[rv_core->rs2] == FIRMWARE_REQ_DONE && rv_core->in_csd_mode) { 
         // do nothing
-    } else if (rv_core->reg_file[rev_core->rs2] == ACQUIRE_MUTEX_LOCK) {
+    } else if (rv_core->reg_file[rv_core->rs2] == ACQUIRE_MUTEX_LOCK) {
         rv_core->mutex_lock_acquire_start = rv_core->curr_cycle;
         rv_core->mutex_lock_acquires += 1;
     } else if (rv_core->reg_file[rv_core->rs2] == ACQUIRED_MUTEX_LOCK) {
@@ -2431,9 +2431,8 @@ uint64_t Core::rv_core_run()
     }
 
     /* increase program counter here */
-    if (!should_stall) {
-        pc = next_pc ? next_pc : pc + 4;
-    }
+    pc = next_pc ? next_pc : pc + 4;
+    
     curr_cycle += next_cycle;
     if (in_csd_mode) {
         printf("running csd mode for pc: %lx and csd cycles: %lu and start pc: %lx and instruction: %x\n", pc, csd_cycles, csd_start_pc, instruction);
@@ -2622,7 +2621,7 @@ Core::Core(SOC *soc, bus_access_func bus_acc, uint64_t cid) : pSOC(soc), bus_acc
     rv_core_init_csr_regs(this);
 }
 
-void Core::getStatList(std::vector<Stats> &stats, std::string prefix) {
+void Core::getStatList(std::vector<Stats> &list, std::string prefix) {
     Stats temp;
     temp.name = prefix + ".mutex_accquires";
     temp.desc = "Number of mutex accquires";
@@ -2639,15 +2638,15 @@ void Core::getStatList(std::vector<Stats> &stats, std::string prefix) {
 }
 
 void Core::getStatValues(std::vector<double> &values) {
-    values.push_back(mutex_accquires);
-    values.push_back(mutex_cycles);
+    values.push_back(mutex_lock_acquires);
+    values.push_back(mutex_lock_acquire_cycles);
     values.push_back(csd_cycles);
     values.push_back(csd_jobs);
 }
 
-void Core::resetStats() {
-    mutex_accquires = 0;
-    mutex_cycles = 0;
+void Core::resetStatValues() {
+    mutex_lock_acquires = 0;
+    mutex_lock_acquire_cycles = 0;
     csd_cycles = 0;
     csd_jobs = 0;
 }

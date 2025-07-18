@@ -18,7 +18,7 @@
  */
 
 
-#include "icl.hh"
+#include "datastructure_locks_icl.hh"
 #include "random.h"
 #include "memory.h"
 #include "def.hh"
@@ -26,12 +26,6 @@
 #include "new.hh"
 #include "firmware_utils.h"
 namespace ICL {
-
-Line::_Line()
-    : tag(0), lastAccessed(0), insertedAt(0), dirty(false), valid(false) {}
-
-Line::_Line(uint64_t t, bool d)
-    : tag(t), lastAccessed(0), insertedAt(0), dirty(d), valid(true) {}
 
 DSICL::DSICL(icl_params& cparams, FTL::FTL *ftl) :
       AbstractICL(cparams, ftl) {
@@ -267,7 +261,7 @@ bool DSICL::read(Request &req) {
     }
     icl_stats.read_req_cycles += read_req_cycles;
     icl_stats.read_requests++;
-    icl_stats.read_req_bytes += req.length;
+    icl_stats.read_bytes += req.length;
     mutex_unlock(&stat_mutex);
     return ret;
 }
@@ -503,7 +497,7 @@ bool DSICL::write(Request &req) {
     }
     icl_stats.write_req_cycles += write_req_cycles;
     icl_stats.write_requests++;
-    icl_stats.write_req_bytes += req.length;
+    icl_stats.write_bytes += req.length;
     icl_stats.heap_top = get_heap_top();
     mutex_unlock(&stat_mutex);
     return ret;
@@ -575,12 +569,12 @@ void DSICL::flush(LPNRange &range) {
     
     read_buffer((uint64_t)&end_cycle, 0, FIRMWARE_CYCLE);
     flush_req_cycles += end_cycle - start_cycle;
-    mutex_lock(&stats_mutex);
+    mutex_lock(&stat_mutex);
     icl_stats.flush_req_cycles += flush_req_cycles;
     icl_stats.flush_requests++;
-    icl_stats.flush_req_bytes += range.nlp * lineCountInSuperPage * lineSize;
+    icl_stats.flush_bytes += range.nlp * lineCountInSuperPage * lineSize;
     icl_stats.heap_top = get_heap_top();
-    mutex_unlock(&stats_mutex);
+    mutex_unlock(&stat_mutex);
 }
 
 // True when hit
@@ -621,12 +615,12 @@ void DSICL::trim(LPNRange &range) {
         process_request_failed();
     }
     read_buffer((uint64_t)&end_cycle, 0, FIRMWARE_CYCLE);
-    mutex_lock(&stats_mutex);
+    mutex_lock(&stat_mutex);
     icl_stats.trim_req_cycles += end_cycle - start_cycle;
     icl_stats.trim_requests++;
-    icl_stats.trim_req_bytes += range.nlp * lineCountInSuperPage * lineSize;
+    icl_stats.trim_bytes += range.nlp * lineCountInSuperPage * lineSize;
     icl_stats.heap_top = get_heap_top();
-    mutex_unlock(&stats_mutex);
+    mutex_unlock(&stat_mutex);
 
 }
 
@@ -634,7 +628,7 @@ void DSICL::format(LPNRange &range) {
     uint64_t start_cycle;
     uint64_t end_cycle;
     read_buffer((uint64_t)&start_cycle, 0, FIRMWARE_CYCLE);
-    mutex_lock(&icl_metadata_mutex);
+    mutex_lock(&cache_metadata_mutex);
     if (useReadCaching || useWriteCaching) {
         uint64_t lpn;
         uint32_t setIdx;
@@ -654,17 +648,17 @@ void DSICL::format(LPNRange &range) {
     // Convert unit
     range.slpn /= lineCountInSuperPage;
     range.nlp = (range.nlp - 1) / lineCountInSuperPage + 1;
-    mutex_unlock(&icl_metadata_mutex);
+    mutex_unlock(&cache_metadata_mutex);
     mutex_lock(&ftl_mutex);
     read_buffer((uint64_t)&end_cycle, 0, FIRMWARE_CYCLE);
     process_request(pFTL->format(range)); // adds one cycle to ICL time, real processing time captured in FTL
     mutex_unlock(&ftl_mutex);
-    mutex_lock(&stats_mutex);
+    mutex_lock(&stat_mutex);
     icl_stats.format_req_cycles += end_cycle - start_cycle;
     icl_stats.format_requests++;
-    icl_stats.format_req_bytes += range.nlp * lineCountInSuperPage * lineSize;
+    icl_stats.format_bytes += range.nlp * lineCountInSuperPage * lineSize;
     icl_stats.heap_top = get_heap_top();
-    mutex_unlock(&stats_mutex);
+    mutex_unlock(&stat_mutex);
   
 }
 

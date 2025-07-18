@@ -39,6 +39,7 @@ typedef enum {
   ICL_CACHE_SIZE,
   ICL_WAY_SIZE,
   ICL_CACHE_LATENCY,
+  ICL_CACHE_TYPE,
 } ICL_CONFIG;
 
 typedef enum {
@@ -51,6 +52,13 @@ typedef enum {
   MODE_SUPERPAGE,  //!< Read one page from one super block (super page)
   MODE_ALL,        //!< Read one page from all NAND flashes
 } PREFETCH_MODE;
+
+typedef enum {
+    ICL_CACHE_SIMPLE = 0,                //!< Simple cache
+    ICL_CACHE_PARTITIONED = 1,           //!< Partitioned cache
+    ICL_CACHE_DATASTRUCTURE = 2,         //!< Data structure cache
+    ICL_CACHE_PARTITIONED_DATASTRUCTURE = 3, //!< Partitioned data structure cache
+} ICL_CACHE_TYPE; 
 
 typedef PREFETCH_MODE EVICT_MODE;
 
@@ -67,6 +75,7 @@ class Config : public BaseConfig {
   PREFETCH_MODE prefetchMode;  //!< Default: MODE_ALL
   EVICT_MODE evictMode;        //!< Default: MODE_ALL
   uint64_t cacheLatency;       //!< Default:
+  ICL_CACHE_TYPE cacheType; //!< Default: ICL_CACHE_SIMPLE
 
  public:
   Config();
