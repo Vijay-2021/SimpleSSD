@@ -502,7 +502,6 @@ void SimpleICL::flush(LPNRange &range) {
                 line.valid = false;
             }
         } else {
-            mutex_lock(&cache_mutex);
             for (uint32_t setIdx = 0; setIdx < setSize; setIdx++) {
                 for (uint32_t wayIdx = 0; wayIdx < waySize; wayIdx++) {
                     Line &line = cacheData[setIdx][wayIdx];

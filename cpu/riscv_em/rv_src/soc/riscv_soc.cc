@@ -386,12 +386,12 @@ void SOC::resetStatValues() {
     for (auto &core : rv_cores) {
         core.resetStatValues();
     }
-    if (ftl_stats) {
-        memset(ftl_stats, 0, sizeof(FTLStats));
-    } 
     if (icl_stats) {
         memset(icl_stats, 0, sizeof(ICLStats));
     }
+    if (ftl_stats) {
+        memset(ftl_stats, 0, sizeof(FTLStats));
+    } 
     total_cycles = 0; 
     total_fast_forward_cycles = 0;
     pDRAM->resetStatValues();
@@ -404,11 +404,11 @@ FTLStats* SOC::getFTLStats() {
 ICLStats* SOC::getICLStats() {
     return icl_stats;
 }
-void SOC::setFTLStats(FTLStats *ftl_stats) {
-    ftl_stats = ftl_stats;
+void SOC::setFTLStats(FTLStats *ftl_stat_fw) {
+    ftl_stats = ftl_stat_fw;
 }
-void SOC::setICLStats(ICLStats *icl_stats) {
-    icl_stats = icl_stats;
+void SOC::setICLStats(ICLStats *icl_stat_fw) {
+    icl_stats = icl_stat_fw;
 }
 
 void SOC::setICLLow(uint64_t *icl_low) {
@@ -512,7 +512,6 @@ void SOC::getStatList(std::vector<Stats> &list, std::string prefix) {
     temp.name = prefix + ".icl_flush_bytes_transferred";
     temp.desc = "Total ICL flush bytes transferred";
     list.push_back(temp);
-
     temp.name = prefix + ".heap_top";
     temp.desc = "Heap top address";
     list.push_back(temp);
@@ -609,7 +608,6 @@ void SOC::getStatValues(std::vector<double> &values) {
     for (auto & core : rv_cores) {
         core.getStatValues(values);
     }
-    auto *icl_stats = getICLStats();
     if (icl_stats != nullptr) {
         values.push_back(icl_stats->read_requests);
         values.push_back(icl_stats->write_requests);
@@ -635,10 +633,9 @@ void SOC::getStatValues(std::vector<double> &values) {
     } else {
         // If ICL stats are not available, push zeros
         for (size_t i = 0; i < 21; i++) {
-        values.push_back(0);
+            values.push_back(0);
         }
     }
-    auto *ftl_stats = getFTLStats();
     if (ftl_stats != nullptr) {
         values.push_back(ftl_stats->read_requests);
         values.push_back(ftl_stats->write_requests);

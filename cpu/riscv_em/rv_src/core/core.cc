@@ -1448,6 +1448,7 @@ static uint64_t instr_PWRITE(Core * rv_core) {
     req->ioFlag.data = rv_core->pSOC->get_ram() + ((uint64_t)req->ioFlag.data - RAM_BASE_ADDR);
     printf("PWRITE: %p, %p, %p\n", req, req->ioFlag.data, (uint64_t*) (rv_core->pSOC->get_ram() + ((rv_core->reg_file[rv_core->rs1] - RAM_BASE_ADDR))));
     rv_core->pSOC->pwrite((uint8_t*) req, (uint64_t*) (rv_core->pSOC->get_ram() + ((rv_core->reg_file[rv_core->rs1] - RAM_BASE_ADDR))));
+    printf("PWRITE done\n");
     req->ioFlag.data = stored_addr;
     return 1;
 }

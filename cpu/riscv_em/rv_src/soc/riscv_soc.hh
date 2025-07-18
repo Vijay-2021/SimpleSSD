@@ -70,8 +70,8 @@ class SOC : public StatObject {
         uint64_t ICL_LOW;
         FTLStats* getFTLStats();
         ICLStats* getICLStats();
-        void setFTLStats(FTLStats *ftl_stats);
-        void setICLStats(ICLStats *icl_stats);
+        void setFTLStats(FTLStats *ftl_stat_fw);
+        void setICLStats(ICLStats *icl_stat_fw);
         void setICLLow(uint64_t *icl_low);
         void setICLHigh(uint64_t *icl_high);
         uint64_t read(uint64_t addr, uint64_t len);

@@ -1210,9 +1210,9 @@ void CPU::read_flash_pal(uint8_t* request, uint64_t* tick) {
 
 void CPU::write_flash_pal(uint8_t* request, uint64_t* tick) {
   debugprint(LOG_CPU, "Write flash PAL from RISCV Core at tick %llu", *tick);
-  PAL::Request* req = (PAL::Request*)request;
+  PAL::Request req = *((PAL::Request*)request);
   uint64_t reqTick = *tick;
-  pPAL->write(*req, reqTick);
+  pPAL->write(req, reqTick);
   *tick = reqTick;
 }
 

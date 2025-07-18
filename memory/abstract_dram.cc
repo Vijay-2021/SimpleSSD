@@ -35,7 +35,7 @@ AbstractDRAM::AbstractDRAM(ConfigReader &c)
 
   convertMemspec();
 
-  
+
   dramPower = new libDRAMPower(spec, false);
 }
 
@@ -114,28 +114,28 @@ void AbstractDRAM::convertMemspec() {
 }
 
 void AbstractDRAM::getStatList(std::vector<Stats> &list, std::string prefix) {
-  Stats temp;
+  // Stats temp;
 
-  temp.name = prefix + "energy";
-  temp.desc = "Total energy comsumed by embedded DRAM (pJ)";
-  list.push_back(temp);
+  // temp.name = prefix + "energy";
+  // temp.desc = "Total energy comsumed by embedded DRAM (pJ)";
+  // list.push_back(temp);
 
-  temp.name = prefix + "power";
-  temp.desc = "Total power comsumed by embedded DRAM (mW)";
-  list.push_back(temp);
+  // temp.name = prefix + "power";
+  // temp.desc = "Total power comsumed by embedded DRAM (mW)";
+  // list.push_back(temp);
 }
 
 void AbstractDRAM::getStatValues(std::vector<double> &values) {
-  values.push_back(totalEnergy);
-  values.push_back(totalPower);
+  // values.push_back(totalEnergy);
+  // values.push_back(totalPower);
 }
 
 void AbstractDRAM::resetStatValues() {
   // calcWindowEnergy clears old data
-  dramPower->calcWindowEnergy(getTick() / pTiming->tCK);
+  // dramPower->calcWindowEnergy(getTick() / pTiming->tCK);
 
-  totalEnergy = 0.0;
-  totalPower = 0.0;
+  // totalEnergy = 0.0;
+  // totalPower = 0.0;
 }
 
 }  // namespace DRAM
