@@ -17,7 +17,7 @@
  * along with SimpleSSD.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "dram/config.hh"
+#include "memory/config.hh"
 
 #include "util/algorithm.hh"
 #include "util/simplessd.hh"
@@ -98,6 +98,7 @@ Config::Config() {
   dram.bankBits = 3;
   dram.colBits = 10;
   dram.rowSize = 8192; // 10 bits for column + 3 bits for offset
+  
   
   dramTiming.tCK = 1250;
   dramTiming.tRCD = 18000;

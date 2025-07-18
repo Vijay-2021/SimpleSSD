@@ -93,7 +93,7 @@ class GenericCache : public AbstractCache {
   } stat;
 
  public:
-  GenericCache(ConfigReader &, FTL::FTL *, DRAM::AbstractDRAM *);
+  GenericCache(ConfigReader &, FTL::FTL *, Memory::SimpleDRAM *);
   ~GenericCache();
 
   bool read(Request &, uint64_t &) override;

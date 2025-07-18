@@ -39,7 +39,7 @@ typedef enum {
   ICL_CACHE_SIZE,
   ICL_WAY_SIZE,
   ICL_CACHE_LATENCY,
-  ICL_CACHE_TYPE,
+  ICL_CACHE_CONFIG,
 } ICL_CONFIG;
 
 typedef enum {

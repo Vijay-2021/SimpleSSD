@@ -57,7 +57,7 @@ class ICL : public StatObject {
   void getStatList(std::vector<Stats> &, std::string) override;
   void getStatValues(std::vector<double> &) override;
   void resetStatValues() override;
-  DRAM::SimpleDRAM *getDRAM() { return pDRAM; }
+  Memory::SimpleDRAM *getDRAM() { return pDRAM; }
   FTL::FTL *getFTL() { return pFTL; }
 };
 

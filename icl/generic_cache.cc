@@ -29,7 +29,7 @@ namespace SimpleSSD {
 
 namespace ICL {
 
-GenericCache::GenericCache(ConfigReader &c, FTL::FTL *f, DRAM::AbstractDRAM *d)
+GenericCache::GenericCache(ConfigReader &c, FTL::FTL *f, Memory::SimpleDRAM *d)
     : AbstractCache(c, f, d),
       superPageSize(f->getInfo()->pageSize),
       parallelIO(f->getInfo()->pageCountToMaxPerf),

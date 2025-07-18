@@ -50,6 +50,7 @@
 #include "util/simplessd.hh"
 #include "util/disk.hh"
 #include "util/def.hh"
+
 namespace SimpleSSD {
 
 namespace ICL {
@@ -113,7 +114,7 @@ struct __attribute__((packed, aligned(4))) icl_params {
     uint64_t cacheSize;
     ICL::EVICT_MODE iclEvictGranularity;
     ICL::PREFETCH_MODE iclPrefetchGranularity;
-    ICL::ICL_CACHE_TYPE cacheType; //!< Type of cache
+    ICL::ICL_CACHE_TYPE cacheType; 
 };
 
 typedef struct _InstStat {

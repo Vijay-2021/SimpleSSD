@@ -1,4 +1,4 @@
-#include "sram.hh"
+#include "memory/sram.hh"
 
 static const int addr_width = 64; // use uint64_t addresses for RISCV
 

@@ -17,7 +17,7 @@
  * along with SimpleSSD.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "dram/abstract_dram.hh"
+#include "memory/abstract_dram.hh"
 
 #include <cstring>
 
@@ -35,6 +35,7 @@ AbstractDRAM::AbstractDRAM(ConfigReader &c)
 
   convertMemspec();
 
+  
   dramPower = new libDRAMPower(spec, false);
 }
 

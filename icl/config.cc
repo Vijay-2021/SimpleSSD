@@ -121,7 +121,7 @@ int64_t Config::readInt(uint32_t idx) {
     case ICL_EVICT_GRANULARITY:
       ret = evictMode;
       break;
-    case ICL_CACHE_TYPE:
+    case ICL_CACHE_CONFIG:
       ret = cacheType;
       break;
   }

@@ -29,8 +29,8 @@ namespace SimpleSSD {
 namespace ICL {
 
 ICL::ICL(ConfigReader &c) : conf(c) {
-  switch (conf.readInt(CONFIG_DRAM, DRAM::DRAM_MODEL)) {
-    case DRAM::SIMPLE_MODEL:
+  switch (conf.readInt(CONFIG_DRAM, Memory::DRAM_MODEL)) {
+    case Memory::SIMPLE_MODEL:
       pDRAM = new Memory::SimpleDRAM(conf);
 
       break;

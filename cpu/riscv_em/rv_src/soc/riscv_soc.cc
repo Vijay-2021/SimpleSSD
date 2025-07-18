@@ -449,7 +449,7 @@ void SOC::getStatList(std::vector<Stats> &list, std::string prefix) {
     Stats temp;
     
     for (auto & core : rv_cores) {
-        core.getStatList(list, prefix + ".core " + std::to_string(core.core_id));
+        core.getStatList(list, prefix + ".core" + std::to_string(core.core_id));
     }
 
     temp.name = prefix + ".icl_read_requests";

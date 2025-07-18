@@ -30,7 +30,7 @@ Line::_Line(uint64_t t, bool d)
     : tag(t), lastAccessed(0), insertedAt(0), dirty(d), valid(true) {}
 
 AbstractCache::AbstractCache(ConfigReader &c, FTL::FTL *f,
-                             DRAM::AbstractDRAM *d)
+                             Memory::SimpleDRAM *d)
     : conf(c), pFTL(f), pDRAM(d) {}
 
 AbstractCache::~AbstractCache() {}

@@ -4,7 +4,7 @@
 #include <cmath>
 #include <cstdint>
 #include <vector>
-
+#include "sim/statistics.hh"
 namespace SimpleSSD {
 
 namespace Memory {

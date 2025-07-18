@@ -17,7 +17,7 @@
  * along with SimpleSSD.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "dram/simple.hh"
+#include "memory/simple.hh"
 
 #include "util/algorithm.hh"
 
@@ -34,6 +34,7 @@ SimpleDRAM::SimpleDRAM(ConfigReader &p)
   pageFetchLatency = pTiming->tRP + pTiming->tRAS;
   interfaceBandwidth = 2.0 * pStructure->busWidth * pStructure->chip *
                        pStructure->channel / 8.0 / pTiming->tCK;
+
 
   autoRefresh = allocate([this](uint64_t now) {
     dramPower->doCommand(Data::MemCommand::REF, 0, now / pTiming->tCK);
@@ -62,16 +63,16 @@ uint64_t SimpleDRAM::getRow(uint64_t addr) {
   return addr >> (pStructure->colBits + pStructure->bankBits);
 }
 
-uint64_t SimpleDRAM::read_access(uint64_t addr, uint64_t size) {
-  access(addr, size);
+uint64_t SimpleDRAM::read_dram(uint64_t addr, uint64_t size) {
   readStat.count++;
   readStat.size += size;
+  return access(addr, size);
 }
 
-uint64_t SimpleDRAM::write_access(uint64_t addr, uint64_t size) {
-  access(addr, size);
+uint64_t SimpleDRAM::write_dram(uint64_t addr, uint64_t size) {
   writeStat.count++;
   writeStat.size += size; 
+  return access(addr, size);
 }
 
 uint64_t SimpleDRAM::access(uint64_t addr, uint64_t size) {

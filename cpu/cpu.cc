@@ -172,7 +172,7 @@ void CPU::RISCVCycle() {
   }
 }
 
-CPU::CPU(ConfigReader &c, ICL::ICL *icl, FTL::FTL *ftl, PAL::PAL *pal, Memory::AbstractDRAM *dram) : conf(c), pICL(icl), pFTL(ftl), pPAL(pal), pDRAM(dram), lastResetStat(0) {
+CPU::CPU(ConfigReader &c, ICL::ICL *icl, FTL::FTL *ftl, PAL::PAL *pal, Memory::SimpleDRAM *dram) : conf(c), pICL(icl), pFTL(ftl), pPAL(pal), pDRAM(dram), lastResetStat(0) {
   clockSpeed = conf.readUint(CONFIG_CPU, CPU_CLOCK);
   clockPeriod = 1000000000000. / clockSpeed;  // in pico-seconds
   hilCore.resize(conf.readUint(CONFIG_CPU, CPU_CORE_HIL));
@@ -219,7 +219,7 @@ CPU::CPU(ConfigReader &c, ICL::ICL *icl, FTL::FTL *ftl, PAL::PAL *pal, Memory::A
   iparams.cacheSize = conf.readUint(CONFIG_ICL, ICL::ICL_CACHE_SIZE);
   iparams.iclEvictGranularity = (ICL::EVICT_MODE)conf.readInt(CONFIG_ICL, ICL::ICL_EVICT_GRANULARITY);
   iparams.iclPrefetchGranularity = (ICL::PREFETCH_MODE)conf.readInt(CONFIG_ICL, ICL::ICL_PREFETCH_GRANULARITY);
-
+  iparams.cacheType = (ICL::ICL_CACHE_TYPE)conf.readInt(CONFIG_ICL, ICL::ICL_CACHE_CONFIG);
   test_mode = conf.readBoolean(CONFIG_CPU, SOC_TEST_MODE);
   test_type = (TEST_TYPE)conf.readUint(CONFIG_CPU, SOC_TEST_TYPE);
   test_count = conf.readUint(CONFIG_CPU, SOC_TEST_COUNT);
@@ -1058,7 +1058,7 @@ void CPU::getStatList(std::vector<Stats> &list, std::string prefix) {
   temp.name = prefix + ".active_duration";
   temp.desc = "Total active duration in ticks";
   list.push_back(temp);
-  getStatList(riscv_soc, prefix + ".riscv");
+  riscv_soc->getStatList(list, prefix + ".riscv");
 }
 
 void CPU::getStatValues(std::vector<double> &values) {
@@ -1099,7 +1099,7 @@ void CPU::getStatValues(std::vector<double> &values) {
   }
   values.push_back(active_periods);
   values.push_back(active_duration);
-  rv_soc->getStatValues(values);
+  riscv_soc->getStatValues(values);
 }
 
 void CPU::resetStatValues() {

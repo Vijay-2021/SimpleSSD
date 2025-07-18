@@ -191,7 +191,7 @@ set (SRC_RISCV_EM
 
 # Source group for MSVC
 SOURCE_GROUP("Source Files\\cpu" FILES ${SRC_CPU})
-SOURCE_GROUP("Source Files\\dram" FILES ${SRC_DRAM})
+SOURCE_GROUP("Source Files\\memory" FILES ${SRC_MEMORY})
 SOURCE_GROUP("Source Files\\ftl" FILES ${SRC_FTL})
 SOURCE_GROUP("Source Files\\ftl\\common" FILES ${SRC_FTL_COMMON})
 SOURCE_GROUP("Source Files\\hil" FILES ${SRC_HIL})
@@ -209,7 +209,7 @@ SOURCE_GROUP("Source Files\\riscv_em" FILES ${SRC_RISCV_EM})
 # Define library
 add_library(simplessd STATIC
   ${SRC_CPU}
-  ${SRC_DRAM}
+  ${SRC_MEMORY}
   ${SRC_FTL}
   ${SRC_FTL_COMMON}
   ${SRC_HIL}
