@@ -46,7 +46,11 @@ AbstractICL::AbstractICL(icl_params& cparams, FTL::FTL *ftl) :
       useReadCaching(cparams.useReadCaching),
       useWriteCaching(cparams.useWriteCaching),
       useReadPrefetch(cparams.useReadPrefetch)  {
-  printf("calling icl initializer!\n");
+  printf("calling icl initializer\n");
+  printf("Line count in superpage: %u, line count in max IO: %u, way size: %u\n",
+         lineCountInSuperPage, lineCountInMaxIO, waySize);
+    printf("super page size is: %u, parallel IO: %u\n",
+           superPageSize, parallelIO);
   uint64_t cacheSize = params.cacheSize;
   uint64_t heap_top = get_heap_top();
   write_buffer((uint64_t)&heap_top, 0, ICL_LOW);

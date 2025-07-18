@@ -17,96 +17,30 @@
  * along with SimpleSSD.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef __ICL_GENERIC_CACHE__
-#define __ICL_GENERIC_CACHE__
+#ifndef __ICL_SIMPLE_CACHE__
+#define __ICL_SIMPLE_CACHE__
 
 #include "vector.hh"
 #include "ftl.hh"
 #include "mutex.h"
+#include "abstract_icl.hh"
 
 namespace ICL {
 
-class SimpleICL {
+class SimpleICL : AbstractICL {
  private:
-  FTL::FTL *pFTL;
-  const uint32_t superPageSize;
-  const uint32_t parallelIO;
-  uint32_t lineCountInSuperPage;
-  uint32_t lineCountInMaxIO;
-  uint32_t lineSize;
-  uint32_t setSize;
-  uint32_t waySize;
-
-  const uint32_t prefetchIOCount;
-  const float prefetchIORatio;
-
-  const bool useReadCaching;
-  const bool useWriteCaching;
-  const bool useReadPrefetch;
-
-  bool bSuperPage;
-  uint8_t* copy_buffer;
-  uint8_t* cache_buffer;
-
-  struct SequentialDetect {
-    bool enabled;
-    Request lastRequest;
-    uint32_t hitCounter;
-    uint32_t accessCounter;
-
-    SequentialDetect() : enabled(false), hitCounter(0), accessCounter(0) {
-      lastRequest.reqID = 1;
-    }
-  } readDetect;
-
-  uint64_t prefetchTrigger;
-  uint64_t lastPrefetched;
-
-  PREFETCH_MODE prefetchMode;
-  EVICT_MODE evictMode;
-
-  Vector<Line *> cacheData;
-  Vector<Line **> evictData;
-
-  uint32_t evictFunction(uint32_t setIdx);
-  Line* compareFunction(Line *a, Line *b);
-
-  uint64_t getCacheLatency();
-
-  uint32_t calcSetIndex(uint64_t);
-  void calcIOPosition(uint64_t, uint32_t &, uint32_t &);
-
-  uint32_t getEmptyWay(uint32_t);
-  uint32_t getValidWay(uint64_t);
-  void checkSequential(Request &, SequentialDetect &);
-
-  void evictCache(bool = true);
-
-  // Stats
-  struct {
-    uint64_t request[2];
-    uint64_t cache[2];
-  } stat;
-
-
-  icl_params params;
-  Mutex icl_mutex;
-  //Mutex evict_data_mutex;
-  //Mutex cache_data_mutex;
-  uint32_t mutex_ct = 64;
+  Mutex cache_mutex;
+  void evictCache(bool flush = true) override;
  public:
-  ICL(icl_params& cparams, FTL::FTL *ftl);
-  ~ICL();
+  SimpleICL(icl_params& cparams, FTL::FTL *ftl);
+  ~SimpleICL();
 
-  bool read(Request &);
-  bool write(Request &);
-  void flush(LPNRange &);
-  void trim(LPNRange &);
-  void format(LPNRange &);
-
-  void resetStatValues();
+  bool read(Request &) override;
+  bool write(Request &) override;
+  void flush(LPNRange &) override;
+  void trim(LPNRange &) override;
+  void format(LPNRange &) override;
   
-  ICLStats icl_stats;
 };
 
 }

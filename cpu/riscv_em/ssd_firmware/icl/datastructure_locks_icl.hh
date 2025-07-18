@@ -17,29 +17,32 @@
  * along with SimpleSSD.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef __ICL_GENERIC_CACHE__
-#define __ICL_GENERIC_CACHE__
+#ifndef __ICL_DS_CACHE__
+#define __ICL_DS_CACHE__
 
 #include "vector.hh"
 #include "ftl.hh"
 #include "mutex.h"
+#include "abstract_icl.hh"
 
 namespace ICL {
 
-class SimpleICL {
+class DSICL : AbstractICL {
  private:
   Mutex cache_metadata_mutex;
   Mutex cache_data_mutex;
   Mutex ftl_mutex;
+  void evictCache(bool flush = true) override;
  public:
   DSICL(icl_params& cparams, FTL::FTL *ftl);
   ~DSICL();
 
-  bool read(Request &);
-  bool write(Request &);
-  void flush(LPNRange &);
-  void trim(LPNRange &);
-  void format(LPNRange &);
+  bool read(Request &) override;
+  bool write(Request &) override;
+  void flush(LPNRange &) override;
+  void trim(LPNRange &) override;
+  void format(LPNRange &) override;
+  
 };
 
 }
