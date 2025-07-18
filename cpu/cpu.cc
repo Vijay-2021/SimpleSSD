@@ -1052,10 +1052,13 @@ void CPU::getStatList(std::vector<Stats> &list, std::string prefix) {
     temp.desc = "CPU for FTL core " + number + " executed other instructions";
     list.push_back(temp);
   }
-
+  temp.name = prefix + ".active_periods";
+  temp.desc = "Number of active periods";
+  list.push_back(temp);
+  temp.name = prefix + ".active_duration";
+  temp.desc = "Total active duration in ticks";
+  list.push_back(temp);
   getStatList(riscv_soc, prefix + ".riscv");
-
-
 }
 
 void CPU::getStatValues(std::vector<double> &values) {
@@ -1094,69 +1097,9 @@ void CPU::getStatValues(std::vector<double> &values) {
     values.push_back(stat.instStat.floatingPoint);
     values.push_back(stat.instStat.otherInsts);
   }
-
-  auto *icl_stats = riscv_soc->getICLStats();
-  if (icl_stats != nullptr) {
-    values.push_back(icl_stats->read_requests);
-    values.push_back(icl_stats->write_requests);
-    values.push_back(icl_stats->trim_requests);
-    values.push_back(icl_stats->format_requests);
-    values.push_back(icl_stats->flush_requests);
-    values.push_back(icl_stats->read_cache_hits);
-    values.push_back(icl_stats->read_cache_misses);
-    values.push_back(icl_stats->write_cache_hits);
-    values.push_back(icl_stats->write_cache_misses);
-    values.push_back(icl_stats->read_cache_evictions);
-    values.push_back(icl_stats->write_cache_evictions);
-    values.push_back(icl_stats->read_req_cycles);
-    values.push_back(icl_stats->write_req_cycles);
-    values.push_back(icl_stats->trim_req_cycles);
-    values.push_back(icl_stats->format_req_cycles);
-    values.push_back(icl_stats->flush_req_cycles);
-  } else {
-    // If ICL stats are not available, push zeros
-    values.push_back(0);
-    values.push_back(0);
-    values.push_back(0);
-    values.push_back(0);
-    values.push_back(0);
-    values.push_back(0);
-    values.push_back(0);
-    values.push_back(0);
-    values.push_back(0);
-    values.push_back(0);
-    values.push_back(0);
-    values.push_back(0);
-    values.push_back(0);
-    values.push_back(0);
-    values.push_back(0);
-    values.push_back(0);
-  }
-  auto *ftl_stats = riscv_soc->getFTLStats();
-  if (ftl_stats != nullptr) {
-    values.push_back(ftl_stats->read_requests);
-    values.push_back(ftl_stats->write_requests);
-    values.push_back(ftl_stats->trim_requests);
-    values.push_back(ftl_stats->format_requests);
-    values.push_back(ftl_stats->garbage_collection_requests);
-    values.push_back(ftl_stats->read_req_cycles);
-    values.push_back(ftl_stats->write_req_cycles);
-    values.push_back(ftl_stats->trim_req_cycles);   
-    values.push_back(ftl_stats->format_req_cycles);
-    values.push_back(ftl_stats->gc_req_cycles);
-  } else {
-    // If FTL stats are not available, push zeros
-    values.push_back(0);
-    values.push_back(0);
-    values.push_back(0);
-    values.push_back(0);
-    values.push_back(0);
-    values.push_back(0);
-    values.push_back(0);
-    values.push_back(0);
-    values.push_back(0);
-    values.push_back(0);
-  }
+  values.push_back(active_periods);
+  values.push_back(active_duration);
+  rv_soc->getStatValues(values);
 }
 
 void CPU::resetStatValues() {
@@ -1182,6 +1125,8 @@ void CPU::resetStatValues() {
     stat.busy = 0;
     stat.instStat = InstStat();
   }
+  active_periods = 0;
+  active_duration = 0;
   riscv_soc->resetStatValues();
 }
 

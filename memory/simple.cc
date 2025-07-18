@@ -123,7 +123,7 @@ void SimpleDRAM::setScheduling(bool enable) {
 bool SimpleDRAM::isScheduling() {
   return !ignoreScheduling;
 }
-
+  
 void SimpleDRAM::read(void *, uint64_t size, uint64_t &tick) {
   uint64_t pageCount = (size > 0) ? (size - 1) / pStructure->pageSize + 1 : 0;
   uint64_t latency =
@@ -205,14 +205,6 @@ void SimpleDRAM::getStatList(std::vector<Stats> &list, std::string prefix) {
 
   temp.name = prefix + "write.bytes";
   temp.desc = "Write data size in byte";
-  list.push_back(temp);
-
-  temp.name = prefix + "request_count";
-  temp.desc = "Total request count";
-  list.push_back(temp);
-
-  temp.name = prefix + "bytes";
-  temp.desc = "Total data size in byte";
   list.push_back(temp);
 }
 

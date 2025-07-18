@@ -109,6 +109,36 @@ bool SRAM::write(uint64_t address){
 	return false;	
 }
 
+void SRAM::resetStats() {
+	reads = 0;
+	read_misses = 0;
+	writes = 0;
+	write_misses = 0;
+}
+
+void SRAM::getStatList(std::vector<Stats> &list, std::string prefix) {
+	Stats temp;
+	temp.name = prefix + ".reads";
+	temp.desc = "Total reads";
+	list.push_back(temp);
+	temp.name = prefix + ".read_misses";
+	temp.desc = "Total read misses";
+	list.push_back(temp);
+	temp.name = prefix + ".writes";
+	temp.desc = "Total writes";
+	list.push_back(temp);
+	temp.name = prefix + ".write_misses";
+	temp.desc = "Total write misses";
+	list.push_back(temp);
+}
+
+void SRAM::getStatValues(std::vector<double> &values) {
+	values.push_back(reads);
+	values.push_back(read_misses);
+	values.push_back(writes);
+	values.push_back(write_misses);
+}
+
 } 
 
 }

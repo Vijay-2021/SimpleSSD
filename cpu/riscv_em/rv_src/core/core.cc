@@ -2622,6 +2622,36 @@ Core::Core(SOC *soc, bus_access_func bus_acc, uint64_t cid) : pSOC(soc), bus_acc
     rv_core_init_csr_regs(this);
 }
 
+void Core::getStatList(std::vector<Stats> &stats, std::string prefix) {
+    Stats temp;
+    temp.name = prefix + ".mutex_accquires";
+    temp.desc = "Number of mutex accquires";
+    list.push_back(temp);
+    temp.name = prefix + ".mutex_cycles";
+    temp.desc = "Cycles spent in mutex accquires";
+    list.push_back(temp);
+    temp.name = prefix + ".csd_cycles";
+    temp.desc = "Cycles spent in CSD mode";
+    list.push_back(temp);
+    temp.name = prefix + ".csd_jobs";
+    temp.desc = "Number of CSD jobs";
+    list.push_back(temp);
+}
+
+void Core::getStatValues(std::vector<double> &values) {
+    values.push_back(mutex_accquires);
+    values.push_back(mutex_cycles);
+    values.push_back(csd_cycles);
+    values.push_back(csd_jobs);
+}
+
+void Core::resetStats() {
+    mutex_accquires = 0;
+    mutex_cycles = 0;
+    csd_cycles = 0;
+    csd_jobs = 0;
+}
+
 } // namespace RISCV
 
 } // namespace CPU

@@ -43,7 +43,7 @@ struct CSDData {
 };
 
 
-class Core {
+class Core : StatObject{
     public: 
         privilege_level curr_priv_mode;
         uint64_t curr_cycle;
@@ -108,12 +108,17 @@ class Core {
         uint64_t csd_cycles = 0;
         bool csd_job_loaded = false;
         bool csd_job_finished = false;
+        uint64_t csd_jobs = 0;
         uint64_t csd_start_pc = 0;
         uint64_t mutex_lock_acquires = 0;
         uint64_t mutex_lock_acquire_cycles = 0;
         uint64_t mutex_lock_acquire_start = 0;
 
         bool should_stal = false;
+
+        void getStatList(std::vector<Stats> &stats, std::string prefix) override;
+        void getStatValues(std::vector<double> &values) override;
+        void resetValues() override;
 
 };
 

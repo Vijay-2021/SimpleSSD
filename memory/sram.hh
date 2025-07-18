@@ -18,13 +18,15 @@ struct Line{
 	}
 };
 
-class SRAM{
+class SRAM : StatObject{
 	public:
 		SRAM(int cacheSize, int blockSize, int numWays);
 		bool read(uint64_t address);
 		bool write(uint64_t address);		
 		void setLRU(uint64_t index, uint64_t way);	
-		
+		void resetStats() override;
+		void getStatList(std::vector<Stats> &list, std::string prefix) override;
+		void getStatValues(std::vector<double> &values) override;
 	private:	
 		int cache_size;
 		int block_size;

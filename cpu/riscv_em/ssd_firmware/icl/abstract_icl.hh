@@ -61,6 +61,7 @@ struct ICLStats {
     uint64_t trim_bytes;
     uint64_t format_bytes;
     uint64_t flush_bytes;
+    uint64_t heap_top;
 };
 
 class AbstractICL {

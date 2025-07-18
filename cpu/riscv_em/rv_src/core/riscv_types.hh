@@ -103,13 +103,17 @@ struct ICLStats {
     uint64_t write_cache_hits;
     uint64_t read_cache_misses;
     uint64_t write_cache_misses;
-    uint64_t read_cache_evictions;
-    uint64_t write_cache_evictions;
+    uint64_t cache_evictions;
     uint64_t read_req_cycles;
     uint64_t write_req_cycles;
     uint64_t trim_req_cycles;
     uint64_t format_req_cycles;
     uint64_t flush_req_cycles;
+    uint64_t read_bytes;
+    uint64_t write_bytes;
+    uint64_t trim_bytes;
+    uint64_t format_bytes;
+    uint64_t flush_bytes;
 };
 
 struct FTLStats {

@@ -249,6 +249,7 @@ bool SimpleICL::read(Request &req) {
     icl_stats.read_req_cycles += read_req_cycles;
     icl_stats.read_requests++;
     icl_stats.read_req_bytes += req.length;
+    icl_stats.heap_top = get_heap_top();
     mutex_unlock(&stat_mutex);
     return ret;
 }
@@ -473,6 +474,7 @@ bool DSICL::write(Request &req) {
     icl_stats.write_req_cycles += write_req_cycles;
     icl_stats.write_requests++;
     icl_stats.write_req_bytes += req.length;
+    icl_stats.heap_top = get_heap_top();
     mutex_unlock(&stat_mutex);
     return ret;
 }
@@ -539,6 +541,7 @@ void DSICL::flush(LPNRange &range) {
     icl_stats.flush_req_cycles += flush_req_cycles;
     icl_stats.flush_requests++;
     icl_stats.flush_req_bytes += range.nlp * lineCountInSuperPage * lineSize;
+    icl_stats.heap_top = get_heap_top();
     mutex_unlock(&stats_mutex);
 }
 
@@ -580,6 +583,7 @@ void DSICL::trim(LPNRange &range) {
     icl_stats.trim_req_cycles += end_cycle - start_cycle;
     icl_stats.trim_requests++;
     icl_stats.trim_req_bytes += range.nlp * lineCountInSuperPage * lineSize;
+    icl_stats.heap_top = get_heap_top();
     mutex_unlock(&stats_mutex);
 
 }
@@ -615,6 +619,7 @@ void DSICL::format(LPNRange &range) {
     icl_stats.format_req_cycles += end_cycle - start_cycle;
     icl_stats.format_requests++;
     icl_stats.format_req_bytes += range.nlp * lineCountInSuperPage * lineSize;
+    icl_stats.heap_top = get_heap_top();
     mutex_unlock(&stats_mutex);
   
 }

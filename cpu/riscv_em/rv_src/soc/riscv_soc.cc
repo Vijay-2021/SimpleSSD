@@ -377,16 +377,19 @@ void SOC::next_simulation_tick(uint64_t next_tick) {
 }
 
 void SOC::resetStatValues() {
-    // for (auto &core : rv_cores) {
-    //     core.reset_stats();
-    // }
+    for (auto &core : rv_cores) {
+        core.reset_stats();
+    }
     if (stats.ftl_stats) {
         memset(stats.ftl_stats, 0, sizeof(FTLStats));
     } 
     if (stats.icl_stats) {
         memset(stats.icl_stats, 0, sizeof(ICLStats));
     }
-    stats.total_cycles = 0;
+    stats.total_cycles = 0; 
+    stats.fast_forward_cycles = 0;
+    pDRAM->resetStats();
+    pCache->resetStats();
 }
 
 FTLStats* SOC::getFTLStats() {
@@ -436,11 +439,11 @@ bool SOC::getTestMode() {
     return test_mode;
 }
 
-void getStatList(std::vector<Stats> &stats, std::string prefix) {
+void SOC::getStatList(std::vector<Stats> &list, std::string prefix) {
     Stats temp;
     
     for (auto & core : rv_cores) {
-        cores.getStatList(stats, prefix + std::to_string(core.core_id));    
+        core.getStatList(stats, prefix + ".core " + std::to_string(core.core_id));
     }
 
     temp.name = prefix + ".icl_read_requests";
@@ -470,11 +473,8 @@ void getStatList(std::vector<Stats> &stats, std::string prefix) {
     temp.name = prefix + ".write_cache_misses";
     temp.desc = "Total write cache misses";
     list.push_back(temp);
-    temp.name = prefix + ".read_cache_evictions";
-    temp.desc = "Total read cache evictions";
-    list.push_back(temp);
-    temp.name = prefix + ".write_cache_evictions";
-    temp.desc = "Total write cache evictions";
+    temp.name = prefix + ".icl_evictions";
+    temp.desc = "Total ICL cache evictions";
     list.push_back(temp);
     temp.name = prefix + ".icl_read_cycles";
     temp.desc = "Total ICL read cycles";
@@ -490,6 +490,21 @@ void getStatList(std::vector<Stats> &stats, std::string prefix) {
     list.push_back(temp);
     temp.name = prefix + ".icl_flush_cycles";
     temp.desc = "Total ICL flush cycles";
+    list.push_back(temp);
+    temp.name = prefix + ".icl_read_bytes_transferred";
+    temp.desc = "Total ICL read bytes transferred";
+    list.push_back(temp);
+    temp.name = prefix + ".icl_write_bytes_transferred";
+    temp.desc = "Total ICL write bytes transferred";
+    list.push_back(temp);
+    temp.name = prefix + ".icl_trim_bytes_transferred";   
+    temp.desc = "Total ICL trim bytes transferred";
+    list.push_back(temp);
+    temp.name = prefix + ".icl_format_bytes_transferred";
+    temp.desc = "Total ICL format bytes transferred";
+    list.push_back(temp);
+    temp.name = prefix + ".icl_flush_bytes_transferred";
+    temp.desc = "Total ICL flush bytes transferred";
     list.push_back(temp);
 
     temp.name = prefix + ".ftl_read_requests";
@@ -530,52 +545,111 @@ void getStatList(std::vector<Stats> &stats, std::string prefix) {
     temp.desc = "Total fast forward cycles";
     list.push_back(temp);
 
-    temp.name = prefix + ".total_dram_read_accesses";
-    temp.desc = "Total DRAM read accesses";
-    list.push_back(temp);
-    temp.name = prefix + ".total_dram_read_stalled_cycles";
-    temp.desc = "Total DRAM Read latency";
-    list.push_back(temp);
-    temp.name = prefix + ".total_dram_write_accesses";
-    temp.desc = "Total DRAM write accesses";
-    list.push_back(temp);
-    temp.name = prefix + ".total_dram_write_stalled_cycles";
-    temp.desc = "Total DRAM Write latency";
-    list.push_back(temp);
-    temp.name = prefix + ".total_dram_read_bytes_transferred"; // ICL requests are modelled similar to OpenSSD by requesting a large amount of data from DRAM
-    temp.desc = "Total DRAM read bytes transferred";
-    list.push_back(temp);
-    temp.name = prefix + ".total_dram_write_bytes_transferred";
-    temp.desc = "Total DRAM write bytes transferred";
-    list.push_back(temp);
+    pDRAM->getStatList(list, prefix + ".dram");
+    pCache->getStatList(list, prefix + ".cache");
+    // temp.name = prefix + ".total_dram_read_accesses";
+    // temp.desc = "Total DRAM read accesses";
+    // list.push_back(temp);
+    // temp.name = prefix + ".total_dram_read_stalled_cycles";
+    // temp.desc = "Total DRAM Read latency";
+    // list.push_back(temp);
+    // temp.name = prefix + ".total_dram_write_accesses";
+    // temp.desc = "Total DRAM write accesses";
+    // list.push_back(temp);
+    // temp.name = prefix + ".total_dram_write_stalled_cycles";
+    // temp.desc = "Total DRAM Write latency";
+    // list.push_back(temp);
+    // temp.name = prefix + ".total_dram_read_bytes_transferred"; // ICL requests are modelled similar to OpenSSD by requesting a large amount of data from DRAM
+    // temp.desc = "Total DRAM read bytes transferred";
+    // list.push_back(temp);
+    // temp.name = prefix + ".total_dram_write_bytes_transferred";
+    // temp.desc = "Total DRAM write bytes transferred";
+    // list.push_back(temp);
 
  
-    temp.name = prefix + ".total_cache_read_accesses";
-    temp.desc = "Total Cache read accesses";
-    list.push_back(temp);
-    temp.name = prefix + ".total_cache_read_hits";
-    temp.desc = "Total Cache read hits";
-    list.push_back(temp);
-    temp.name = prefix + ".total_cache_read_misses";
-    temp.desc = "Total Cache read misses";
-    list.push_back(temp);
-    temp.name = prefix + ".total_cache_write_accesses";
-    temp.desc = "Total Cache write accesses";
-    list.push_back(temp);
-    temp.name = prefix + ".total_cache_write_hits";
-    temp.desc = "Total Cache write hits";
-    list.push_back(temp);
-    temp.name = prefix + ".total_cache_write_misses";
-    temp.desc = "Total Cache write misses";
-    list.push_back(temp);
-    temp.name = prefix + ".total_cache_read_evictions";
-    temp.desc = "Total Cache read evictions";
-    list.push_back(temp);
-    temp.name = prefix + ".total_cache_write_evictions";
-    temp.desc = "Total Cache write evictions";
-    list.push_back(temp);
+    // temp.name = prefix + ".total_cache_read_accesses";
+    // temp.desc = "Total Cache read accesses";
+    // list.push_back(temp);
+    // temp.name = prefix + ".total_cache_read_hits";
+    // temp.desc = "Total Cache read hits";
+    // list.push_back(temp);
+    // temp.name = prefix + ".total_cache_read_misses";
+    // temp.desc = "Total Cache read misses";
+    // list.push_back(temp);
+    // temp.name = prefix + ".total_cache_write_accesses";
+    // temp.desc = "Total Cache write accesses";
+    // list.push_back(temp);
+    // temp.name = prefix + ".total_cache_write_hits";
+    // temp.desc = "Total Cache write hits";
+    // list.push_back(temp);
+    // temp.name = prefix + ".total_cache_write_misses";
+    // temp.desc = "Total Cache write misses";
+    // list.push_back(temp);
+    // temp.name = prefix + ".total_cache_read_evictions";
+    // temp.desc = "Total Cache read evictions";
+    // list.push_back(temp);
+    // temp.name = prefix + ".total_cache_write_evictions";
+    // temp.desc = "Total Cache write evictions";
+    // list.push_back(temp);
 
 
+}
+
+void SOC::getStatValues(std::vector<double> &values) {
+    for (auto & core : rv_cores) {
+        core.getStatValues(values);
+    }
+    auto *icl_stats = riscv_soc->getICLStats();
+    if (icl_stats != nullptr) {
+        values.push_back(icl_stats->read_requests);
+        values.push_back(icl_stats->write_requests);
+        values.push_back(icl_stats->trim_requests);
+        values.push_back(icl_stats->format_requests);
+        values.push_back(icl_stats->flush_requests);
+        values.push_back(icl_stats->read_cache_hits);
+        values.push_back(icl_stats->read_cache_misses);
+        values.push_back(icl_stats->write_cache_hits);
+        values.push_back(icl_stats->write_cache_misses);
+        values.push_back(icl_stats->read_cache_evictions);
+        values.push_back(icl_stats->write_cache_evictions);
+        values.push_back(icl_stats->read_req_cycles);
+        values.push_back(icl_stats->write_req_cycles);
+        values.push_back(icl_stats->trim_req_cycles);
+        values.push_back(icl_stats->format_req_cycles);
+        values.push_back(icl_stats->flush_req_cycles);
+        values.push_back(icl_stats->read_bytes_transferred);
+        values.push_back(icl_stats->write_bytes_transferred);
+        values.push_back(icl_stats->trim_bytes_transferred);
+        values.push_back(icl_stats->format_bytes_transferred);
+        values.push_back(icl_stats->flush_bytes_transferred);
+    } else {
+        // If ICL stats are not available, push zeros
+        for (size_t i = 0; i < 20; i++) {
+        values.push_back(0);
+        }
+    }
+    auto *ftl_stats = riscv_soc->getFTLStats();
+    if (ftl_stats != nullptr) {
+        values.push_back(ftl_stats->read_requests);
+        values.push_back(ftl_stats->write_requests);
+        values.push_back(ftl_stats->trim_requests);
+        values.push_back(ftl_stats->format_requests);
+        values.push_back(ftl_stats->garbage_collection_requests);
+        values.push_back(ftl_stats->read_req_cycles);
+        values.push_back(ftl_stats->write_req_cycles);
+        values.push_back(ftl_stats->trim_req_cycles);   
+        values.push_back(ftl_stats->format_req_cycles);
+        values.push_back(ftl_stats->gc_req_cycles);
+    } else {
+        // If FTL stats are not available, push zeros
+        for (size_t i = 0; i < 10; i++) {
+        values.push_back(0);
+        }
+    }
+    values.push_back(riscv_soc->stats.total_cycles);
+    values.push_back(riscv_soc->stats.total_fast_forward_cycles);
+    pDRAM->getStatValues(values);
+    pCache->getStatValues(values);   
 }
 
 } // namespace RISCV

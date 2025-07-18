@@ -72,8 +72,8 @@ class SOC : StatObject{
         } rv_soc_mem_access_cb_td;
         uint64_t clock_period;
         rv_soc_mem_access_cb_td mem_access_cbs[6];
-        DRAM::AbstractDRAM *pDRAM;
-        SRAM::SRAM *pCache; // SRAM for RISCV
+        Memory::SimpleDRAM *pDRAM;
+        Memory::SRAM *pCache; // SRAM for RISCV
         std::vector<Core> rv_cores;
         std::vector<uint64_t> next_core_ticks;
         uint64_t ICL_HIGH;
