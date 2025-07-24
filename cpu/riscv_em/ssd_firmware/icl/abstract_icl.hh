@@ -2,7 +2,7 @@
 #define __ABSTRACT_ICL_HH__
 
 #include "vector.hh"
-#include "ftl.hh"
+#include "unlocked_ftl.hh"
 #include "mutex.h"
 #include "abstract_icl.hh"
 
@@ -144,7 +144,6 @@ class AbstractICL {
         void checkSequential(Request &req, SequentialDetect &data);
         uint32_t evictFunction(uint32_t setIdx);
         Line* compareFunction(Line *a, Line *b);
-        virtual void evictCache(bool = true) = 0;
         Mutex stat_mutex;
     public:
         virtual bool read(Request &) = 0;

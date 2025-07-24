@@ -52,14 +52,12 @@ void DSICL::evictCache(bool flush) {
         reqInternal.lpn = evictData[row][col]->tag / lineCountInSuperPage;
         reqInternal.ioFlag.reset();
         reqInternal.ioFlag.set(row);
-        mutex_unlock(&cache_metadata_mutex);
         mutex_lock(&ftl_mutex);
         beginAt = pFTL->write(reqInternal); // update with ftl return time
         mutex_unlock(&ftl_mutex);
         mutex_lock(&stat_mutex);
         icl_stats.cache_evictions++; // only count evictions if we write data to FTL
         mutex_unlock(&stat_mutex);
-        mutex_lock(&cache_metadata_mutex);
       }
 
       if (flush) {
@@ -78,9 +76,9 @@ void DSICL::evictCache(bool flush) {
 // True when hit
 bool DSICL::read(Request &req) {
     bool ret = false;
-    uint64_t start_cycle;
-    uint64_t end_cycle;
-    uint64_t read_req_cycles;
+    uint64_t start_cycle = 0;
+    uint64_t end_cycle = 0;
+    uint64_t read_req_cycles = 0;
     bool cache_hit = false;
     read_buffer((uint64_t)&start_cycle, 0, FIRMWARE_CYCLE);
     // debugprint(LOG_ICL_GENERIC_CACHE,
@@ -93,7 +91,7 @@ bool DSICL::read(Request &req) {
         // uint64_t arrived = getTick();
         mutex_lock(&cache_metadata_mutex);
         if (useReadPrefetch) {
-        checkSequential(req, readDetect);
+          checkSequential(req, readDetect);
         }
         wayIdx = getValidWay(req.range.slpn);
         // Do we have valid data?
@@ -506,6 +504,7 @@ bool DSICL::write(Request &req) {
 // True when flushed
 void DSICL::flush(LPNRange &range) {
     uint64_t flush_req_cycles = 0;
+    uint64_t flush_bytes_transferred = 0;
     uint64_t start_cycle;
     uint64_t end_cycle;
     read_buffer((uint64_t)&start_cycle, 0, FIRMWARE_CYCLE);
@@ -526,6 +525,7 @@ void DSICL::flush(LPNRange &range) {
                     reqInternal.ioFlag.set(line.tag % lineCountInSuperPage);
                     read_buffer((uint64_t)&end_cycle, 0, FIRMWARE_CYCLE);
                     flush_req_cycles += end_cycle - start_cycle;
+                    flush_bytes_transferred += lineSize;
                     mutex_unlock(&cache_metadata_mutex);
                     mutex_lock(&ftl_mutex);
                     uint64_t ftlTick = pFTL->write(reqInternal);
@@ -537,7 +537,6 @@ void DSICL::flush(LPNRange &range) {
                 line.valid = false;
             }
         } else {
-            mutex_lock(&cache_metadata_mutex);
             for (uint32_t setIdx = 0; setIdx < setSize; setIdx++) {
                 for (uint32_t wayIdx = 0; wayIdx < waySize; wayIdx++) {
                     Line &line = cacheData[setIdx][wayIdx];
@@ -548,6 +547,7 @@ void DSICL::flush(LPNRange &range) {
                             reqInternal.ioFlag.set(line.tag % lineCountInSuperPage);
                             read_buffer((uint64_t)&end_cycle, 0, FIRMWARE_CYCLE);
                             flush_req_cycles += end_cycle - start_cycle;
+                            flush_bytes_transferred += lineSize;
                             mutex_unlock(&cache_metadata_mutex);
                             mutex_lock(&ftl_mutex);
                             uint64_t ftlTick = pFTL->write(reqInternal);
@@ -572,7 +572,7 @@ void DSICL::flush(LPNRange &range) {
     mutex_lock(&stat_mutex);
     icl_stats.flush_req_cycles += flush_req_cycles;
     icl_stats.flush_requests++;
-    icl_stats.flush_bytes += range.nlp * lineCountInSuperPage * lineSize;
+    icl_stats.flush_bytes += flush_bytes_transferred;
     icl_stats.heap_top = get_heap_top();
     mutex_unlock(&stat_mutex);
 }
@@ -583,6 +583,7 @@ void DSICL::trim(LPNRange &range) {
     uint64_t start_cycle;
     uint64_t end_cycle;
     uint64_t trim_req_cycles = 0;
+    uint64_t trim_bytes_transferred = 0;
     read_buffer((uint64_t)&start_cycle, 0, FIRMWARE_CYCLE);
     if (useReadCaching || useWriteCaching) {
         uint64_t finishedAt;
@@ -600,6 +601,7 @@ void DSICL::trim(LPNRange &range) {
                     mutex_lock(&ftl_mutex);
                     read_buffer((uint64_t)&end_cycle, 0, FIRMWARE_CYCLE);
                     trim_req_cycles += end_cycle - start_cycle;
+                    trim_bytes_transferred += lineSize;
                     uint64_t trim_tick = pFTL->trim(reqInternal);
                     read_buffer((uint64_t)&start_cycle, 0, FIRMWARE_CYCLE); // reset start cycle after FTL finishes
                     mutex_unlock(&ftl_mutex);
@@ -618,7 +620,7 @@ void DSICL::trim(LPNRange &range) {
     mutex_lock(&stat_mutex);
     icl_stats.trim_req_cycles += end_cycle - start_cycle;
     icl_stats.trim_requests++;
-    icl_stats.trim_bytes += range.nlp * lineCountInSuperPage * lineSize;
+    icl_stats.trim_bytes += trim_bytes_transferred;
     icl_stats.heap_top = get_heap_top();
     mutex_unlock(&stat_mutex);
 

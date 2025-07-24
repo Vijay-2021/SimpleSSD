@@ -21,7 +21,7 @@
 #define __ICL_PARTITIONED_DS_CACHE__
 
 #include "vector.hh"
-#include "ftl.hh"
+#include "unlocked_ftl.hh"
 #include "mutex.h"
 #include "abstract_icl.hh"
 
@@ -32,7 +32,7 @@ class PartitionedDSICL : public AbstractICL {
   Mutex cache_metadata_mutex;
   Mutex cache_data_mutex;
   Mutex ftl_mutex;
-  void evictCache(bool flush = true) override;
+  void evictCache(bool flush = true);
  public:
   PartitionedDSICL(icl_params& cparams, FTL::FTL *ftl);
 

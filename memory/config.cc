@@ -98,7 +98,7 @@ Config::Config() {
   dram.bankBits = 3;
   dram.colBits = 10;
   dram.rowSize = 8192; // 10 bits for column + 3 bits for offset
-  
+  dram.colWidthBits = 3;
   
   dramTiming.tCK = 1250;
   dramTiming.tRCD = 18000;

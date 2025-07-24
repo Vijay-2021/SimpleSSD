@@ -56,11 +56,11 @@ SimpleDRAM::~SimpleDRAM() {
 }
 
 uint64_t SimpleDRAM::getBank(uint64_t addr) {
-  return (addr >> pStructure->colBits) & ((1 << pStructure->bankBits) - 1);
+  return (addr >> (pStructure->colBits + pStructure->colWidthBits)) & ((1 << pStructure->bankBits) - 1);
 }
 
 uint64_t SimpleDRAM::getRow(uint64_t addr) {
-  return addr >> (pStructure->colBits + pStructure->bankBits);
+  return addr >> (pStructure->colBits + pStructure->bankBits + pStructure->colWidthBits);
 }
 
 uint64_t SimpleDRAM::read_dram(uint64_t addr, uint64_t size) {
@@ -78,20 +78,21 @@ uint64_t SimpleDRAM::write_dram(uint64_t addr, uint64_t size) {
 uint64_t SimpleDRAM::access(uint64_t addr, uint64_t size) {
     uint64_t offset = 0;
     uint64_t current_tick = getTick();
-
     while (offset < size) {
+        
         uint64_t a = addr + offset;
         uint64_t bank = getBank(a);
         uint64_t row = getRow(a);
         uint64_t rowOffset = a % pStructure->rowSize;
         uint64_t chunk = std::min(size - offset, pStructure->rowSize - rowOffset);
-        uint64_t bursts = std::ceil((double)chunk / pStructure->burstLength);
+        uint64_t bursts = std::ceil((double)chunk / (pStructure->colWidthBits * pStructure->burstLength));
 
         // Wait for bank to become available
-        if (bank_available[bank] > current_tick) {
+        if (bank_available[bank] > current_tick && current_tick != 0) {
+            total_stall_cycles += (bank_available[bank] - current_tick) / 2500;
             current_tick = bank_available[bank];
-            total_stall_cycles += (current_tick - bank_available[bank]);
             total_stalls++;
+            
         }
 
         // Row hit or miss

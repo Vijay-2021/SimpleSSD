@@ -1446,9 +1446,7 @@ static uint64_t instr_PWRITE(Core * rv_core) {
     PAL::Request* req = (PAL::Request *) (rv_core->pSOC->get_ram() + (rv_core->reg_file[rv_core->rd] - RAM_BASE_ADDR));
     uint8_t* stored_addr = req->ioFlag.data;
     req->ioFlag.data = rv_core->pSOC->get_ram() + ((uint64_t)req->ioFlag.data - RAM_BASE_ADDR);
-    printf("PWRITE: %p, %p, %p\n", req, req->ioFlag.data, (uint64_t*) (rv_core->pSOC->get_ram() + ((rv_core->reg_file[rv_core->rs1] - RAM_BASE_ADDR))));
     rv_core->pSOC->pwrite((uint8_t*) req, (uint64_t*) (rv_core->pSOC->get_ram() + ((rv_core->reg_file[rv_core->rs1] - RAM_BASE_ADDR))));
-    printf("PWRITE done\n");
     req->ioFlag.data = stored_addr;
     return 1;
 }
@@ -1590,7 +1588,6 @@ static uint64_t instr_FSQRT(Core *rv_core) {
 
 static uint64_t instr_FSGNJ(Core *rv_core) {
     rv_core->float_reg_file[rv_core->rd] = std::copysign(rv_core->float_reg_file[rv_core->rs1], rv_core->float_reg_file[rv_core->rs2]);
-    printf("executing float sign injunction on %f and %f for result %f\n at pc %lx",  rv_core->float_reg_file[rv_core->rs1], rv_core->float_reg_file[rv_core->rs2], rv_core->float_reg_file[rv_core->rd], rv_core->pc);
     return FLT_SGNJ_CYCLE_COUNT;
 }
 
@@ -1619,19 +1616,16 @@ static uint64_t instr_FMAX(Core *rv_core) {
 
 static uint64_t instr_FEQ(Core *rv_core) {
     rv_core->reg_file[rv_core->rd] = (rv_core->float_reg_file[rv_core->rs1] == rv_core->float_reg_file[rv_core->rs2]);
-    printf("executing float equal on %f and %f for result %f\n",  rv_core->float_reg_file[rv_core->rs1], rv_core->float_reg_file[rv_core->rs2], rv_core->float_reg_file[rv_core->rd]);
     return FLT_CMPEQ_CYCLE_COUNT;
 }
 
 static uint64_t instr_FLT(Core *rv_core) {
     rv_core->reg_file[rv_core->rd] = (rv_core->float_reg_file[rv_core->rs1] < rv_core->float_reg_file[rv_core->rs2]);
-    printf("executing float less than on %f and %f for result %f\n",  rv_core->float_reg_file[rv_core->rs1], rv_core->float_reg_file[rv_core->rs2], rv_core->float_reg_file[rv_core->rd]);
     return FLT_CMPLT_CYCLE_COUNT;
 }
 
 static uint64_t instr_FLE(Core *rv_core) {
     rv_core->reg_file[rv_core->rd] = (rv_core->float_reg_file[rv_core->rs1] <= rv_core->float_reg_file[rv_core->rs2]);
-    printf("executing float equal on %f and %f for result %f\n",  rv_core->float_reg_file[rv_core->rs1], rv_core->float_reg_file[rv_core->rs2], rv_core->float_reg_file[rv_core->rd]);
     return FLT_CMPLE_CYCLE_COUNT;
 }
 
@@ -1878,7 +1872,6 @@ static void R_float_type_preparation(Core *rv_core, int32_t *next_subcode) {
             }
             break;
         case FLT_CMP:
-            printf("executing float compare with func3 %d and func7 %d\n", rv_core->func3, rv_core->func7);
             if (rv_core->func3 == FLT_CMPEQ) {
                 rv_core->execute_cb = instr_FEQ;
             } else if (rv_core->func3 == FLT_CMPLT) {
@@ -2434,7 +2427,12 @@ uint64_t Core::rv_core_run()
 
     /* increase program counter here */
     pc = next_pc ? next_pc : pc + 4;
-    
+    if (next_pc) {
+        if (last_jump_points.size() > 100) {
+            last_jump_points.pop();
+        }
+        last_jump_points.push(pc);
+    }
     curr_cycle += next_cycle;
     if (in_csd_mode) {
         printf("running csd mode for pc: %lx and csd cycles: %lu and start pc: %lx and instruction: %x\n", pc, csd_cycles, csd_start_pc, instruction);

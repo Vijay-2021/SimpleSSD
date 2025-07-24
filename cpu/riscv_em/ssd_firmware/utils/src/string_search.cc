@@ -1,3 +1,4 @@
+#include "string_search.hh"
 #include "utils.h"
 #include "embext.hh"
 #include "memory_allocator.hh"
@@ -5,6 +6,7 @@
 #include "cs_instructions.h"
 #include "string.h"
 #include <stdint.h>
+
 
 #define ALPHABET_LEN 256
 #define NOT_FOUND patlen
@@ -152,10 +154,10 @@ void make_delta2(int *delta2, uint8_t *pat, int32_t patlen) {
 #endif
 }
 
-uint32_t boyer_moore (uint8_t *string, uint32_t stringlen, uint8_t *pat, uint32_t patlen, MemoryAllocator *allocator) {
+uint32_t boyer_moore (uint8_t *string, uint32_t stringlen, uint8_t *pat, uint32_t patlen) {
     int i;
     int delta1[ALPHABET_LEN];
-    int *delta2 = allocator->mmalloc(patlen * sizeof(int));
+    int *delta2 = malloc(patlen * sizeof(int));
     make_delta1(delta1, pat, patlen);
     make_delta2(delta2, pat, patlen);
     int n_shifts = 0;
@@ -172,7 +174,7 @@ uint32_t boyer_moore (uint8_t *string, uint32_t stringlen, uint8_t *pat, uint32_
             chars_compared++;
         }
         if (j < 0) {
-            allocator->mfree(delta2);
+            free(delta2);
             return (uint32_t) i+1;
         }
         chars_compared++;
@@ -187,16 +189,15 @@ uint32_t boyer_moore (uint8_t *string, uint32_t stringlen, uint8_t *pat, uint32_
 
         i += max(delta1[string[i]], delta2[j]);
     }
-    allocator->mfree(delta2);
+    free(delta2);
     return 0;
 }
 
-int main(EmbExt2 *ext2, MemoryAllocator *allocator) {
+int string_search(char *file_name, char *pattern, EmbExt2 *ext2) {
     uint8_t *search_buffer = nullptr;
     int search_size = 0;
-    char pattern[] = "Hello";
     int patlen = strlen(pattern) - 1;
-    void *vfe = ext2->open("/home/data/inputs/test_hit.txt", O_RDONLY, 0777);
+    void *vfe = ext2->open(file_name, O_RDONLY, 0777);
     int chars_compared = 0;
     if (!vfe) {
         // handle error
@@ -213,7 +214,7 @@ int main(EmbExt2 *ext2, MemoryAllocator *allocator) {
         // handle error
     }
 
-    search_buffer = (uint8_t *)allocator->mmalloc(size);
+    search_buffer = (uint8_t *) malloc(size);
     if (!search_buffer) {
         ext2->close(vfe);
         // handle error
@@ -221,7 +222,7 @@ int main(EmbExt2 *ext2, MemoryAllocator *allocator) {
 
     int bytes_read = ext2->read(vfe, search_buffer, size);
     if (bytes_read != size) {
-        allocator->mfree(search_buffer);
+        free(search_buffer);
         ext2->close(vfe);
         // handle error
     }
@@ -229,7 +230,7 @@ int main(EmbExt2 *ext2, MemoryAllocator *allocator) {
     ext2->close(vfe);
     search_size = size;
     printf("Loaded file!\n");
-    uint32_t pos = boyer_moore(search_buffer, search_size, pattern, patlen, allocator);
+    uint32_t pos = boyer_moore(search_buffer, search_size, pattern, patlen);
     if (pos == 0 && chars_compared != strlen(pattern))
         printf("Not Found - ");
     else

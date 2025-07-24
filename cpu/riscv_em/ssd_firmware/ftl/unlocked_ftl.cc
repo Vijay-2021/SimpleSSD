@@ -17,7 +17,7 @@
 * along with SimpleSSD.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "ftl.hh"
+#include "unlocked_ftl.hh"
 #include "utils.h"
 #include "firmware_utils.h"
 #include "move.hh"
@@ -35,7 +35,7 @@ FTL::FTL(ftl_params &fparams) : params(fparams), lastFreeBlock(fparams.pageCount
   printf("total page count to max perf: %u\n", params.pageCountToMaxPerf);
   printf("io Unit in page: %u and pageCountToMaxPerf: %u and bRandomTweak %u and ftl_gc_mode %d and ftl_filling_mode %d and choice param %u and reclaim block %u\n", 
          params.ioUnitInPage, params.pageCountToMaxPerf, (uint32_t)params.bRandomTweak, (int)params.ftl_gc_mode, (int)params.ftl_filling_mode, params.choiceParam, params.ftl_gc_reclaim_block);
-  for (uint32_t i = 0; i < 128; i++) {
+  for (uint32_t i = 0; i < params.totalPhysicalBlocks; i++) {
     freeBlocks.emplace_back(move(Block(i, params.pagesInBlock, params.ioUnitInPage)));
   }
   for (auto &block : freeBlocks) {
@@ -56,9 +56,10 @@ FTL::FTL(ftl_params &fparams) : params(fparams), lastFreeBlock(fparams.pageCount
   lastFreeBlockIndex = 0;
 
   memset(&stat, 0, sizeof(stat));
-
+  memset(&ftl_stats, 0, sizeof(ftl_stats));
   bRandomTweak = params.bRandomTweak;
   bitsetSize = bRandomTweak ? params.ioUnitInPage : 1;
+  mutex_init(&block_mutex);
   printf("finished setup, starting initialization\n");
   initialize();
 }
@@ -198,8 +199,10 @@ uint64_t FTL::format(LPNRange &range) {
       auto *mappingList = &table[idx];
 
       // Do trim
+      mutex_lock(&block_mutex);
       for (uint32_t idx = 0; idx < bitsetSize; idx++) {
         auto &mapping = mappingList->at(idx);
+        
         auto *block = &blocks[mapping.first];
 
         if (!block->isValid()) {
@@ -212,6 +215,7 @@ uint64_t FTL::format(LPNRange &range) {
           list.push_back(mapping.first);
         }
       }
+      mutex_unlock(&block_mutex);
       table[idx].clear();
   }
 
@@ -229,7 +233,10 @@ uint64_t FTL::format(LPNRange &range) {
 } 
 
 float FTL::freeBlockRatio() {
-  return (float)nFreeBlocks / params.totalPhysicalBlocks;
+  mutex_lock(&block_mutex);
+  float ret_val = (float)nFreeBlocks / params.totalPhysicalBlocks;
+  mutex_unlock(&block_mutex);
+  return ret_val;
 }
 
 uint32_t FTL::convertBlockIdx(uint32_t blockIdx) {
@@ -242,7 +249,7 @@ uint32_t FTL::getFreeBlock(uint32_t idx) {
   if (idx >= params.pageCountToMaxPerf) {
     panic("Index out of range");
   }
-
+  mutex_lock(&block_mutex);
   if (nFreeBlocks > 0) {
     // Search block which is blockIdx % params.pageCountToMaxPerf == idx
     auto iter = freeBlocks.begin();
@@ -273,11 +280,12 @@ uint32_t FTL::getFreeBlock(uint32_t idx) {
   else {
     panic("No free block left");
   }
-
+  mutex_unlock(&block_mutex);
   return blockIndex;
 }
 
 uint32_t FTL::getLastFreeBlock(Bitset &iomap) {
+  mutex_lock(&block_mutex);
   if (!bRandomTweak || (lastFreeBlockIOMap & iomap).any()) {
     // Update lastFreeBlockIndex
     lastFreeBlockIndex++;
@@ -304,7 +312,7 @@ uint32_t FTL::getLastFreeBlock(Bitset &iomap) {
 
     bReclaimMore = true;
   }
-
+  mutex_unlock(&block_mutex);
   return lastFreeBlock.at(lastFreeBlockIndex);
 }
 
@@ -547,6 +555,10 @@ uint64_t FTL::doGarbageCollection(Vector<uint32_t> &blocksToReclaim) {
 
 uint64_t FTL::readInternal(Request &req) {
   auto *mappingList = &table[req.lpn];
+  if (mappingList->size() == 0) { // create a mapping for testing purposes, will add configuration to this later
+    table[req.lpn] = Vector<Pair<uint32_t, uint32_t>>(
+            bitsetSize, {params.totalPhysicalBlocks, params.pagesInBlock});
+  }
   if (mappingList->size() != 0) {
     PAL::Request palRequest(req);
     uint64_t beginAt;
@@ -568,7 +580,7 @@ uint64_t FTL::readInternal(Request &req) {
           else {
             palRequest.ioFlag.set();
           }
-
+          mutex_lock(&block_mutex);
           auto* block = &blocks[palRequest.blockIndex];
 
           if (!block->isValid()) {
@@ -577,6 +589,7 @@ uint64_t FTL::readInternal(Request &req) {
           read_buffer((uint64_t)&beginAt, 0, FIRMWARE_TICK);
 
           block->read(palRequest.pageIndex, idx);
+          mutex_unlock(&block_mutex);
           pread((uint64_t) &palRequest, (uint64_t)&beginAt);
           // pPAL->read(palRequest, beginAt);
 
@@ -597,8 +610,8 @@ uint64_t FTL::writeInternal(Request &req, bool sendToPAL) {
   PAL::Request palRequest(req);
   Block *block;
   auto *mappingList = &table[req.lpn];
-  uint64_t beginAt;
-  uint64_t finishedAt;
+  uint64_t beginAt = 0;
+  uint64_t finishedAt = 0;
   read_buffer((uint64_t)&finishedAt, 0, FIRMWARE_TICK);
   bool readBeforeWrite = false;
 
@@ -609,10 +622,12 @@ uint64_t FTL::writeInternal(Request &req, bool sendToPAL) {
 
         if (mapping->first < params.totalPhysicalBlocks &&
             mapping->second < params.pagesInBlock) {
+          mutex_lock(&block_mutex);
           block = &blocks[mapping->first];
 
           // Invalidate current page
           block->invalidate(mapping->second, idx);
+          mutex_unlock(&block_mutex);
         }
       }
     }
@@ -624,13 +639,15 @@ uint64_t FTL::writeInternal(Request &req, bool sendToPAL) {
   }
 
   // Write data to free block
+
   uint32_t blockIdx = getLastFreeBlock(req.ioFlag);
+  mutex_lock(&block_mutex);
   block = &blocks[blockIdx];
 
   if (!block->isValid()) {
     panic("No such block");
   }
-
+  mutex_unlock(&block_mutex);
   if (!bRandomTweak && !req.ioFlag.all()) {
     // We have to read old data
     readBeforeWrite = true;
@@ -638,13 +655,14 @@ uint64_t FTL::writeInternal(Request &req, bool sendToPAL) {
 
   for (uint32_t idx = 0; idx < bitsetSize; idx++) {
     if (req.ioFlag.test(idx) || !bRandomTweak) {
+      mutex_lock(&block_mutex);
       uint32_t pageIndex = block->getNextWritePageIndex(idx);
       auto *mapping = &mappingList->at(idx);
 
       read_buffer((uint64_t)&beginAt, 0, FIRMWARE_TICK);
 
       block->write(pageIndex, req.lpn, idx);
-
+      mutex_unlock(&block_mutex);
       // Read old data if needed (Only executed when bRandomTweak = false)
       // Maybe some other init procedures want to perform 'partial-write'
       // So check sendToPAL variable
@@ -740,6 +758,7 @@ void FTL::eraseInternal(PAL::Request &req, uint64_t &tick) {
   uint64_t beginAt;
   read_buffer((uint64_t)&beginAt, 0, FIRMWARE_TICK);
   uint64_t threshold = params.bad_block_threshold;
+  mutex_lock(&block_mutex);
   Block* block = &blocks[req.blockIndex];
   uint64_t pal_time;
   // Sanity checks
@@ -758,7 +777,7 @@ void FTL::eraseInternal(PAL::Request &req, uint64_t &tick) {
 
   // Check erase count
   uint32_t erasedCount = block->getEraseCount();
-
+  
   if (erasedCount < threshold) {
     // Reverse search
     auto iter = freeBlocks.end();
@@ -785,6 +804,7 @@ void FTL::eraseInternal(PAL::Request &req, uint64_t &tick) {
 
   // Remove block from block list
   blocks[req.blockIndex] = Block(); // set to invalid block
+  mutex_unlock(&block_mutex);
   uint64_t endAt;
   read_buffer((uint64_t)&endAt, 0, FIRMWARE_TICK);
   tick += endAt - beginAt;

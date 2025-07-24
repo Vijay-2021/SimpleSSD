@@ -104,6 +104,7 @@ AbstractICL::AbstractICL(icl_params& cparams, FTL::FTL *ftl) :
   prefetchMode = params.iclPrefetchGranularity;
   mutex_init(&stat_mutex);
   memset(&stat, 0, sizeof(stat));
+  resetStatValues();
 }
 
 AbstractICL::~AbstractICL() {

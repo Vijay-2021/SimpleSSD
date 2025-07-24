@@ -219,6 +219,7 @@ class CPU : public StatObject {
     uint64_t last_start_tick = 0;
     uint64_t active_periods = 0;
     uint64_t active_duration = 0;
+    uint64_t last_test_tick = 0;
   public:
     CPU(ConfigReader &, ICL::ICL *, FTL::FTL *, PAL::PAL *pal, Memory::SimpleDRAM *dram);
     ~CPU();

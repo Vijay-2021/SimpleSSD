@@ -74,14 +74,14 @@ bool SimpleICL::read(Request &req) {
     bool ret = false;
     uint64_t start_cycle;
     uint64_t end_cycle;
-    uint64_t read_req_cycles;
+    uint64_t read_req_cycles = 0;
     bool cache_hit = false;
     read_buffer((uint64_t)&start_cycle, 0, FIRMWARE_CYCLE);
     // debugprint(LOG_ICL_GENERIC_CACHE,
     //           "READ  | REQ %7u-%-4u | LCA %" PRIu64 " | SIZE %" PRIu64,
     //           req.reqID, req.reqSubID, req.range.slpn, req.length);
 
-    if (useReadCaching) {
+    if (useReadCaching && req.length < lineSize) {
         uint32_t setIdx = calcSetIndex(req.range.slpn);
         uint32_t wayIdx;
         // uint64_t arrived = getTick();
@@ -220,15 +220,20 @@ bool SimpleICL::read(Request &req) {
         }
     }
     else {
-        mutex_lock(&cache_mutex);
-        FTL::Request reqInternal(lineCountInSuperPage, req);
-        //simulates writing data to dram after retrieving it from NVM, however we do in opposite order for timing correctness
-        dram_write((uint64_t)copy_buffer, req.length);
-        read_buffer((uint64_t)&end_cycle, 0, FIRMWARE_CYCLE);
-        read_req_cycles += end_cycle - start_cycle;
-        process_request(pFTL->read(reqInternal));
-        read_buffer((uint64_t)&start_cycle, 0, FIRMWARE_CYCLE); // reset start cycle after FTL finishes
-        mutex_unlock(&cache_mutex);
+        uint64_t tick;
+        read_buffer((uint64_t)&tick, 0, FIRMWARE_TICK);
+        for (size_t lpn = req.range.slpn; lpn < req.range.slpn + req.range.nlp; lpn++) {
+            mutex_lock(&cache_mutex);
+            FTL::Request reqInternal(lineCountInSuperPage, req);
+            //simulates writing data to dram after retrieving it from NVM, however we do in opposite order for timing correctness
+            dram_write((uint64_t)copy_buffer, req.length);
+            read_buffer((uint64_t)&end_cycle, 0, FIRMWARE_CYCLE);
+            read_req_cycles += end_cycle - start_cycle;
+            tick = MAX(tick, pFTL->read(reqInternal));
+            read_buffer((uint64_t)&start_cycle, 0, FIRMWARE_CYCLE); // reset start cycle after FTL finishes
+            mutex_unlock(&cache_mutex);
+        }
+        process_request(tick);
     }
 
     read_buffer((uint64_t)&end_cycle, 0, FIRMWARE_CYCLE);
@@ -475,6 +480,7 @@ bool SimpleICL::write(Request &req) {
 // True when flushed
 void SimpleICL::flush(LPNRange &range) {
     uint64_t flush_req_cycles = 0;
+    uint64_t flush_bytes_transferred = 0;
     uint64_t start_cycle;
     uint64_t end_cycle;
     read_buffer((uint64_t)&start_cycle, 0, FIRMWARE_CYCLE);
@@ -483,7 +489,6 @@ void SimpleICL::flush(LPNRange &range) {
         read_buffer((uint64_t)&finishedAt, 0, FIRMWARE_TICK);
         FTL::Request reqInternal(lineCountInSuperPage);
         mutex_lock(&cache_mutex);
-        read_buffer((uint64_t)&start_cycle, 0, FIRMWARE_CYCLE); // reset start cycle after FTL finishes(eviction can cause FTL writes so we skip)
         if (range.nlp < setSize * waySize) {
             for (uint64_t lpn = range.slpn; lpn < range.slpn + range.nlp; lpn++) {
                 uint32_t setIdx = calcSetIndex(lpn);
@@ -495,6 +500,7 @@ void SimpleICL::flush(LPNRange &range) {
                     reqInternal.ioFlag.set(line.tag % lineCountInSuperPage);
                     read_buffer((uint64_t)&end_cycle, 0, FIRMWARE_CYCLE);
                     flush_req_cycles += end_cycle - start_cycle;
+                    flush_bytes_transferred += lineSize;
                     uint64_t ftlTick = pFTL->write(reqInternal);
                     read_buffer((uint64_t)&start_cycle, 0, FIRMWARE_CYCLE); // reset start cycle after FTL finishes
                     finishedAt = MAX(finishedAt, ftlTick);
@@ -512,6 +518,7 @@ void SimpleICL::flush(LPNRange &range) {
                             reqInternal.ioFlag.set(line.tag % lineCountInSuperPage);
                             read_buffer((uint64_t)&end_cycle, 0, FIRMWARE_CYCLE);
                             flush_req_cycles += end_cycle - start_cycle;
+                            flush_bytes_transferred += lineSize;
                             uint64_t ftlTick = pFTL->write(reqInternal);
                             read_buffer((uint64_t)&start_cycle, 0, FIRMWARE_CYCLE); // reset start cycle after FTL finishes
                             finishedAt = MAX(finishedAt, ftlTick);
@@ -532,7 +539,7 @@ void SimpleICL::flush(LPNRange &range) {
     mutex_lock(&stat_mutex);
     icl_stats.flush_req_cycles += flush_req_cycles;
     icl_stats.flush_requests++;
-    icl_stats.flush_bytes += range.nlp * lineCountInSuperPage * lineSize;
+    icl_stats.flush_bytes += flush_bytes_transferred;
     icl_stats.heap_top = get_heap_top();
     mutex_unlock(&stat_mutex);
 }
@@ -543,6 +550,7 @@ void SimpleICL::trim(LPNRange &range) {
     uint64_t start_cycle;
     uint64_t end_cycle;
     uint64_t trim_req_cycles = 0;
+    uint64_t trim_bytes_transferred = 0;
     read_buffer((uint64_t)&start_cycle, 0, FIRMWARE_CYCLE);
     if (useReadCaching || useWriteCaching) {
         uint64_t finishedAt;
@@ -558,6 +566,7 @@ void SimpleICL::trim(LPNRange &range) {
                     reqInternal.ioFlag.set(line.tag % lineCountInSuperPage);
                     read_buffer((uint64_t)&end_cycle, 0, FIRMWARE_CYCLE);
                     trim_req_cycles += end_cycle - start_cycle;
+                    trim_bytes_transferred += lineSize;
                     uint64_t trim_tick = pFTL->trim(reqInternal);
                     read_buffer((uint64_t)&start_cycle, 0, FIRMWARE_CYCLE); // reset start cycle after FTL finishes
                     finishedAt = MAX(finishedAt, trim_tick);
@@ -574,7 +583,7 @@ void SimpleICL::trim(LPNRange &range) {
     mutex_lock(&stat_mutex);
     icl_stats.trim_req_cycles += end_cycle - start_cycle;
     icl_stats.trim_requests++;
-    icl_stats.trim_bytes += range.nlp * lineCountInSuperPage * lineSize;
+    icl_stats.trim_bytes += trim_bytes_transferred;
     icl_stats.heap_top = get_heap_top();
     mutex_unlock(&stat_mutex);
 

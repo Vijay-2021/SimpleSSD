@@ -58,6 +58,7 @@ void HIL::read(Request &req) {
   };
   Request *pReq = new Request(req);
   pReq->reqID = ++reqCount;
+  printf("req count is %lu\n", reqCount);
   pCPU->submitRead(pReq, doRead);
 }
 
@@ -80,6 +81,7 @@ void HIL::write(Request &req) {
   };
   Request *pReq = new Request(req);
   pReq->reqID = ++reqCount; 
+  printf("req count is %lu\n", reqCount);
   pCPU->submitWrite(pReq, doWrite);
 
 }
@@ -97,6 +99,7 @@ void HIL::flush(Request &req) {
   };
   Request *pReq = new Request(req);
   pReq->reqID = ++reqCount;
+  printf("req count is %lu\n", reqCount);
   pCPU->submitFlush(pReq, doFlush);
 }
 
@@ -116,6 +119,7 @@ void HIL::trim(Request &req) {
   };
   Request *pReq = new Request(req);
   pReq->reqID = ++reqCount;
+  printf("req count is %lu\n", reqCount);
   pCPU->submitTrim(pReq, doFlush);
 }
 
@@ -132,6 +136,7 @@ void HIL::format(Request &req, bool erase) {
   };
   Request *pReq = new Request(req);
   pReq->reqID = ++reqCount;
+  printf("req count is %lu\n", reqCount);
   if (erase) {
     pCPU->submitFlush(pReq, req.function);
   } else {

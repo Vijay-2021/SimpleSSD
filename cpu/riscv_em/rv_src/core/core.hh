@@ -3,6 +3,7 @@
 
 #include "riscv_types.hh"
 
+#include <queue>
 
 #include "rv_src/core/pmp/pmp.hh"
 #include "rv_src/core/trap/trap.hh"
@@ -114,12 +115,13 @@ class Core : public StatObject {
         uint64_t mutex_lock_acquires = 0;
         uint64_t mutex_lock_acquire_cycles = 0;
         uint64_t mutex_lock_acquire_start = 0;
-
-        bool should_stal = false;
+        bool should_stall = false;
 
         void getStatList(std::vector<Stats> &list, std::string prefix) override;
         void getStatValues(std::vector<double> &values) override;
         void resetStatValues() override;
+
+        std::queue<rv_word_t> last_jump_points; // used for debugging
 
 };
 

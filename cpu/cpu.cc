@@ -402,10 +402,17 @@ void CPU::startRISCV() {
 void CPU::stopRISCV() {
   if (test_mode && RISCV::soc_run_mode_ == RISCV::SOC_RUN_MODE::FAST_FORWARD_MODE) {
     RISCV::soc_run_mode_ = RISCV::SOC_RUN_MODE::TIMING_MODE;
+    riscv_soc->resetStatValues(); // reset the stats to ignore the fast-forwarded cycles
     schedule(RISCVCycleEvent, getTick() + clockPeriod);
   } else {
     if (RISCV::soc_run_mode_ == RISCV::SOC_RUN_MODE::TIMING_MODE) {
-      active_duration = getTick() - last_start_tick;
+      active_duration += getTick() - last_start_tick;
+      if (test_mode) {
+        last_test_tick = getTick();
+      }
+    }
+    if (RISCV::soc_run_mode_ == RISCV::SOC_RUN_MODE::FAST_FORWARD_MODE) {
+      riscv_soc->resetStatValues(); // ignore the fast-forwarded cycles(this is just for setting up the SSD initial state, not important for our data gathering)
     }
     uint64_t RISCVCycleTick = 0;
     scheduled(RISCVCycleEvent, &RISCVCycleTick);
@@ -1058,6 +1065,9 @@ void CPU::getStatList(std::vector<Stats> &list, std::string prefix) {
   temp.name = prefix + ".active_duration";
   temp.desc = "Total active duration in ticks";
   list.push_back(temp);
+  temp.name = prefix + ".last_test_tick";
+  temp.desc = "Last test tick";
+  list.push_back(temp);
   riscv_soc->getStatList(list, prefix + ".riscv");
 }
 
@@ -1099,6 +1109,7 @@ void CPU::getStatValues(std::vector<double> &values) {
   }
   values.push_back(active_periods);
   values.push_back(active_duration);
+  values.push_back(last_test_tick);
   riscv_soc->getStatValues(values);
 }
 
@@ -1127,6 +1138,7 @@ void CPU::resetStatValues() {
   }
   active_periods = 0;
   active_duration = 0;
+  last_test_tick = 0;
   riscv_soc->resetStatValues();
 }
 
@@ -1201,7 +1213,9 @@ uint64_t CPU::trim_flash_icl(uint8_t* buffer, uint64_t offset , uint64_t len) {
 
 // TO-DO: implement!
 void CPU::read_flash_pal(uint8_t* request, uint64_t* tick) {
-  debugprint(LOG_CPU, "Read flash PAL from RISCV Core at tick %llu", *tick);
+  if (!test_mode) {
+    debugprint(LOG_CPU, "Read flash PAL from RISCV Core at tick %llu", *tick);
+  }
   PAL::Request* req = (PAL::Request*)request;
   uint64_t reqTick = *tick;
   pPAL->read(*req, reqTick);
@@ -1209,7 +1223,9 @@ void CPU::read_flash_pal(uint8_t* request, uint64_t* tick) {
 }
 
 void CPU::write_flash_pal(uint8_t* request, uint64_t* tick) {
-  debugprint(LOG_CPU, "Write flash PAL from RISCV Core at tick %llu", *tick);
+  if (!test_mode) {
+    debugprint(LOG_CPU, "Write flash PAL from RISCV Core at tick %llu", *tick);
+  }
   PAL::Request req = *((PAL::Request*)request);
   uint64_t reqTick = *tick;
   pPAL->write(req, reqTick);
@@ -1288,16 +1304,12 @@ void CPU::runDMA(uint64_t finished_at, uint64_t core_id) {
   if (!test_mode) {
     DMAFunction func = callbacks[core_id].first;
     void* context = callbacks[core_id].second;
-    debugprint(LOG_CPU, "Running DMA function at tick %lu for core ID %lu",
-              finished_at, core_id);
+    debugprint(LOG_CPU, "Running DMA function at tick %lu for core ID %lu with context %p",
+              finished_at, core_id, context);
     if (func != nullptr) {
-      func(finished_at, context);
-    }
-  } else {
-    debugprint(LOG_CPU, "Skipping DMA function in test mode but executing callback for core ID %lu at tick %lu",
-              core_id, finished_at);
-    if (RISCV::soc_run_mode_ == RISCV::SOC_RUN_MODE::TIMING_MODE) {
-      debugprint(LOG_CPU, "Fast forwarding to tick %lu", finished_at);
+      func(MAX(finished_at, getTick()), context);
+      callbacks[core_id].first = nullptr; // Reset callback
+      callbacks[core_id].second = nullptr; // Reset context
     }
   }
 }
@@ -1351,9 +1363,9 @@ void CPU::generateSequentialIO(uint64_t count, uint64_t min_size, uint64_t max_s
       req.reqType = ICL_REQ_WRITE;
     }
     uint64_t size = min_size + (rand() % (max_size - min_size + 1));
-    req.range.slpn = (i * lba_size) / page_size; // Example sequential LPN
+    req.range.slpn = (i * min_size) / page_size; // Example sequential LPN
     req.range.nlp = size / page_size; // Read 1 page
-    req.offset = (i * lba_size) % page_size; // Example offset within the page
+    req.offset = (i * min_size) % page_size; // Example offset within the page
     req.length = size; // Random length
     req.reqID = global_req_id++;
     req.reqSubID = 0;
@@ -1502,7 +1514,7 @@ bool CPU::socIsPaused() {
 
 uint64_t CPU::submitRead(HIL::Request *req, DMAFunction &callback) {
   if (!test_mode) {
-    debugprint(LOG_CPU, "Submitting read request with ID %u", req->reqID);
+    debugprint(LOG_CPU, "Submitting read request with ID %u and ptr: %p", req->reqID, req);
     ICL::Request request(*req);
     request.reqType = ICL_REQ_READ;
     req_queue.push({request, callback, (void*)req});

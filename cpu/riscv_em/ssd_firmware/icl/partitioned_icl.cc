@@ -30,44 +30,19 @@ namespace ICL {
 
 PartitionedICL::PartitionedICL(icl_params& cparams, FTL::FTL *ftl) :
       AbstractICL(cparams, ftl) {
-  printf("calling partitioned icl initializer!\n");
-  mutex_init(&cache_mutex);
-}
-  
-
-void PartitionedICL::evictCache(bool flush) {
-  FTL::Request reqInternal(lineCountInSuperPage);
-  uint64_t tick;
-  for (uint32_t row = 0; row < lineCountInSuperPage; row++) {
-    read_buffer((uint64_t)&tick, 0, FIRMWARE_TICK);
-    for (uint32_t col = 0; col < parallelIO; col++) {
-      uint64_t beginAt = tick; // all parallel requests start at the same time
-
-      if (evictData[row][col] == nullptr) {
-        continue;
-      }
-
-      if (evictData[row][col]->valid && evictData[row][col]->dirty) {
-        reqInternal.lpn = evictData[row][col]->tag / lineCountInSuperPage;
-        reqInternal.ioFlag.reset();
-        reqInternal.ioFlag.set(row);
-        beginAt = pFTL->write(reqInternal); // update with ftl return time
-        mutex_lock(&stat_mutex); // we technically will accquire two locks here, but there should be no circular wait
-        icl_stats.cache_evictions++; // only count evictions if we write data to FTL
-        mutex_unlock(&stat_mutex);
-      }
-
-      if (flush) {
-        evictData[row][col]->valid = false;
-        evictData[row][col]->tag = 0;
-      }
-
-      evictData[row][col]->insertedAt = beginAt;
-      evictData[row][col]->lastAccessed = beginAt;
-      evictData[row][col]->dirty = false;
-      evictData[row][col] = nullptr;
+    printf("calling partitioned icl initializer!\n");
+    cache_mutex = (Mutex *)malloc(sizeof(Mutex) * waySize);
+    for (int i = 0; i < waySize; i++) {
+        mutex_init(&cache_mutex[i]); // we take DeepFlash setup(give each core its own way)
     }
-  }
+}
+
+bool PartitionedICL::check_specific_way(uint32_t set, uint32_t way, uint32_t lca) {
+    Line &line = cacheData[set][way];
+    if (line.valid && line.tag == lca) {
+        return true;
+    }
+    return false;
 }
 
 // True when hit
@@ -81,155 +56,75 @@ bool PartitionedICL::read(Request &req) {
     // debugprint(LOG_ICL_GENERIC_CACHE,
     //           "READ  | REQ %7u-%-4u | LCA %" PRIu64 " | SIZE %" PRIu64,
     //           req.reqID, req.reqSubID, req.range.slpn, req.length);
-
-    if (useReadCaching) {
+    
+    if (useReadCaching && req.length < lineSize) {
         uint32_t setIdx = calcSetIndex(req.range.slpn);
-        uint32_t wayIdx;
-        // uint64_t arrived = getTick();
-        mutex_lock(&cache_mutex);
-        if (useReadPrefetch) {
-            checkSequential(req, readDetect);
-        }
-        wayIdx = getValidWay(req.range.slpn);
-        // Do we have valid data?
-        if (wayIdx != waySize) {
+        uint32_t wayIdx = req.range.slpn % waySize; // simple way selection
+        mutex_lock(&cache_mutex[wayIdx]);
+        if (check_specific_way(setIdx, wayIdx, req.range.slpn)) {
             cache_hit = true;
-            uint64_t tick;
-            read_buffer((uint64_t)&tick, 0, FIRMWARE_TICK);
-            cacheData[setIdx][wayIdx].lastAccessed = tick;
-            mutex_unlock(&cache_mutex); // assume that there aren't race conditions, and we can read freely(not accurate but used for our simple model to gain some basic parallelism)
+            mutex_unlock(&cache_mutex[wayIdx]); // assume that there aren't race conditions, and we can read freely(not accurate but used for our simple model to gain some basic parallelism)
             dram_read((uint64_t)(cache_buffer + (setIdx * waySize + wayIdx) * lineSize), req.length);
             ret = true;
-            // Do we need to prefetch data?
-            if (useReadPrefetch && req.range.slpn == prefetchTrigger) {
-                // debugprint(LOG_ICL_GENERIC_CACHE, "READ  | Prefetch triggered");
-                req.range.slpn = lastPrefetched;
-                mutex_lock(&cache_mutex);
-                goto ICL_GENERIC_CACHE_READ;
-            } else {
-                uint64_t tick;
-                read_buffer((uint64_t)&tick, 0, FIRMWARE_TICK);
-                process_request(tick);
-            }
-        }
-        // We should read data from NVM
-        else {
-            ICL_GENERIC_CACHE_READ:
+            uint64_t tick;
+            read_buffer((uint64_t)&tick, 0, FIRMWARE_TICK);
+            process_request(tick);
+        } else {
             FTL::Request reqInternal(lineCountInSuperPage, req);
-            Vector<Pair<uint64_t, uint64_t>> readList;
-            uint32_t row, col;  // Variable for I/O position (IOFlag)
             uint64_t dramAt;
-            uint64_t beginLCA, endLCA;
-
-            if (readDetect.enabled) {
-                if (!ret) {
-                    // debugprint(LOG_ICL_GENERIC_CACHE, "READ  | Read ahead triggered");
-                }
-
-                beginLCA = req.range.slpn;
-
-                // If super-page is disabled, just read all pages from all planes
-                    if (prefetchMode == MODE_ALL || !bSuperPage) {
-                    endLCA = beginLCA + lineCountInMaxIO;
-                    prefetchTrigger = beginLCA + lineCountInMaxIO / 2;
-                }
-                    else {
-                    endLCA = beginLCA + lineCountInSuperPage;
-                    prefetchTrigger = beginLCA + lineCountInSuperPage / 2;
-                }
-
-                lastPrefetched = endLCA;
-            }
-            else {
-                beginLCA = req.range.slpn;
-                endLCA = beginLCA + 1;
-            }
-            bool need_to_evict = false;
-            for (uint64_t lca = beginLCA; lca < endLCA; lca++) {
-
-                // Check cache
-                if (getValidWay(lca) != waySize) {
-                    continue;
-                }
-
-                // Find way to write data read from NVM
-                setIdx = calcSetIndex(lca);
-                wayIdx = getEmptyWay(setIdx);
-
-                if (wayIdx == waySize) {
-                wayIdx = evictFunction(setIdx);
-
-                if (cacheData[setIdx][wayIdx].dirty) {
-                    // We need to evict data before write
-                    calcIOPosition(cacheData[setIdx][wayIdx].tag, row, col);
-                    evictData[row][col] = cacheData[setIdx] + wayIdx;
-                    need_to_evict = true;
-                }
-                }
-                uint64_t tick;
-                read_buffer((uint64_t)&tick, 0, FIRMWARE_TICK);
-                cacheData[setIdx][wayIdx].insertedAt = tick;
-                cacheData[setIdx][wayIdx].lastAccessed = tick;
-                cacheData[setIdx][wayIdx].valid = true;
-                cacheData[setIdx][wayIdx].dirty = false;
-                readList.push_back({lca, ((uint64_t)setIdx << 32) | wayIdx});
-            }
-            if (need_to_evict) {
+            Line *pLine = &cacheData[setIdx][wayIdx];
+            if (pLine->valid && pLine->dirty) { // if we have valid dirty data and its not a hit, we need to evict it(in direct mapped setup)
+                reqInternal.ioFlag.reset();
+                uint32_t row, col;  // Variable for I/O position (IOFlag)
+                calcIOPosition(req.range.slpn, row, col);
+                reqInternal.ioFlag.set(row);
                 read_buffer((uint64_t)&end_cycle, 0, FIRMWARE_CYCLE);
                 read_req_cycles += end_cycle - start_cycle;
-                evictCache();
-                read_buffer((uint64_t)&start_cycle, 0, FIRMWARE_CYCLE); // reset start cycle after FTL finishes(eviction can cause FTL reads so we skip)
+                pFTL->write(reqInternal); // write dirty data to NVM
+                read_buffer((uint64_t)&start_cycle, 0, FIRMWARE_CYCLE); // reset start cycle after FTL finishes(eviction can cause FTL writes so we skip)
+                mutex_lock(&stat_mutex); // we technically will accquire two locks here, but there should be no circular wait
+                icl_stats.cache_evictions++; // only count evictions if we write data to FTL
+                mutex_unlock(&stat_mutex);
             }
-            uint64_t beginAt, finishedAt;
-            read_buffer((uint64_t)&finishedAt, 0, FIRMWARE_TICK);
-            beginAt = finishedAt;
-            readList.size();
-            for (auto &iter : readList) {
-                Line *pLine = &cacheData[iter.second >> 32][iter.second & 0xFFFFFFFF];
-                // Read data
-                reqInternal.lpn = iter.first / lineCountInSuperPage;
-                reqInternal.ioFlag.reset();
-                reqInternal.ioFlag.set(iter.first % lineCountInSuperPage);
-                read_buffer((uint64_t)&beginAt, 0, FIRMWARE_TICK);  // Ignore cache metadata access
-
-                // If superPageSizeData is true, read first LPN only
-                read_buffer((uint64_t)&end_cycle, 0, FIRMWARE_CYCLE);
-                read_req_cycles += end_cycle - start_cycle; // ignore the ftl time
-                uint64_t read_time = pFTL->read(reqInternal);
-                read_buffer((uint64_t)&start_cycle, 0, FIRMWARE_CYCLE); // reset start cycle after FTL finishes
             
-                dram_write((uint64_t)copy_buffer, lineSize);
-                // Set cache data
-                beginAt = MAX(beginAt, read_time);
+            // Read data
+            reqInternal.ioFlag.reset();
+            reqInternal.ioFlag.set(req.range.slpn % lineCountInSuperPage);
 
-                pLine->insertedAt = beginAt;
-                pLine->lastAccessed = beginAt;
-                pLine->tag = iter.first;
+            read_buffer((uint64_t)&end_cycle, 0, FIRMWARE_CYCLE);
+            read_req_cycles += end_cycle - start_cycle; // ignore the ftl time
+            uint64_t read_time = pFTL->read(reqInternal);
+            read_buffer((uint64_t)&start_cycle, 0, FIRMWARE_CYCLE); // reset start cycle after FTL finishes
+        
+            dram_write((uint64_t)copy_buffer, lineSize);
+            // Set cache data
 
-                if (pLine->tag == req.range.slpn) {
-                    finishedAt = beginAt;
-                } 
+            pLine->insertedAt = read_time;
+            pLine->lastAccessed = read_time;
+            pLine->tag = req.range.slpn;
+            pLine->valid = true;
+            pLine->dirty = false;
 
-                // debugprint(LOG_ICL_GENERIC_CACHE,
-                //           "READ  | Cache miss at (%u, %u) | %" PRIu64 " - %" PRIu64
-                //           " (%" PRIu64 ")",
-                //           iter.second >> 32, iter.second & 0xFFFFFFFF, tick, beginAt,
-                //           beginAt - tick);
-            }
-            mutex_unlock(&cache_mutex);
-            process_request(finishedAt);
+            mutex_unlock(&cache_mutex[wayIdx]);
+            uint64_t tick;
+            read_buffer((uint64_t)&tick, 0, FIRMWARE_TICK);
+            process_request(tick);
         }
-    }
-    else {
-        mutex_lock(&cache_mutex);
-        FTL::Request reqInternal(lineCountInSuperPage, req);
-        //simulates writing data to dram after retrieving it from NVM, however we do in opposite order for timing correctness
-        dram_write((uint64_t)copy_buffer, req.length);
-        read_buffer((uint64_t)&end_cycle, 0, FIRMWARE_CYCLE);
-        read_req_cycles += end_cycle - start_cycle;
-        process_request(pFTL->read(reqInternal));
-        read_buffer((uint64_t)&start_cycle, 0, FIRMWARE_CYCLE); // reset start cycle after FTL finishes
-        mutex_unlock(&cache_mutex);
+    } else {
+        uint64_t tick;
+        read_buffer((uint64_t)&tick, 0, FIRMWARE_TICK);
+        for (size_t lpn = req.range.slpn; lpn < req.range.slpn + req.range.nlp; lpn++) {
+            mutex_lock(&cache_mutex[lpn % waySize]);
+            FTL::Request reqInternal(lineCountInSuperPage, req);
+            //simulates writing data to dram after retrieving it from NVM, however we do in opposite order for timing correctness
+            dram_write((uint64_t)copy_buffer, req.length);
+            read_buffer((uint64_t)&end_cycle, 0, FIRMWARE_CYCLE);
+            read_req_cycles += end_cycle - start_cycle;
+            tick = MAX(tick, pFTL->read(reqInternal));
+            read_buffer((uint64_t)&start_cycle, 0, FIRMWARE_CYCLE); // reset start cycle after FTL finishes
+            mutex_unlock(&cache_mutex[lpn % waySize]);
+        }
+        process_request(tick);
     }
 
     read_buffer((uint64_t)&end_cycle, 0, FIRMWARE_CYCLE);
@@ -268,29 +163,22 @@ bool PartitionedICL::write(Request &req) {
     else {
         read_buffer((uint64_t)&end_cycle, 0, FIRMWARE_CYCLE);
         write_req_cycles += end_cycle - start_cycle;
-        mutex_lock(&cache_mutex);
+        mutex_lock(&cache_mutex[req.range.slpn % waySize]);
         flash = pFTL->write(reqInternal); // write to NVM first, then write to cache
-        mutex_unlock(&cache_mutex);
+        mutex_unlock(&cache_mutex[req.range.slpn % waySize]);
         read_buffer((uint64_t)&start_cycle, 0, FIRMWARE_CYCLE); // reset start cycle after FTL finishes
         process_request(flash);
     }
 
     if (useWriteCaching) {
-        mutex_lock(&cache_mutex);
+        mutex_lock(&cache_mutex[req.range.slpn % waySize]);
         uint32_t setIdx = calcSetIndex(req.range.slpn);
-        uint32_t wayIdx;
-
-        wayIdx = getValidWay(req.range.slpn);
+        uint32_t wayIdx = req.range.slpn % waySize;
 
         // Can we update old data?
-        if (wayIdx != waySize) {
+        if (check_specific_way(setIdx, wayIdx, req.range.slpn)) {
             cache_hit = true;
             uint64_t arrived = tick;
-
-            // Wait cache to be valid
-            if (tick < cacheData[setIdx][wayIdx].insertedAt) {
-                tick = cacheData[setIdx][wayIdx].insertedAt;
-            }
 
             // TODO: TEMPORAL CODE
             // We should only show DRAM latency when cache become dirty
@@ -321,10 +209,9 @@ bool PartitionedICL::write(Request &req) {
             }
         } else {
             uint64_t arrived = tick;
-            wayIdx = getEmptyWay(setIdx);
 
             // Do we have place to write data?
-            if (wayIdx != waySize) {
+            if (check_specific_way(setIdx, wayIdx, req.range.slpn)) {
 
                 if (dirty) {
                     // Update last accessed time
@@ -353,73 +240,19 @@ bool PartitionedICL::write(Request &req) {
             }
             // We have to flush
             else {
-                uint32_t row, col;  // Variable for I/O position (IOFlag)
-                uint32_t setToFlush = calcSetIndex(req.range.slpn);
-
-                for (setIdx = 0; setIdx < setSize; setIdx++) {
-                    for (wayIdx = 0; wayIdx < waySize; wayIdx++) {
-                        if (cacheData[setIdx][wayIdx].valid) {
-                            calcIOPosition(cacheData[setIdx][wayIdx].tag, row, col);
-
-                            evictData[row][col] = compareFunction(evictData[row][col],
-                                                                    cacheData[setIdx] + wayIdx);
-                        }
-                    }
-                }
-
-                if (evictMode == MODE_SUPERPAGE) {
+                Line *pLine = &cacheData[setIdx][wayIdx];
+                if (pLine->valid && pLine->dirty) { // if we have valid dirty data and its not a hit, we need to evict it(in direct mapped setup)
                     uint32_t row, col;  // Variable for I/O position (IOFlag)
-
-                    for (row = 0; row < lineCountInSuperPage; row++) {
-                        for (col = 0; col < parallelIO - 1; col++) {
-                            evictData[row][col + 1] =
-                                compareFunction(evictData[row][col], evictData[row][col + 1]);
-                            evictData[row][col] = nullptr;
-                        }
-                    }
-                }
-
-                // We must flush setToFlush set
-                bool have = false;
-
-                for (row = 0; row < lineCountInSuperPage; row++) {
-                    for (col = 0; col < parallelIO; col++) {
-                        if (evictData[row][col] &&
-                            calcSetIndex(evictData[row][col]->tag) == setToFlush) {
-                            have = true;
-                        }
-                    }
-                }
-
-                // We don't have setToFlush
-                if (!have) {
-                    Line *pLineToFlush = nullptr;
-
-                    for (wayIdx = 0; wayIdx < waySize; wayIdx++) {
-                        if (cacheData[setToFlush][wayIdx].valid) {
-                        pLineToFlush =
-                            compareFunction(pLineToFlush, cacheData[setToFlush] + wayIdx);
-                        }
-                    }
-
-                    if (pLineToFlush) {
-                        calcIOPosition(pLineToFlush->tag, row, col);
-
-                        evictData[row][col] = pLineToFlush;
-                    }
-                }
-
-                read_buffer((uint64_t)&end_cycle, 0, FIRMWARE_CYCLE);
-                write_req_cycles += end_cycle - start_cycle;
-                evictCache(true);
-                read_buffer((uint64_t)&start_cycle, 0, FIRMWARE_CYCLE); // reset start cycle after FTL finishes(eviction can cause FTL writes so we skip)
-
-                // Update cacheline of current request
-                setIdx = setToFlush;
-                wayIdx = getEmptyWay(setIdx);
-
-                if (wayIdx == waySize) {
-                    panic("Cache corrupted!");
+                    calcIOPosition(req.range.slpn, row, col);
+                    reqInternal.ioFlag.reset();
+                    reqInternal.ioFlag.set(row);
+                    read_buffer((uint64_t)&end_cycle, 0, FIRMWARE_CYCLE);
+                    write_req_cycles += end_cycle - start_cycle;
+                    pFTL->write(reqInternal); // update with ftl return time
+                    read_buffer((uint64_t)&start_cycle, 0, FIRMWARE_CYCLE); // reset start cycle after FTL finishes(eviction can cause FTL writes so we skip)
+                    mutex_lock(&stat_mutex); // we technically will accquire two locks here, but there should be no circular wait
+                    icl_stats.cache_evictions++; // only count evictions if we write data to FTL
+                    mutex_unlock(&stat_mutex);
                 }
 
                 uint64_t tick;
@@ -435,26 +268,25 @@ bool PartitionedICL::write(Request &req) {
                 // Update cache data
                 
                 if (dirty) {
-                read_buffer((uint64_t)&tick, 0, FIRMWARE_TICK);
-                process_request(tick);
+                    read_buffer((uint64_t)&tick, 0, FIRMWARE_TICK);
+                    process_request(tick);
                 }
 
             }
         }
-        mutex_unlock(&cache_mutex);
+        mutex_unlock(&cache_mutex[req.range.slpn % waySize]);
 
-    }   
-    else {
-        mutex_lock(&cache_mutex);
+    } else {
+        mutex_lock(&cache_mutex[req.range.slpn % waySize]);
         if (dirty) {
-        read_buffer((uint64_t)&end_cycle, 0, FIRMWARE_CYCLE);
-        write_req_cycles += end_cycle - start_cycle;
-        process_request(pFTL->write(reqInternal));
-        read_buffer((uint64_t)&start_cycle, 0, FIRMWARE_CYCLE); 
+            read_buffer((uint64_t)&end_cycle, 0, FIRMWARE_CYCLE);
+            write_req_cycles += end_cycle - start_cycle;
+            process_request(pFTL->write(reqInternal));
+            read_buffer((uint64_t)&start_cycle, 0, FIRMWARE_CYCLE); 
         }
         // TEMP: Disable DRAM calculation for prevent conflict
         dram_read((uint64_t)copy_buffer, req.length);
-        mutex_unlock(&cache_mutex);
+        mutex_unlock(&cache_mutex[req.range.slpn % waySize]);
     }
   
     read_buffer((uint64_t)&end_cycle, 0, FIRMWARE_CYCLE);
@@ -483,10 +315,10 @@ void PartitionedICL::flush(LPNRange &range) {
         uint64_t finishedAt;
         read_buffer((uint64_t)&finishedAt, 0, FIRMWARE_TICK);
         FTL::Request reqInternal(lineCountInSuperPage);
-        mutex_lock(&cache_mutex);
         read_buffer((uint64_t)&start_cycle, 0, FIRMWARE_CYCLE); // reset start cycle after FTL finishes(eviction can cause FTL writes so we skip)
         if (range.nlp < setSize * waySize) {
             for (uint64_t lpn = range.slpn; lpn < range.slpn + range.nlp; lpn++) {
+                mutex_lock(&cache_mutex[lpn % waySize]);
                 uint32_t setIdx = calcSetIndex(lpn);
                 uint32_t wayIdx = getValidWay(lpn);
 
@@ -501,14 +333,16 @@ void PartitionedICL::flush(LPNRange &range) {
                     finishedAt = MAX(finishedAt, ftlTick);
                 }
                 line.valid = false;
+                mutex_unlock(&cache_mutex[lpn % waySize]);
             }
         } else {
-            mutex_lock(&cache_mutex);
-            for (uint32_t setIdx = 0; setIdx < setSize; setIdx++) {
-                for (uint32_t wayIdx = 0; wayIdx < waySize; wayIdx++) {
+            for (uint32_t wayIdx = 0; wayIdx < waySize; wayIdx++) {
+                mutex_lock(&cache_mutex[wayIdx]); // cache space is partitioned by way, so we can lock only one way at a time
+                for (uint32_t setIdx = 0; setIdx < setSize; setIdx++) {
                     Line &line = cacheData[setIdx][wayIdx];
 
                     if (line.tag >= range.slpn && line.tag < range.slpn + range.nlp) {
+                        
                         if (line.dirty) {
                             reqInternal.lpn = line.tag / lineCountInSuperPage;
                             reqInternal.ioFlag.set(line.tag % lineCountInSuperPage);
@@ -521,9 +355,9 @@ void PartitionedICL::flush(LPNRange &range) {
                         line.valid = false;
                     }
                 }
+                mutex_unlock(&cache_mutex[wayIdx]); // unlock way mutex
             }
         }
-        mutex_unlock(&cache_mutex);
         process_request(finishedAt);
     } else {
         process_request_failed();
@@ -550,7 +384,7 @@ void PartitionedICL::trim(LPNRange &range) {
         uint64_t finishedAt;
         read_buffer((uint64_t)&finishedAt, 0, FIRMWARE_TICK);
         FTL::Request reqInternal(lineCountInSuperPage);
-        mutex_lock(&cache_mutex);
+        mutex_lock(&cache_mutex[range.slpn % waySize]);
         for (uint32_t setIdx = 0; setIdx < setSize; setIdx++) {
             for (uint32_t wayIdx = 0; wayIdx < waySize; wayIdx++) {
                 Line &line = cacheData[setIdx][wayIdx];
@@ -567,7 +401,7 @@ void PartitionedICL::trim(LPNRange &range) {
                 }
             }
         }
-        mutex_unlock(&cache_mutex);
+        mutex_unlock(&cache_mutex[range.slpn % waySize]);
         process_request(finishedAt);
     } else {
         process_request_failed();
@@ -586,7 +420,7 @@ void PartitionedICL::format(LPNRange &range) {
     uint64_t start_cycle;
     uint64_t end_cycle;
     read_buffer((uint64_t)&start_cycle, 0, FIRMWARE_CYCLE);
-    mutex_lock(&cache_mutex);
+    mutex_lock(&cache_mutex[range.slpn % waySize]);
     if (useReadCaching || useWriteCaching) {
         uint64_t lpn;
         uint32_t setIdx;
@@ -608,7 +442,7 @@ void PartitionedICL::format(LPNRange &range) {
     range.nlp = (range.nlp - 1) / lineCountInSuperPage + 1;
     read_buffer((uint64_t)&end_cycle, 0, FIRMWARE_CYCLE);
     process_request(pFTL->format(range)); // adds one cycle to ICL time, real processing time captured in FTL
-    mutex_unlock(&cache_mutex);
+    mutex_unlock(&cache_mutex[range.slpn % waySize]);
     mutex_lock(&stat_mutex);
     icl_stats.format_req_cycles += end_cycle - start_cycle;
     icl_stats.format_requests++;

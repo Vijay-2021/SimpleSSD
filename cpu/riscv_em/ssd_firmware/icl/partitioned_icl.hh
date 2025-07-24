@@ -21,7 +21,7 @@
 #define __ICL_PARTITIONED_CACHE__
 
 #include "vector.hh"
-#include "ftl.hh"
+#include "unlocked_ftl.hh"
 #include "mutex.h"
 #include "abstract_icl.hh"
 
@@ -29,8 +29,9 @@ namespace ICL {
 
 class PartitionedICL : public AbstractICL {
  private:
-  Mutex cache_mutex;
-  void evictCache(bool flush = true) override;
+  Mutex *cache_mutex;
+  uint32_t partitions = 8;
+  bool check_specific_way(uint32_t set, uint32_t way, uint32_t lca);
  public:
   PartitionedICL(icl_params& cparams, FTL::FTL *ftl);
 

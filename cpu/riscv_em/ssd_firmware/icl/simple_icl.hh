@@ -21,7 +21,7 @@
 #define __ICL_SIMPLE_CACHE__
 
 #include "vector.hh"
-#include "ftl.hh"
+#include "unlocked_ftl.hh"
 #include "mutex.h"
 #include "abstract_icl.hh"
 
@@ -30,7 +30,7 @@ namespace ICL {
 class SimpleICL : public AbstractICL {
  private:
   Mutex cache_mutex;
-  void evictCache(bool flush = true) override;
+  void evictCache(bool flush = true);
  public:
   SimpleICL(icl_params& cparams, FTL::FTL *ftl);
 

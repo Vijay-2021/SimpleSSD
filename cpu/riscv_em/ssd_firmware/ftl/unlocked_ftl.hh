@@ -17,8 +17,8 @@
 * along with SimpleSSD.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef __RISCV_FTL_FW__
-#define __RISCV_FTL_FW__
+#ifndef __RISCV_UNLOCKED_FTL__
+#define __RISCV_UNLOCKED_FTL__
 
 #include "cs_instructions.h"
 #include "vector.hh"
@@ -28,6 +28,7 @@
 #include "def.hh"
 #include "block.hh"
 #include "limits.hh"
+#include "mutex.h"
 
 namespace FTL {
 
@@ -92,7 +93,7 @@ class FTL {
     uint64_t writeInternal(Request &, bool = true);
     uint64_t trimInternal(Request &);
     void eraseInternal(PAL::Request &, uint64_t &tick);
-
+    Mutex block_mutex; 
  public:
     FTL(ftl_params& fparams);
     ~FTL();

@@ -50,6 +50,7 @@ class Config : public BaseConfig {
     uint64_t colBits;
     uint64_t bankBits;
     uint64_t rowSize; 
+    uint64_t colWidthBits; // Number of bits for column width
   } DRAMStructure;
 
   typedef struct {    // Unit: ps

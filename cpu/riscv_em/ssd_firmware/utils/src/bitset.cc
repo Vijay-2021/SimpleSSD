@@ -40,6 +40,9 @@ Bitset::Bitset(const Bitset &rhs) {
     allocSize = DIVCEIL(dataSize, 8);
     if (rhs.data) {
       data = (uint8_t *)malloc(allocSize);
+      if (data == nullptr) {
+        panic("Failed to allocate memory for Bitset!");
+      }
       memcpy(data, rhs.data, allocSize);
     } else {
       data = (uint8_t *) calloc(allocSize, 1);

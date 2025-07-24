@@ -20,10 +20,16 @@ extern void mm_print_out();
 extern void paging_init();
 extern void paging_map_virtual_to_phys(uint64_t virt, uint64_t phys);
 
-extern void* malloc(size_t size);
-extern void* calloc(size_t num, size_t size);
-extern void* realloc(void *ptr, size_t size);
-extern void free(void *mem);
+extern bool init_allocator(const void *base, const void *limit, const size_t heap_blocks, const size_t split_thresh, const size_t alignment);
+extern void *malloc(size_t num);
+extern void *calloc(size_t num, size_t size);
+extern bool free(void *ptr);
+extern void *realloc(void *ptr,size_t num);
+
+extern size_t num_free();
+extern size_t num_used();
+extern size_t num_fresh();
+extern bool check();
 
 extern void* memcpy(void* dest, const void* src, size_t num );
 extern void* memset (void * ptr, int value, size_t num );

@@ -79,6 +79,14 @@ static uint64_t rv_soc_bus_access(void *priv, privilege_level priv_level, bus_ac
     printf("address is: %p\n", (void*)address);
     printf("pc is: %p\n", (void*)rv_soc->rv_cores[rv_soc->current_core].pc);
     printf("instruction is: %x\n", rv_soc->rv_cores[rv_soc->current_core].instruction);
+    printf("Core is: %u\n", rv_soc->current_core);
+    int j = 0;
+    while (rv_soc->rv_cores[rv_soc->current_core].last_jump_points.size() > 0) {
+        uint64_t entry = rv_soc->rv_cores[rv_soc->current_core].last_jump_points.front();
+        rv_soc->rv_cores[rv_soc->current_core].last_jump_points.pop();
+        printf("Jump point %u: %lx\n", j, entry);
+        j++;
+    }
     die_msg("Invalid Addresses, or no valid write pointer found, write not executed!");
     return 0; // 0 to indicate error
 }
@@ -420,7 +428,7 @@ void SOC::setICLHigh(uint64_t *icl_high) {
 }
 
 uint64_t SOC::read(uint64_t addr, uint64_t len) {
-    if (((ICL_HIGH == 0 && ICL_LOW == 0) || (addr > ICL_HIGH || addr < ICL_LOW)) && pCache->read(addr)) {
+    if (((ICL_HIGH == 0 && ICL_LOW == 0) || (addr > ICL_HIGH || addr < ICL_LOW)) && len < 64 && pCache->read(addr)) {
         return LOAD_CACHE_CYCLE_COUNT;
     } else {
         uint64_t dramReadTime = pDRAM->read_dram((void*)addr, len);
@@ -431,7 +439,7 @@ uint64_t SOC::read(uint64_t addr, uint64_t len) {
 }
 
 uint64_t SOC::write(uint64_t addr, uint64_t len) {
-    if (((ICL_HIGH == 0 && ICL_LOW == 0) || (addr > ICL_HIGH || addr < ICL_LOW)) && pCache->write(addr)) {
+    if (((ICL_HIGH == 0 && ICL_LOW == 0) || (addr > ICL_HIGH || addr < ICL_LOW)) && len < 64 && pCache->write(addr)) {
         return WRITE_CACHE_CYCLE_COUNT;
     } else {
         uint64_t dramWriteTime = pDRAM->write_dram((void*)addr, len);
